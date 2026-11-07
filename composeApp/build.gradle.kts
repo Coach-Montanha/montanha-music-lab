@@ -413,10 +413,13 @@ android {
         create("release") {
             val storeFilePath = secretProps.getProperty("release.signing.storeFile")
             if (!storeFilePath.isNullOrEmpty()) {
-                storeFile = file(storeFilePath)
-                storePassword = secretProps.getProperty("release.signing.storePassword")
-                keyAlias = secretProps.getProperty("release.signing.keyAlias")
-                keyPassword = secretProps.getProperty("release.signing.keyPassword")
+                val f = file(storeFilePath)
+                if (f.exists() && f.length() > 0) {
+                    storeFile = f
+                    storePassword = secretProps.getProperty("release.signing.storePassword")
+                    keyAlias = secretProps.getProperty("release.signing.keyAlias")
+                    keyPassword = secretProps.getProperty("release.signing.keyPassword")
+                }
             }
         }
     }
@@ -424,7 +427,11 @@ android {
     buildTypes {
         getByName("release") {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("release")
+            if (signingConfigs.getByName("release").storeFile != null) {
+                signingConfig = signingConfigs.getByName("release")
+            } else {
+                signingConfig = signingConfigs.getByName("debug")
+            }
         }
         getByName("debug") {
             // Debug and release share the application id, so sign both with the release key
@@ -472,7 +479,7 @@ nucleus.application {
         packageName = bundleId
         // User-facing name (.app bundle, DMG productName, Launchpad/Dock); packageName above is the reverse-DNS id.
         // The GraalVM DMG task reads only appName ?: packageName, not macOS.packageName
-        appName = if (isNightly) "Spotube Nightly" else "Spotube"
+        appName = if (isNightly) "Montanha Music Lab Nightly" else "Montanha Music Lab"
         packageVersion = version
         licenseFile = project.file("../LICENSE")
 

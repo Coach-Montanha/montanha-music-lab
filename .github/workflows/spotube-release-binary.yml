@@ -217,12 +217,14 @@ jobs:
         run: chmod +x gradlew
 
       - name: Decode keystore
+        if: ${{ secrets.KEYSTORE != '' }}
         env:
           KEYSTORE: ${{ secrets.KEYSTORE }}
         run: |
           echo "$KEYSTORE" | base64 --decode > "${{ github.workspace }}/composeApp/upload-keystore.jks"
 
       - name: Configure Android signing
+        if: ${{ secrets.KEYSTORE != '' }}
         working-directory: composeApp
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}

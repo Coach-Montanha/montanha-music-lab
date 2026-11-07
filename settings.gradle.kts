@@ -15,7 +15,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-rootProject.name = "MontanhaMusicLab"
+rootProject.name = "Spotube"
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 pluginManagement {
