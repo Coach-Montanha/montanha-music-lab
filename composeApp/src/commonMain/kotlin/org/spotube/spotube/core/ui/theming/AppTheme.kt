@@ -86,37 +86,82 @@ data class AppColors(
     val scrim: Color
 )
 
-/** Maps Millennium's semantic palette onto the app's role names. */
-fun appColorsFrom(m: MillenniumColors): AppColors = AppColors(
-    primary = m.accent,
-    onPrimary = m.onAccent,
-    primaryContainer = m.raised,
-    onPrimaryContainer = m.text,
-    secondary = m.accent,
-    onSecondary = m.onAccent,
-    secondaryContainer = m.raised,
-    onSecondaryContainer = m.text,
-    tertiaryContainer = m.raised,
-    onTertiaryContainer = m.text,
-    background = m.background,
-    onBackground = m.text,
-    surface = m.surface,
-    onSurface = m.text,
-    surfaceVariant = m.inset,
-    onSurfaceVariant = m.muted,
-    surfaceContainer = m.surface,
-    surfaceContainerHigh = m.raised,
-    surfaceContainerHighest = m.raised,
-    inverseSurface = m.text,
-    inverseOnSurface = m.background,
-    outline = m.border,
-    outlineVariant = m.border,
-    error = m.danger,
-    onError = m.background,
-    errorContainer = m.danger.copy(alpha = 0.16f),
-    onErrorContainer = m.danger,
-    scrim = m.scrim
-)
+private val MontanhaVoltMint = Color(0xFF00F59B)
+private val MontanhaEmerald = Color(0xFF10B981)
+private val MontanhaOledBackground = Color(0xFF060709)
+private val MontanhaSurfacePanel = Color(0xFF0C0E14)
+private val MontanhaCardSurface = Color(0xFF12151E)
+private val MontanhaTextPrimary = Color(0xFFF8FAFC)
+private val MontanhaTextSecondary = Color(0xFF94A3B8)
+private val MontanhaBorderSubtle = Color(0x1AFFFFFF)
+
+/** Maps Millennium's semantic palette onto the app's role names with Montanha Luxury Dark support. */
+fun appColorsFrom(m: MillenniumColors): AppColors {
+    val isDark = m.background.luminance() < 0.5f
+    return if (isDark) {
+        AppColors(
+            primary = MontanhaVoltMint,
+            onPrimary = MontanhaOledBackground,
+            primaryContainer = MontanhaCardSurface,
+            onPrimaryContainer = MontanhaTextPrimary,
+            secondary = MontanhaEmerald,
+            onSecondary = MontanhaOledBackground,
+            secondaryContainer = MontanhaSurfacePanel,
+            onSecondaryContainer = MontanhaTextPrimary,
+            tertiaryContainer = MontanhaCardSurface,
+            onTertiaryContainer = MontanhaTextPrimary,
+            background = MontanhaOledBackground,
+            onBackground = MontanhaTextPrimary,
+            surface = MontanhaSurfacePanel,
+            onSurface = MontanhaTextPrimary,
+            surfaceVariant = MontanhaCardSurface,
+            onSurfaceVariant = MontanhaTextSecondary,
+            surfaceContainer = MontanhaSurfacePanel,
+            surfaceContainerHigh = MontanhaCardSurface,
+            surfaceContainerHighest = MontanhaCardSurface,
+            inverseSurface = MontanhaTextPrimary,
+            inverseOnSurface = MontanhaOledBackground,
+            outline = MontanhaBorderSubtle,
+            outlineVariant = MontanhaBorderSubtle,
+            error = m.danger,
+            onError = MontanhaOledBackground,
+            errorContainer = m.danger.copy(alpha = 0.16f),
+            onErrorContainer = m.danger,
+            scrim = m.scrim
+        )
+    } else {
+        AppColors(
+            primary = m.accent,
+            onPrimary = m.onAccent,
+            primaryContainer = m.raised,
+            onPrimaryContainer = m.text,
+            secondary = m.accent,
+            onSecondary = m.onAccent,
+            secondaryContainer = m.raised,
+            onSecondaryContainer = m.text,
+            tertiaryContainer = m.raised,
+            onTertiaryContainer = m.text,
+            background = m.background,
+            onBackground = m.text,
+            surface = m.surface,
+            onSurface = m.text,
+            surfaceVariant = m.inset,
+            onSurfaceVariant = m.muted,
+            surfaceContainer = m.surface,
+            surfaceContainerHigh = m.raised,
+            surfaceContainerHighest = m.raised,
+            inverseSurface = m.text,
+            inverseOnSurface = m.background,
+            outline = m.border,
+            outlineVariant = m.border,
+            error = m.danger,
+            onError = m.background,
+            errorContainer = m.danger.copy(alpha = 0.16f),
+            onErrorContainer = m.danger,
+            scrim = m.scrim
+        )
+    }
+}
 
 /** Named text styles used by the app, independent of Material typography. */
 @Immutable

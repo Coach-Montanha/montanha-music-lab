@@ -46,7 +46,7 @@ plugins {
     kotlin("plugin.atomicfu") version libs.versions.kotlin
 }
 
-val bundleId = "org.spotube.spotube"
+val bundleId = "com.montanha.musiclab"
 val version = "6.0.0"
 // Set to N to release <version>-beta.N (same app id, icons and name as stable); null for a plain stable release.
 // Installer metadata (packageVersion) must stay numeric, so it keeps using plain `version`.
@@ -71,7 +71,7 @@ val isProductionBuild = providers.gradleProperty("production").map { it.toBoolea
         }
     }
 )
-val targetName = "Spotube"
+val targetName = "Montanha Music Lab"
 val homePageUrl = "https://spotube.cc"
 val repositoryUrl = "https://github.com/team-spotube/spotube"
 val appVersionName = if (betaNumber != null) "$version-beta.$betaNumber" else version
