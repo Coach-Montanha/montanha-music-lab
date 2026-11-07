@@ -124,7 +124,7 @@
     <string name="settings_option_name_and_code">%1$s (%2$s)</string>
 
     <string name="settings_theme_title">Tema</string>
-    <string name="settings_theme_subtitle_current">Scegli come Spotube si adatta all\'aspetto del sistema. Attuale: %1$s</string>
+    <string name="settings_theme_subtitle_current">Scegli come Montanha Music Lab si adatta all\'aspetto del sistema. Attuale: %1$s</string>
     <string name="settings_theme_light">Chiaro</string>
     <string name="settings_theme_dark">Scuro</string>
     <string name="settings_theme_system">Sistema</string>
@@ -174,7 +174,7 @@
     <string name="settings_download_folder_title">Cartella di download personalizzata</string>
     <string name="settings_download_folder_current">Cartella attuale: %1$s</string>
     <string name="settings_download_folder_description">Lascia vuoto per usare la cartella Musica predefinita.</string>
-    <string name="settings_download_folder_placeholder">C:\Music\Spotube</string>
+    <string name="settings_download_folder_placeholder">C:\Music\Montanha Music Lab</string>
     <string name="settings_local_media_folders_title">Cartelle multimediali locali</string>
     <string name="settings_local_media_folders_subtitle_current">Cartelle personalizzate da analizzare sul desktop. Aggiunte: %1$d</string>
     <string name="settings_local_media_folders_subtitle_empty">Nessuna cartella personalizzata aggiunta</string>
@@ -220,8 +220,8 @@
     <string name="settings_allow_remote_control_subtitle">Consenti agli altri dispositivi sulla stessa rete di controllare la riproduzione quando si connettono.</string>
     <string name="settings_remote_device_name_title">Nome del dispositivo per il controllo remoto</string>
     <string name="settings_remote_device_name_subtitle">Il nome che gli altri dispositivi vedono quando trovano questo. Attuale: %1$s</string>
-    <string name="settings_remote_device_name_description">Scegli un nome riconoscibile da mostrare agli altri dispositivi della tua rete quando trovano questa istanza di Spotube.</string>
-    <string name="settings_remote_device_name_placeholder">es. Spotube del soggiorno</string>
+    <string name="settings_remote_device_name_description">Scegli un nome riconoscibile da mostrare agli altri dispositivi della tua rete quando trovano questa istanza di Montanha Music Lab.</string>
+    <string name="settings_remote_device_name_placeholder">es. Montanha Music Lab del soggiorno</string>
     <string name="settings_remote_device_name_default">nome host del dispositivo</string>
     <string name="settings_playback_port_subtitle_current">Porta usata dal server proxy di riproduzione. Attuale: %1$d</string>
     <string name="settings_playback_port_description">Scegli una porta tra 1 e 65535.</string>
@@ -233,12 +233,12 @@
     <string name="settings_blacklist_subtitle">Gestisci brani e artisti in blacklist</string>
 
     <string name="settings_desktop_minimize_title">Riduci nell\'area di notifica</string>
-    <string name="settings_desktop_minimize_subtitle">Mantieni Spotube in esecuzione nell\'area di notifica quando la finestra è ridotta a icona.</string>
+    <string name="settings_desktop_minimize_subtitle">Mantieni Montanha Music Lab in esecuzione nell\'area di notifica quando la finestra è ridotta a icona.</string>
     <string name="settings_desktop_discord_title">Rich Presence di Discord</string>
     <string name="settings_desktop_discord_subtitle">Mostra lo stato di riproduzione attuale su Discord dal desktop.</string>
 
     <string name="settings_updates_auto_check_title">Controlla automaticamente gli aggiornamenti</string>
-    <string name="settings_updates_auto_check_subtitle">Cerca nuove versioni di Spotube in background.</string>
+    <string name="settings_updates_auto_check_subtitle">Cerca nuove versioni di Montanha Music Lab in background.</string>
 
     <string name="settings_plugins_manage_title">Gestisci plugin</string>
     <string name="settings_plugins_manage_subtitle">Gestisci i tuoi plugin</string>
@@ -304,7 +304,7 @@
     <string name="settings_jam_broker_username">Nome utente (facoltativo)</string>
     <string name="settings_jam_broker_password">Password (facoltativa)</string>
     <string name="settings_jam_broker_client_id">Prefisso ID client</string>
-    <string name="settings_jam_broker_client_id_subtitle">Usato per identificare questa istanza di Spotube</string>
+    <string name="settings_jam_broker_client_id_subtitle">Usato per identificare questa istanza di Montanha Music Lab</string>
     <string name="settings_jam_broker_tls_subtitle">Crittografa la connessione al broker</string>
     <string name="settings_jam_broker_diagnostics_subtitle">Verifica le impostazioni attuali del broker prima di avviare una stanza.</string>
     <string name="settings_jam_broker_test">Verifica connessione</string>
@@ -348,7 +348,7 @@
     <string name="jam_error_create">Impossibile creare la sessione Jam</string>
     <string name="jam_error_join">Impossibile partecipare alla sessione Jam</string>
     <string name="jam_error_invalid_code">Inserisci un codice stanza di sei caratteri composto da lettere e cifre.</string>
-    <string name="jam_share_message">Unisciti alla mia Jam su Spotube con il codice: %1$s</string>
+    <string name="jam_share_message">Unisciti alla mia Jam su Montanha Music Lab con il codice: %1$s</string>
 
     <string name="player_go_to_album">Vai all\'album</string>
     <string name="player_sleep_timer">Timer di spegnimento</string>
@@ -360,8 +360,8 @@
 
     <string name="update_action_ignore">Ignora</string>
     <string name="update_action_update">Aggiorna</string>
-    <string name="app_update_dialog_title">Spotube %1$s è disponibile</string>
-    <string name="app_update_dialog_no_notes">Scopri le novità di questa versione nella pagina dei download di Spotube.</string>
+    <string name="app_update_dialog_title">Montanha Music Lab %1$s è disponibile</string>
+    <string name="app_update_dialog_no_notes">Scopri le novità di questa versione nella pagina dei download di Montanha Music Lab.</string>
     <string name="plugin_update_dialog_title">%1$s %2$s è disponibile</string>
     <string name="plugin_update_dialog_current_version">Attualmente installata: %1$s</string>
     <string name="plugin_update_dialog_no_notes">Scopri le novità di questo aggiornamento nella pagina del plugin.</string>
@@ -370,11 +370,11 @@
     <string name="welcome_next">Avanti</string>
     <string name="welcome_back">Indietro</string>
     <string name="welcome_get_started">Inizia</string>
-    <string name="welcome_app_name">Spotube</string>
+    <string name="welcome_app_name">Montanha Music Lab</string>
     <string name="welcome_brand_freedom">Musica, senza vincoli.</string>
     <string name="welcome_brand_quiet_description">Un player open source per un mondo di musica.\nTutto da esplorare. Tutto da rendere tuo.</string>
     <string name="welcome_donate_quiet_title">Aiutaci a mantenere vivo questo progetto.</string>
-    <string name="welcome_donate_letter">Spotube è creato da persone, non da un\'azienda in abbonamento. Se diventa parte della tua quotidianità, un piccolo contributo ci aiuta a dargli la cura che merita.\n\nGrazie per fare spazio al software indipendente.</string>
+    <string name="welcome_donate_letter">Montanha Music Lab è creato da persone, non da un\'azienda in abbonamento. Se diventa parte della tua quotidianità, un piccolo contributo ci aiuta a dargli la cura che merita.\n\nGrazie per fare spazio al software indipendente.</string>
     <string name="welcome_plugins_setup_guide">Inizia con un plugin di catalogo per trovare brani e playlist. Scegli un plugin audio per riprodurli. Testi e cronologia di ascolto sono facoltativi. Scopri un plugin qui sotto, controlla le sue autorizzazioni, installalo e poi selezionalo qui.</string>
     <string name="welcome_plugins_discover">Scopri plugin</string>
     <string name="welcome_plugins_sources">Le tue fonti</string>
@@ -387,7 +387,7 @@
     <string name="welcome_step_plugins">Plugin</string>
     <string name="welcome_step_guide">Guida</string>
 
-    <string name="welcome_guide_title">Come usare Spotube</string>
+    <string name="welcome_guide_title">Come usare Montanha Music Lab</string>
     <string name="welcome_guide_subtitle">Quattro rapidi passaggi e sei pronto ad ascoltare.</string>
     <string name="welcome_guide_signin_title">Accedi</string>
     <string name="welcome_guide_signin_desc">Collega il tuo account o scegli il tuo plugin di catalogo.</string>
@@ -410,7 +410,7 @@
     <!-- Page 2: donations -->
     <string name="welcome_donate_eyebrow">I sostenitori ci fanno andare avanti</string>
     <string name="welcome_donate_title">Creato con passione. Tenuto in vita da te.</string>
-    <string name="welcome_donate_message">Spotube è gratuito al 100%, libero e open source: niente pubblicità, niente abbonamenti, nessun tracciamento. Ogni funzione esiste perché persone come te hanno scelto di contribuire allo sviluppo.</string>
+    <string name="welcome_donate_message">Montanha Music Lab è gratuito al 100%, libero e open source: niente pubblicità, niente abbonamenti, nessun tracciamento. Ogni funzione esiste perché persone come te hanno scelto di contribuire allo sviluppo.</string>
     <string name="welcome_donate_patreon_title">Patreon</string>
     <string name="welcome_donate_patreon_tag">Sostenitore mensile</string>
     <string name="welcome_donate_patreon_subtitle">Sostieni lo sviluppo continuo e l\'infrastruttura</string>
@@ -421,14 +421,14 @@
     <string name="welcome_donate_opencollective_tag">Fondo della community</string>
     <string name="welcome_donate_opencollective_subtitle">Sostegno finanziario trasparente e gestito dalla community</string>
     <string name="welcome_donate_thanks">Grazie di cuore per credere nella musica libera.</string>
-    <string name="welcome_donate_optional">Il sostegno è del tutto facoltativo: Spotube resta comunque gratuito.</string>
+    <string name="welcome_donate_optional">Il sostegno è del tutto facoltativo: Montanha Music Lab resta comunque gratuito.</string>
     <string name="welcome_donate_action">Sostieni</string>
     <string name="welcome_donate_open_content_description">Apri %1$s</string>
 
     <!-- Support / donations -->
-    <string name="support_button_label">Sostieni Spotube</string>
-    <string name="support_dialog_title">Sostieni Spotube</string>
-    <string name="support_dialog_message">Spotube è gratuito, libero e open source: niente pubblicità, niente abbonamenti, nessun tracciamento. Se ti rende felice, valuta di sostenere il progetto.</string>
+    <string name="support_button_label">Sostieni Montanha Music Lab</string>
+    <string name="support_dialog_title">Sostieni Montanha Music Lab</string>
+    <string name="support_dialog_message">Montanha Music Lab è gratuito, libero e open source: niente pubblicità, niente abbonamenti, nessun tracciamento. Se ti rende felice, valuta di sostenere il progetto.</string>
     <string name="support_dialog_reminder_hint">Puoi disattivare questi promemoria in Impostazioni → Supporto.</string>
     <string name="support_dialog_dismiss">Forse più tardi</string>
     <string name="settings_support_reminders_title">Promemoria di sostegno</string>
@@ -437,7 +437,7 @@
     <!-- Page 3: plugins -->
     <string name="welcome_plugins_eyebrow">Architettura modulare</string>
     <string name="welcome_plugins_title">Scegli da dove arriva la tua musica.</string>
-    <string name="welcome_plugins_subtitle">Spotube separa la ricerca nel catalogo, lo streaming audio e i testi sincronizzati. Configura i tuoi motori qui sotto o cambiali in qualsiasi momento.</string>
+    <string name="welcome_plugins_subtitle">Montanha Music Lab separa la ricerca nel catalogo, lo streaming audio e i testi sincronizzati. Configura i tuoi motori qui sotto o cambiali in qualsiasi momento.</string>
     <string name="welcome_plugins_metadata_title">Motore metadati</string>
     <string name="welcome_plugins_metadata_description">Gestisce scoperta musicale, ricerca, elenchi di brani e playlist.</string>
     <string name="welcome_plugins_audio_title">Motore audio</string>
@@ -459,13 +459,13 @@
     <!-- Page 4: how it works -->
     <string name="welcome_how_eyebrow">Architettura retro-moderna</string>
     <string name="welcome_how_title">Puro Hi-Fi, zero intermediari</string>
-    <string name="welcome_how_subtitle">Ecco come Spotube gestisce la riproduzione decentralizzata direttamente sul tuo dispositivo.</string>
+    <string name="welcome_how_subtitle">Ecco come Montanha Music Lab gestisce la riproduzione decentralizzata direttamente sul tuo dispositivo.</string>
     <string name="welcome_how_status_badge">PEER-TO-PEER DIRETTO • OPUS 256 KBPS</string>
     <string name="welcome_how_mockup_title">Ora blu</string>
-    <string name="welcome_how_mockup_artist">Spotube · dimostrazione del player</string>
+    <string name="welcome_how_mockup_artist">Montanha Music Lab · dimostrazione del player</string>
     <string name="welcome_how_mockup_lyric">Un po\' di musica per i momenti di mezzo.</string>
     <string name="welcome_how_step_search_title">1. Ricerca decentralizzata</string>
-    <string name="welcome_how_step_search_desc">Le ricerche vanno direttamente al plugin di catalogo scelto. Spotube non profila mai i tuoi gusti.</string>
+    <string name="welcome_how_step_search_desc">Le ricerche vanno direttamente al plugin di catalogo scelto. Montanha Music Lab non profila mai i tuoi gusti.</string>
     <string name="welcome_how_step_stream_title">2. Risoluzione diretta degli stream</string>
     <string name="welcome_how_step_stream_desc">L\'audio arriva direttamente dai server dei contenuti al tuo dispositivo. Nessun proxy intermedio né raccolta remota di dati.</string>
     <string name="welcome_how_step_playback_title">3. DSP e riproduzione in locale</string>
@@ -845,8 +845,8 @@
     <string name="plugin_error_builtin_add">I plugin integrati sono già inclusi e non possono essere aggiunti di nuovo.</string>
     <string name="plugin_error_builtin_remove">I plugin integrati non possono essere rimossi.</string>
     <string name="plugin_error_api_version_invalid">%1$s dichiara un apiVersion non valido (%2$s). È previsto un versionamento semantico compatibile con %3$s.</string>
-    <string name="plugin_error_app_api_version_invalid">La versione API dei plugin di Spotube %1$s non è valida.</string>
-    <string name="plugin_error_api_incompatible">%1$s è destinato all\'API plugin %2$s, ma Spotube supporta l\'API plugin %3$s con modifiche incompatibili. Installa un plugin creato per la stessa versione principale dell\'API.</string>
+    <string name="plugin_error_app_api_version_invalid">La versione API dei plugin di Montanha Music Lab %1$s non è valida.</string>
+    <string name="plugin_error_api_incompatible">%1$s è destinato all\'API plugin %2$s, ma Montanha Music Lab supporta l\'API plugin %3$s con modifiche incompatibili. Installa un plugin creato per la stessa versione principale dell\'API.</string>
 
     <!-- Plugin install prompts -->
     <string name="plugin_prompt_incompatible_title">API del plugin non compatibile</string>

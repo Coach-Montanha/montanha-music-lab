@@ -1,20 +1,3 @@
-/*
- * Copyright (C) 2026 Kingkor Roy Tirtho and Spotube Contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
-
 package org.spotube.spotube.modules.plugin.guard
 
 import androidx.lifecycle.ViewModel
@@ -26,10 +9,13 @@ import org.spotube.spotube.modules.library.LibraryTab
 import org.spotube.spotube.modules.plugin.PluginAbility
 import org.spotube.spotube.modules.plugin.PluginManager
 import org.spotube.spotube.modules.plugin.PluginManagerStates
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 sealed interface MetadataPluginGuardState {
     data object Loading : MetadataPluginGuardState
@@ -41,10 +27,13 @@ sealed interface MetadataPluginGuardState {
 }
 
 class MetadataPluginGuardViewModel(
-    pluginManager: PluginManager,
+    val pluginManager: PluginManager,
     private val navigationCommands: NavigationCommands,
     private val libraryState: LibraryState
 ) : ViewModel() {
+    private val _isSettingUp = MutableStateFlow(false)
+    val isSettingUp: StateFlow<Boolean> = _isSettingUp.asStateFlow()
+
     val uiState: StateFlow<MetadataPluginGuardState> = pluginManager.state
         .map { state ->
             when (state) {
@@ -62,6 +51,32 @@ class MetadataPluginGuardViewModel(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = MetadataPluginGuardState.Loading)
+
+    fun startAutoSetup() {
+        if (_isSettingUp.value) return
+        viewModelScope.launch {
+            _isSettingUp.value = true
+            try {
+                pluginManager.autoSetupDefaultMetadataPlugin()
+            } catch (e: Exception) {
+                openPlugins()
+            } finally {
+                _isSettingUp.value = false
+            }
+        }
+    }
+
+    fun selectFirstMetadataPlugin() {
+        val currentState = pluginManager.state.value
+        if (currentState is PluginManagerStates.Data) {
+            val metadataPlugin = currentState.plugins.firstOrNull { PluginAbility.METADATA in it.abilities }
+            if (metadataPlugin != null) {
+                pluginManager.setSelectedPlugin(PluginAbility.METADATA, metadataPlugin)
+            } else {
+                startAutoSetup()
+            }
+        }
+    }
 
     fun openPlugins() {
         navigationCommands.navigateTo(Routes.Plugins)

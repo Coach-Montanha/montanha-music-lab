@@ -340,6 +340,23 @@ class PluginManager(
         }
     }
 
+    /** Automatically installs and selects the default metadata plugin (Spotify) without prompt. */
+    suspend fun autoSetupDefaultMetadataPlugin() {
+        withContext(Dispatchers.IO) {
+            val url = "https://github.com/sonic-liberation/spotube-plugin-spotify/releases/download/1.0.1/plugin.smplug"
+            val response = httpClient.get(url)
+            val bytes = response.bodyAsChannel().readRemaining().readByteArray()
+            addPluginFromByteArray(bytes = bytes, allowReplacingInstalled = true)
+            val currentState = state.value
+            if (currentState is PluginManagerStates.Data) {
+                val metadataPlugin = currentState.plugins.firstOrNull { PluginAbility.METADATA in it.abilities }
+                if (metadataPlugin != null) {
+                    setSelectedPlugin(PluginAbility.METADATA, metadataPlugin)
+                }
+            }
+        }
+    }
+
     /** Parses the zip, reads plugin.json, then surfaces a PendingPlugin for the UI to confirm. */
     suspend fun preparePlugin(bytes: ByteArray) {
         withContext(Dispatchers.IO) {

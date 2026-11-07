@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -48,40 +49,14 @@ import org.spotube.spotube.modules.plugin.MetadataAuthViewModel
 import org.spotube.spotube.core.ui.theming.AppTheme
 import org.spotube.spotube.modules.shell.LocalAppShellBottomInset
 import org.spotube.spotube.resources.iconsax.Iconsax
-import org.spotube.spotube.resources.iconsax.IconsaxAdd
-import org.spotube.spotube.resources.iconsax.IconsaxBoxAdd
-import org.spotube.spotube.resources.iconsax.IconsaxCheckCircle
+import org.spotube.spotube.resources.iconsax.IconsaxPlay
 import org.spotube.spotube.resources.iconsax.IconsaxMusicLibrary
-import org.jetbrains.compose.resources.StringResource
-import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import org.spotube.millennium.composables.MillenniumButton
 import org.spotube.millennium.composables.MillenniumButtonStyle
-import org.spotube.millennium.composables.MillenniumCard
 import org.spotube.millennium.composables.MillenniumIcon
 import org.spotube.millennium.theme.MillenniumTheme
-import spotube.composeapp.generated.resources.Res
-import spotube.composeapp.generated.resources.no_metadata_plugin_action_install
-import spotube.composeapp.generated.resources.no_metadata_plugin_action_local
-import spotube.composeapp.generated.resources.no_metadata_plugin_local_hint
-import spotube.composeapp.generated.resources.no_metadata_plugin_action_select
-import spotube.composeapp.generated.resources.no_metadata_plugin_description_install
-import spotube.composeapp.generated.resources.no_metadata_plugin_description_select
-import spotube.composeapp.generated.resources.no_metadata_plugin_step_discover
-import spotube.composeapp.generated.resources.no_metadata_plugin_step_install
-import spotube.composeapp.generated.resources.no_metadata_plugin_step_select
-import spotube.composeapp.generated.resources.no_metadata_plugin_title
 
-/**
- * Renders [content] only while a metadata plugin is selected. Otherwise shows a guided
- * "no plugin" state with a call to action leading to the plugin manager, instead of letting
- * the screen sit on an endless loading skeleton.
- *
- * @param backButton whether the placeholder's top bar shows a back button (for pushed screens).
- * @param requireLogin also swap [content] for a friendly sign-in prompt while the plugin needs an
- * account and the user isn't signed in (for screens that only make sense when logged in).
- * @param showTopBar false when the host screen already draws its own app bar (e.g. Library tabs).
- */
 @Composable
 fun MetadataPluginGuard(
     backButton: Boolean = false,
@@ -93,6 +68,7 @@ fun MetadataPluginGuard(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val authState by authViewModel.uiState.collectAsStateWithLifecycle()
+    val isSettingUp by viewModel.isSettingUp.collectAsStateWithLifecycle()
 
     when (val s = state) {
         is MetadataPluginGuardState.Available ->
@@ -119,8 +95,16 @@ fun MetadataPluginGuard(
             Modifier.fillMaxSize().background(MillenniumTheme.colors.background))
         is MetadataPluginGuardState.Missing -> NoMetadataPluginScreen(
             hasInstalledPlugins = s.hasInstalledPlugins,
+            isSettingUp = isSettingUp,
             backButton = backButton,
             showTopBar = showTopBar,
+            onStartSetup = {
+                if (s.hasInstalledPlugins) {
+                    viewModel.selectFirstMetadataPlugin()
+                } else {
+                    viewModel.startAutoSetup()
+                }
+            },
             onOpenPlugins = viewModel::openPlugins,
             onOpenLocalTracks = viewModel::openLocalTracks)
     }
@@ -129,8 +113,10 @@ fun MetadataPluginGuard(
 @Composable
 private fun NoMetadataPluginScreen(
     hasInstalledPlugins: Boolean,
+    isSettingUp: Boolean,
     backButton: Boolean,
     showTopBar: Boolean,
+    onStartSetup: () -> Unit,
     onOpenPlugins: () -> Unit,
     onOpenLocalTracks: () -> Unit
 ) {
@@ -144,62 +130,54 @@ private fun NoMetadataPluginScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp)
+                .padding(horizontal = 24.dp)
                 .padding(bottom = LocalAppShellBottomInset.current),
             contentAlignment = Alignment.Center) {
             Column(
                 modifier = Modifier
                     .widthIn(max = 420.dp)
-                    .padding(vertical = 24.dp),
+                    .padding(vertical = 32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                
                 HeroBadge()
 
                 Text(
-                    text = stringResource(Res.string.no_metadata_plugin_title),
-                    style = AppTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.SemiBold,
+                    text = "É a primeira vez?",
+                    style = AppTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
                     color = AppTheme.colors.onSurface,
                     textAlign = TextAlign.Center)
 
                 Text(
-                    text = stringResource(
-                        if (hasInstalledPlugins) Res.string.no_metadata_plugin_description_select
-                        else Res.string.no_metadata_plugin_description_install),
-                    style = AppTheme.typography.bodyMedium,
+                    text = "Então clique no botão abaixo para iniciar o Montanha Music Lab e liberar o catálogo de músicas.",
+                    style = AppTheme.typography.bodyLarge,
                     color = AppTheme.colors.onSurfaceVariant,
                     textAlign = TextAlign.Center)
 
-                if (!hasInstalledPlugins) {
-                    MillenniumCard(modifier = Modifier.fillMaxWidth()) {
-                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Step(1, Res.string.no_metadata_plugin_step_discover)
-                            Step(2, Res.string.no_metadata_plugin_step_install)
-                            Step(3, Res.string.no_metadata_plugin_step_select)
-                        }
-                    }
-                }
-
                 MillenniumButton(
-                    onClick = onOpenPlugins,
-                    style = MillenniumButtonStyle.Primary) {
+                    onClick = onStartSetup,
+                    loading = isSettingUp,
+                    style = MillenniumButtonStyle.Primary,
+                    modifier = Modifier.fillMaxWidth().height(52.dp)) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         MillenniumIcon(
-                            if (hasInstalledPlugins) Iconsax.IconsaxCheckCircle else Iconsax.IconsaxAdd,
+                            Iconsax.IconsaxPlay,
                             contentDescription = null,
-                            modifier = Modifier.size(18.dp))
+                            modifier = Modifier.size(20.dp))
                         Text(
-                            stringResource(
-                                if (hasInstalledPlugins) Res.string.no_metadata_plugin_action_select
-                                else Res.string.no_metadata_plugin_action_install))
+                            if (isSettingUp) "Iniciando o laboratório..."
+                            else "Então clique aqui para iniciar",
+                            fontWeight = FontWeight.Bold)
                     }
                 }
 
                 MillenniumButton(
                     onClick = onOpenLocalTracks,
-                    style = MillenniumButtonStyle.Secondary) {
+                    style = MillenniumButtonStyle.Secondary,
+                    modifier = Modifier.fillMaxWidth().height(48.dp)) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -207,14 +185,14 @@ private fun NoMetadataPluginScreen(
                             Iconsax.IconsaxMusicLibrary,
                             contentDescription = null,
                             modifier = Modifier.size(18.dp))
-                        Text(stringResource(Res.string.no_metadata_plugin_action_local))
+                        Text("Ouvir músicas locais do dispositivo")
                     }
                 }
 
                 Text(
-                    text = stringResource(Res.string.no_metadata_plugin_local_hint),
+                    text = "Configuração automática de fábrica",
                     style = AppTheme.typography.labelSmall,
-                    color = AppTheme.colors.onSurfaceVariant,
+                    color = AppTheme.colors.onSurfaceVariant.copy(alpha = 0.7f),
                     textAlign = TextAlign.Center)
             }
         }
@@ -226,45 +204,21 @@ private fun HeroBadge() {
     val primary = AppTheme.colors.primary
     Box(
         modifier = Modifier
-            .size(104.dp)
+            .size(112.dp)
             .clip(CircleShape)
-            .background(Brush.radialGradient(listOf(primary.copy(alpha = 0.22f), primary.copy(alpha = 0f)))),
+            .background(Brush.radialGradient(listOf(primary.copy(alpha = 0.25f), primary.copy(alpha = 0f)))),
         contentAlignment = Alignment.Center) {
         Box(
             modifier = Modifier
-                .size(72.dp)
-                .clip(RoundedCornerShape(20.dp))
-                .background(primary.copy(alpha = 0.12f)),
+                .size(76.dp)
+                .clip(RoundedCornerShape(22.dp))
+                .background(primary.copy(alpha = 0.15f)),
             contentAlignment = Alignment.Center) {
             MillenniumIcon(
-                Iconsax.IconsaxBoxAdd,
+                Iconsax.IconsaxPlay,
                 contentDescription = null,
-                modifier = Modifier.size(36.dp),
+                modifier = Modifier.size(38.dp),
                 tint = primary)
         }
-    }
-}
-
-@Composable
-private fun Step(index: Int, label: StringResource) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Box(
-            modifier = Modifier
-                .size(26.dp)
-                .clip(CircleShape)
-                .background(AppTheme.colors.primary.copy(alpha = 0.14f)),
-            contentAlignment = Alignment.Center) {
-            Text(
-                text = index.toString(),
-                style = AppTheme.typography.labelMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = AppTheme.colors.primary)
-        }
-        Text(
-            text = stringResource(label),
-            style = AppTheme.typography.bodyMedium,
-            color = AppTheme.colors.onSurface)
     }
 }

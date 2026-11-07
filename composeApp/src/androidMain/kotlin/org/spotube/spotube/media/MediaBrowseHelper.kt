@@ -94,7 +94,7 @@ class MediaBrowseHelper(
             .setMediaId(MEDIA_ID_ROOT)
             .setMediaMetadata(
                 MediaMetadata.Builder()
-                    .setTitle("Spotube")
+                    .setTitle("Montanha Music Lab")
                     .setIsBrowsable(true)
                     .setIsPlayable(false)
                     .build()

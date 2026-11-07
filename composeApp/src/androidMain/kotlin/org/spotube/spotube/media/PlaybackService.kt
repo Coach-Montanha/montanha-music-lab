@@ -100,7 +100,7 @@ class PlaybackService : MediaLibraryService(), KoinComponent {
         // Short-lived placeholder until Media3 posts the playback notification. No localized text:
         // loading it here would block the main thread (see createNotificationChannel).
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Spotube")
+            .setContentTitle("Montanha Music Lab")
             .setSmallIcon(R.drawable.ic_stat_spotube)
             .setContentIntent(sessionActivity)
             .setOngoing(true)
