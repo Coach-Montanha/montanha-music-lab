@@ -17,7 +17,6 @@
 
 package org.spotube.spotube.modules.welcome
 
-
 import org.spotube.millennium.composables.MillenniumButton
 import org.spotube.millennium.composables.MillenniumButtonStyle
 import org.spotube.millennium.composables.MillenniumCard
@@ -33,6 +32,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -61,16 +62,16 @@ import spotube.composeapp.generated.resources.welcome_skip
 /**
  * First-run Welcome/Onboarding screen. It is a route
  * ([org.spotube.spotube.core.navigation.Routes.Welcome]) rendered inside the app shell.
- *
- * The steps are exposed through a Millennium tab group rather than ad-hoc dots or a footer
- * walk-through, so the screen reads as one deliberate panel on every window size.
- * Each step owns its content and the footer only carries the forward action.
  */
 @Composable
 fun WelcomeScreen(viewModel: WelcomeViewModel) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     WelcomeTheme {
-        Box(Modifier.fillMaxSize()) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .navigationBarsPadding()
+        ) {
             WelcomeBackground()
             Column(modifier = Modifier.fillMaxSize()) {
                 ApplicationMainBar(
@@ -96,7 +97,7 @@ fun WelcomeScreen(viewModel: WelcomeViewModel) {
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 16.dp),
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
                     contentAlignment = Alignment.Center) {
                     MillenniumCard(
                         modifier = Modifier
@@ -109,7 +110,7 @@ fun WelcomeScreen(viewModel: WelcomeViewModel) {
                                 modifier = Modifier
                                     .weight(1f)
                                     .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
                                 state = state,
                                 viewModel = viewModel)
                             MillenniumSeparator()
@@ -138,14 +139,11 @@ private fun WelcomeStepSwitcher(
         tabLabel = { labels[it] }) { index ->
         when (index) {
             0 -> BrandingPage()
-
-            1 -> DonationPage(
+            1 -> HowItWorksPage()
+            2 -> PluginsPage()
+            else -> DonationPage(
                 donations = state.donations,
                 onDonate = viewModel::openDonation)
-
-            2 -> PluginsPage()
-
-            else -> HowItWorksPage()
         }
     }
 }
@@ -157,15 +155,16 @@ private fun WelcomeActionBar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically) {
         Spacer(Modifier.weight(1f))
         MillenniumButton(
             onClick = viewModel::onPrimary,
+            modifier = Modifier.height(48.dp),
             style = MillenniumButtonStyle.Secondary) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     text = stringResource(state.primaryLabel),
                     fontWeight = FontWeight.SemiBold)
@@ -176,7 +175,7 @@ private fun WelcomeActionBar(
                         Iconsax.IconsaxNext
                     },
                     contentDescription = null,
-                    modifier = Modifier.size(16.dp))
+                    modifier = Modifier.size(18.dp))
             }
         }
     }

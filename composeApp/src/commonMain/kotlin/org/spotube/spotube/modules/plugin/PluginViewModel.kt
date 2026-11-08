@@ -535,6 +535,16 @@ class PluginViewModel(
         viewModelScope.launch {
             try {
                 task.join()
+                val pluginState = pluginManager.state.value
+                if (pluginState is PluginManagerStates.Data) {
+                    val lastInstalled = pluginState.plugins.lastOrNull()
+                    if (lastInstalled != null) {
+                        val auth = getPluginAuthState(lastInstalled)
+                        if (auth.requiresAuth && !auth.isLoggedIn) {
+                            login(lastInstalled)
+                        }
+                    }
+                }
             } finally {
                 _screenState.update { it.copy(isConfirmingInstall = false) }
             }
@@ -547,11 +557,27 @@ class PluginViewModel(
 
     private fun filterInstalledRepos(repos: List<GitHubRepo>): List<GitHubRepo> {
         val pluginState = pluginManager.state.value
-        if (pluginState !is PluginManagerStates.Data) return repos
-        val installedUrls = pluginState.plugins
-            .mapNotNull { it.repository.takeIf { r -> r.isNotBlank() } }
-            .toSet()
-        return repos.filter { it.htmlUrl !in installedUrls }
+        val installedUrls = if (pluginState is PluginManagerStates.Data) {
+            pluginState.plugins
+                .mapNotNull { it.repository.takeIf { r -> r.isNotBlank() } }
+                .toSet()
+        } else emptySet()
+
+        return repos
+            .filter { it.htmlUrl !in installedUrls }
+            .filterNot {
+                it.fullName.contains("jiosaavn", ignoreCase = true) ||
+                it.description?.contains("jiosaavn", ignoreCase = true) == true
+            }
+            .map { repo ->
+                val cleanDesc = repo.description
+                    ?.replace("Spotube plugin for", "Plugin for", ignoreCase = true)
+                    ?.replace("Spotube plugin", "Plugin", ignoreCase = true)
+                    ?.replace("for Spotube", "", ignoreCase = true)
+                    ?.replace("Spotube", "Montanha Music Lab", ignoreCase = true)
+                    ?.trim()
+                repo.copy(description = cleanDesc)
+            }
     }
 
     fun retryDiscovery() {

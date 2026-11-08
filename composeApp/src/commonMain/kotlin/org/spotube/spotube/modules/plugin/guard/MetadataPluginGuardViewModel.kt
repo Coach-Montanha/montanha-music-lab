@@ -58,6 +58,12 @@ class MetadataPluginGuardViewModel(
             _isSettingUp.value = true
             try {
                 pluginManager.autoSetupDefaultMetadataPlugin()
+                val metaService = pluginManager.selectedMetadataPlugin.value
+                metaService?.use {
+                    if (coreAPI.requiresAuthentication) {
+                        coreAPI.login()
+                    }
+                }
             } catch (e: Exception) {
                 openPlugins()
             } finally {

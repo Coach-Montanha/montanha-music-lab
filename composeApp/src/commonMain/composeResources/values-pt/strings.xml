@@ -372,9 +372,9 @@
     <string name="welcome_get_started">Começar</string>
     <string name="welcome_app_name">Montanha Music Lab</string>
     <string name="welcome_brand_freedom">Música, sem amarras.</string>
-    <string name="welcome_brand_quiet_description">Um player de código aberto para um mundo de música.\nPara você explorar. Para você deixar do seu jeito.</string>
+    <string name="welcome_brand_quiet_description">Um player com a cara do Montanha.</string>
     <string name="welcome_donate_quiet_title">Mantenha este projeto vivo.</string>
-    <string name="welcome_donate_letter">O montanha music lab é feito por apenas uma pessoa... Eu! Não foi uma empresa que criou. Se o meu app fizer parte do seu dia-a-dia, um pequeno apoio poderá me ajudar a continuar cuidado dele como ele merece.\n\nObrigado por abrir espaço para um vibe coder independente.</string>
+    <string name="welcome_donate_letter">O Montanha Music Lab é feito por apenas uma pessoa... Eu! Não foi uma empresa que criou. Se o meu app fizer parte do seu dia-a-dia, um pequeno apoio poderá me ajudar a continuar cuidado dele como ele merece.\n\nObrigado por abrir espaço para um vibe coder independente.</string>
     <string name="welcome_plugins_setup_guide">Comece com um plugin de catálogo para encontrar músicas e playlists. Escolha um plugin de áudio para tocá-las. Letras e histórico de reprodução são opcionais. Descubra um plugin abaixo, revise as permissões, instale-o e depois selecione-o aqui.</string>
     <string name="welcome_plugins_discover">Descobrir plugins</string>
     <string name="welcome_plugins_sources">Suas fontes</string>

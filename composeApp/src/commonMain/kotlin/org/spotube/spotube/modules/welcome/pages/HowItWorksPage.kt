@@ -74,6 +74,7 @@ fun HowItWorksPage(modifier: Modifier = Modifier) {
                 icon = Iconsax.IconsaxMusic,
                 title = Res.string.welcome_guide_lyrics_title,
                 description = Res.string.welcome_guide_lyrics_desc)
+            Spacer(Modifier.height(24.dp))
         }
     }
 }

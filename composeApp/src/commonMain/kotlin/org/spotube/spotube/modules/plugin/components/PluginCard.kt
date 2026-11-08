@@ -17,7 +17,6 @@
 
 package org.spotube.spotube.modules.plugin.components
 
-
 import org.spotube.millennium.composables.MillenniumButton
 import org.spotube.millennium.composables.MillenniumButtonStyle
 import org.spotube.millennium.composables.MillenniumIcon
@@ -30,6 +29,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -37,7 +37,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 
 import org.spotube.spotube.core.ui.theming.AppTheme
-
 import com.composeunstyled.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -48,7 +47,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import okio.Path
 import org.spotube.spotube.modules.plugin.BUILT_IN_PLUGINS
-import org.spotube.spotube.modules.plugin.PluginAbility
 import org.spotube.spotube.modules.plugin.PluginEntry
 import org.spotube.spotube.resources.iconsax.Iconsax
 import org.spotube.spotube.resources.iconsax.IconsaxBox
@@ -80,19 +78,24 @@ internal fun PluginCard(
     logoPath: Path? = null,
     isAuthInProgress: Boolean = false,
     isRemoving: Boolean = false) {
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        // Top Header: Logo + Title + Description + Active Chip
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Plugin icon
+            // Plugin Icon
             Box(
                 modifier = Modifier
                     .size(44.dp)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(AppTheme.colors.primary.copy(alpha = 0.1f))
+                    .background(AppTheme.colors.primary.copy(alpha = 0.12f))
             ) {
                 PluginLogo(
                     plugin = plugin,
@@ -111,19 +114,21 @@ internal fun PluginCard(
                     })
             }
 
-            // Text content
+            // Info Column
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Row(
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
                         plugin.name,
-                        style = AppTheme.typography.bodyLarge,
+                        style = AppTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
+                        color = AppTheme.colors.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false)
@@ -138,12 +143,12 @@ internal fun PluginCard(
                             Row(
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
                                 MillenniumIcon(
                                     Iconsax.IconsaxCheckSquare,
                                     contentDescription = null,
-                                    modifier = Modifier.size(10.dp),
+                                    modifier = Modifier.size(11.dp),
                                     tint = AppTheme.colors.primary
                                 )
                                 Text(
@@ -165,122 +170,101 @@ internal fun PluginCard(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
+            }
+        }
 
-                // Meta chips row
+        // Bottom Action & Meta Bar: Badges on left, Action buttons on right
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            // Metadata chips (Author, Version, Abilities)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.weight(1f, fill = false)
+            ) {
+                // Author
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(3.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(3.dp)
-                    ) {
-                        MillenniumIcon(
-                            Iconsax.User,
-                            contentDescription = null,
-                            modifier = Modifier.size(11.dp),
-                            tint = AppTheme.colors.onSurfaceVariant
-                        )
-                        Text(
-                            plugin.author,
-                            style = AppTheme.typography.labelSmall,
-                            color = AppTheme.colors.onSurfaceVariant
-                        )
-                    }
-                    if (plugin !in BUILT_IN_PLUGINS)
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(3.dp)
-                        ) {
-                            MillenniumIcon(
-                                Iconsax.IconsaxTag,
-                                contentDescription = null,
-                                modifier = Modifier.size(11.dp),
-                                tint = AppTheme.colors.onSurfaceVariant
-                            )
-                            Text(
-                                stringResource(Res.string.plugin_version_label, plugin.version),
-                                style = AppTheme.typography.labelSmall,
-                                color = AppTheme.colors.onSurfaceVariant
-                            )
-                        }
+                    MillenniumIcon(
+                        Iconsax.User,
+                        contentDescription = null,
+                        modifier = Modifier.size(12.dp),
+                        tint = AppTheme.colors.onSurfaceVariant
+                    )
+                    Text(
+                        plugin.author,
+                        style = AppTheme.typography.labelSmall,
+                        color = AppTheme.colors.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
 
-                // Ability chips
-                if (plugin.abilities.isNotEmpty()) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        plugin.abilities.forEach { ability ->
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(4.dp))
-                                    .background(AppTheme.colors.secondaryContainer.copy(alpha = 0.6f))
-                            ) {
-                                Text(
-                                    ability.displayLabel(),
-                                    style = AppTheme.typography.labelSmall,
-                                    color = AppTheme.colors.onSecondaryContainer,
-                                    modifier = Modifier.padding(
-                                        horizontal = 6.dp,
-                                        vertical = 2.dp
-                                    )
-                                )
-                            }
-                        }
+                // Abilities
+                plugin.abilities.forEach { ability ->
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(AppTheme.colors.secondaryContainer.copy(alpha = 0.6f))
+                    ) {
+                        Text(
+                            ability.displayLabel(),
+                            style = AppTheme.typography.labelSmall,
+                            color = AppTheme.colors.onSecondaryContainer,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
                     }
                 }
             }
 
-            Column(
-                modifier = Modifier.align(Alignment.Bottom),
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+            // Action Buttons
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (onInfo != null) {
-                        MillenniumIconButton(
-                            onClick = onInfo,
-                            style = MillenniumIconButtonStyle.Quiet) {
-                            MillenniumIcon(
-                                Iconsax.IconsaxInformation,
-                                contentDescription = null,
-                                tint = AppTheme.colors.onSurfaceVariant)
-                        }
+                if (onInfo != null) {
+                    MillenniumIconButton(
+                        onClick = onInfo,
+                        style = MillenniumIconButtonStyle.Quiet) {
+                        MillenniumIcon(
+                            Iconsax.IconsaxInformation,
+                            contentDescription = null,
+                            tint = AppTheme.colors.onSurfaceVariant)
                     }
-                    if (onSupport != null) {
-                        MillenniumIconButton(
-                            onClick = onSupport,
-                            style = MillenniumIconButtonStyle.Quiet) {
-                            MillenniumIcon(
-                                Iconsax.IconsaxHeart,
-                                contentDescription = null,
-                                tint = AppTheme.colors.onSurfaceVariant)
-                        }
+                }
+                if (onSupport != null) {
+                    MillenniumIconButton(
+                        onClick = onSupport,
+                        style = MillenniumIconButtonStyle.Quiet) {
+                        MillenniumIcon(
+                            Iconsax.IconsaxHeart,
+                            contentDescription = null,
+                            tint = AppTheme.colors.onSurfaceVariant)
                     }
-                    if (plugin in BUILT_IN_PLUGINS) {
-                        Text(
-                            stringResource(Res.string.plugin_state_builtin),
-                            style = AppTheme.typography.labelSmall,
-                            color = AppTheme.colors.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                .border(
-                                    BorderStroke(1.dp, AppTheme.colors.outlineVariant),
-                                    shape = RoundedCornerShape(6.dp)
-                                )
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    } else {
-                        MillenniumIconButton(
-                            onClick = onRemove,
-                            loading = isRemoving,
-                            style = MillenniumIconButtonStyle.Quiet) {
-                            MillenniumIcon(
-                                Iconsax.IconsaxTrash,
-                                contentDescription = stringResource(Res.string.plugin_action_remove),
-                                tint = AppTheme.colors.onSurfaceVariant)
-                        }
+                }
+                if (plugin in BUILT_IN_PLUGINS) {
+                    Text(
+                        stringResource(Res.string.plugin_state_builtin),
+                        style = AppTheme.typography.labelSmall,
+                        color = AppTheme.colors.onSurfaceVariant,
+                        modifier = Modifier
+                            .border(BorderStroke(1.dp, AppTheme.colors.outlineVariant), shape = RoundedCornerShape(6.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                } else {
+                    MillenniumIconButton(
+                        onClick = onRemove,
+                        loading = isRemoving,
+                        style = MillenniumIconButtonStyle.Quiet) {
+                        MillenniumIcon(
+                            Iconsax.IconsaxTrash,
+                            contentDescription = stringResource(Res.string.plugin_action_remove),
+                            tint = AppTheme.colors.onSurfaceVariant)
                     }
                 }
 
@@ -296,11 +280,12 @@ internal fun PluginCard(
                         style = MillenniumButtonStyle.Secondary) {
                         Text(
                             text = stringResource(label),
-                            style = AppTheme.typography.labelLarge
+                            style = AppTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold
                         )
+                    }
                 }
             }
         }
     }
 }
-

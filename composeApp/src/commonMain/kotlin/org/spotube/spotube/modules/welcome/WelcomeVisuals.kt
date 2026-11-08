@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.TextUnit
 import com.composeunstyled.Text
 import org.spotube.spotube.core.ui.theming.AppTheme
@@ -64,5 +65,7 @@ fun WelcomeWordmark(
         modifier = modifier,
         fontWeight = FontWeight.Bold,
         fontSize = fontSize,
+        lineHeight = fontSize * 1.25f,
+        textAlign = TextAlign.Center,
         color = AppTheme.colors.onSurface)
 }

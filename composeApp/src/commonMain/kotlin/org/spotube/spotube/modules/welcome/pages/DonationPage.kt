@@ -29,21 +29,24 @@ fun DonationPage(
     modifier: Modifier = Modifier) {
     val clipboardManager = LocalClipboardManager.current
     Column(
-        modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(32.dp),
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 24.dp, vertical = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center) {
         Text(
             stringResource(Res.string.welcome_donate_quiet_title),
             style = AppTheme.typography.displaySmall,
             textAlign = TextAlign.Center)
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(18.dp))
         Text(
             stringResource(Res.string.welcome_donate_letter),
             modifier = Modifier.widthIn(max = 540.dp),
             style = AppTheme.typography.bodyLarge,
             color = AppTheme.colors.onSurfaceVariant,
             textAlign = TextAlign.Center)
-        Spacer(Modifier.height(32.dp))
+        Spacer(Modifier.height(24.dp))
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -55,6 +58,7 @@ fun DonationPage(
                         }
                         onDonate(option.url)
                     },
+                    modifier = Modifier.height(48.dp),
                     style = MillenniumButtonStyle.Secondary) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -67,12 +71,13 @@ fun DonationPage(
                 }
             }
         }
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(20.dp))
         Text(
             stringResource(Res.string.welcome_donate_optional),
             modifier = Modifier.widthIn(max = 500.dp),
             style = AppTheme.typography.bodySmall,
             color = AppTheme.colors.onSurfaceVariant,
             textAlign = TextAlign.Center)
+        Spacer(Modifier.height(24.dp))
     }
 }

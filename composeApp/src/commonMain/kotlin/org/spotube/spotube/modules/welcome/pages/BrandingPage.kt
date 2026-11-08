@@ -20,23 +20,34 @@ import spotube.composeapp.generated.resources.*
 @Composable
 fun BrandingPage(modifier: Modifier = Modifier) {
     Column(
-        modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(32.dp),
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 24.dp, vertical = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center) {
-        Image(painterResource(Res.drawable.spotube_logo), null, Modifier.size(88.dp))
-        Spacer(Modifier.height(24.dp))
-        WelcomeWordmark(fontSize = 48.sp)
-        Spacer(Modifier.height(24.dp))
+        Image(
+            painterResource(Res.drawable.spotube_logo),
+            contentDescription = "Montanha Music Lab Logo",
+            modifier = Modifier.size(96.dp)
+        )
+        Spacer(Modifier.height(20.dp))
+        WelcomeWordmark(
+            fontSize = 32.sp,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+        )
+        Spacer(Modifier.height(18.dp))
         Text(
             stringResource(Res.string.welcome_brand_freedom),
             style = AppTheme.typography.displaySmall,
             textAlign = TextAlign.Center)
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(14.dp))
         Text(
             stringResource(Res.string.welcome_brand_quiet_description),
             modifier = Modifier.widthIn(max = 440.dp),
             style = AppTheme.typography.bodyLarge,
             color = AppTheme.colors.onSurfaceVariant,
             textAlign = TextAlign.Center)
+        Spacer(Modifier.height(16.dp))
     }
 }
