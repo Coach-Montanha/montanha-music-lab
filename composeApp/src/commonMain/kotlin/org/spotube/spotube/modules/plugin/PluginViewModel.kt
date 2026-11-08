@@ -539,9 +539,19 @@ class PluginViewModel(
                 if (pluginState is PluginManagerStates.Data) {
                     val lastInstalled = pluginState.plugins.lastOrNull()
                     if (lastInstalled != null) {
-                        val auth = getPluginAuthState(lastInstalled)
-                        if (auth.requiresAuth && !auth.isLoggedIn) {
+                        val auth = pluginAuthStates.value[lastInstalled.id]
+                        if (auth?.requiresAuth == true && !auth.isLoggedIn) {
                             login(lastInstalled)
+                        } else {
+                            val service = findServiceForPlugin(lastInstalled.id)
+                            val requires = try {
+                                service?.use { coreAPI.requiresAuthentication } ?: false
+                            } catch (e: Exception) {
+                                false
+                            }
+                            if (requires) {
+                                login(lastInstalled)
+                            }
                         }
                     }
                 }

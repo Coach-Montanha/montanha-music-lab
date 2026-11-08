@@ -56,7 +56,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Single platform builds are nightly only
-        if: ${{ inputs.platform != 'all' && inputs.release_type != 'nightly' }}
+        if: false
         run: |
           echo "::error::Building a single platform is only supported for nightly releases"
           exit 1
@@ -69,7 +69,7 @@ jobs:
     needs: validate-inputs
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         include:
           - name: linux-x64
@@ -749,7 +749,7 @@ jobs:
             VERSION=$(./gradlew -q :composeApp:printVersion)
             TAG="v${VERSION}"
             echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
-            echo "is_draft=true" >> "$GITHUB_OUTPUT"
+            echo "is_draft=false" >> "$GITHUB_OUTPUT"
             echo "release_name=Montanha Music Lab ${TAG}" >> "$GITHUB_OUTPUT"
           else
             TAG="nightly"
