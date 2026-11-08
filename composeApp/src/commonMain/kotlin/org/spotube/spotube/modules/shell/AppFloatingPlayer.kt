@@ -228,7 +228,7 @@ internal fun FloatingPlayerContent(
                     MillenniumIconButton(
                         onClick = onPrevious,
                         enabled = playerUiState.queue.isNotEmpty(),
-                        style = MillenniumIconButtonStyle.Ghost
+                        style = MillenniumIconButtonStyle.Quiet
                     ) {
                         MillenniumIcon(
                             Iconsax.IconsaxPrevious,
@@ -248,7 +248,7 @@ internal fun FloatingPlayerContent(
                     MillenniumIconButton(
                         onClick = onNext,
                         enabled = playerUiState.queue.isNotEmpty(),
-                        style = MillenniumIconButtonStyle.Ghost
+                        style = MillenniumIconButtonStyle.Quiet
                     ) {
                         MillenniumIcon(
                             Iconsax.IconsaxNext,

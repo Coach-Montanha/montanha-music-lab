@@ -88,6 +88,7 @@ class PlaylistRepository(
         if (playlistId.startsWith("local_")) {
             return PaginationResult(
                 items = emptyList(),
+                totalCount = 0,
                 nextPagination = null
             )
         }
@@ -103,6 +104,7 @@ class PlaylistRepository(
                 }
             }
         }
+    }
 
     suspend fun toggleSavedPlaylist(playlistId: String, currentIsSaved: Boolean) = plugin?.let { plugin ->
         if (currentIsSaved) {

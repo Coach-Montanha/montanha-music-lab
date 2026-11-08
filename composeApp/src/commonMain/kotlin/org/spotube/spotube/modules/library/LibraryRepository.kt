@@ -82,10 +82,12 @@ class LibraryRepository(
         json.decodeFromString<List<MetadataPlaylist>>(content)
     }.getOrDefault(emptyList())
 
-    private fun persistLocalPlaylists(playlists: List<MetadataPlaylist>) = runCatching {
+    private fun persistLocalPlaylists(playlists: List<MetadataPlaylist>) {
         val path = localPlaylistsPath ?: return
-        val content = json.encodeToString(playlists)
-        FileSystem.SYSTEM.write(path) { writeUtf8(content) }
+        runCatching {
+            val content = json.encodeToString(playlists)
+            FileSystem.SYSTEM.write(path) { writeUtf8(content) }
+        }
     }
 
     private val localPlaylists = MutableStateFlow<List<MetadataPlaylist>>(loadLocalPlaylists())
@@ -142,6 +144,7 @@ class LibraryRepository(
         }
         return PaginationResult(
             items = local,
+            totalCount = local.size,
             nextPagination = null
         )
     }
