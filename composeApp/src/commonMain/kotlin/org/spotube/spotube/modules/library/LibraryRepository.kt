@@ -36,6 +36,14 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.launch
+import kotlin.time.Clock
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.encodeToString
+import okio.FileSystem
+import okio.Path.Companion.toPath
+import okio.SYSTEM
+import org.spotube.spotube.core.paths.Paths
+
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class LibraryRepository(
@@ -62,7 +70,32 @@ class LibraryRepository(
     private val savedArtistIds = MutableStateFlow<Set<String>>(emptySet())
     val savedArtistIdsFlow: StateFlow<Set<String>> = savedArtistIds.asStateFlow()
 
+    private val json = Json { ignoreUnknownKeys = true }
+    private val localPlaylistsPath = runCatching {
+        "${Paths().getApplicationDataDirPath()}/montanha_local_playlists.json".toPath()
+    }.getOrNull()
+
+    private fun loadLocalPlaylists(): List<MetadataPlaylist> = runCatching {
+        val path = localPlaylistsPath ?: return emptyList()
+        if (!FileSystem.SYSTEM.exists(path)) return emptyList()
+        val content = FileSystem.SYSTEM.read(path) { readUtf8() }
+        json.decodeFromString<List<MetadataPlaylist>>(content)
+    }.getOrDefault(emptyList())
+
+    private fun persistLocalPlaylists(playlists: List<MetadataPlaylist>) = runCatching {
+        val path = localPlaylistsPath ?: return
+        val content = json.encodeToString(playlists)
+        FileSystem.SYSTEM.write(path) { writeUtf8(content) }
+    }
+
+    private val localPlaylists = MutableStateFlow<List<MetadataPlaylist>>(loadLocalPlaylists())
+
+    fun getLocalPlaylist(id: String): MetadataPlaylist? =
+        localPlaylists.value.find { it.id == id }
+
     init {
+        savedPlaylistIds.value += localPlaylists.value.map { it.id }.toSet()
+
         scope.launch {
             pluginManager.selectedMetadataPlugin
                 .filterNotNull()
@@ -88,8 +121,8 @@ class LibraryRepository(
         savedArtistIds.value = emptySet()
     }
 
-    suspend fun savedPlaylists(paginationStrategy: PaginationStrategy? = null) =
-        authPlugin?.let { plugin ->
+    suspend fun savedPlaylists(paginationStrategy: PaginationStrategy? = null): PaginationResult<MetadataPlaylist>? {
+        val remoteResult = authPlugin?.let { plugin ->
             playlistCache.get(
                 key = paginationStrategy ?: PaginationStrategy.Offset(0, 20)
             ) {
@@ -102,6 +135,16 @@ class LibraryRepository(
                 }
             }
         }
+        val local = localPlaylists.value
+        if (remoteResult != null) {
+            val allItems = local + remoteResult.items
+            return remoteResult.copy(items = allItems)
+        }
+        return PaginationResult(
+            items = local,
+            nextPagination = null
+        )
+    }
 
     suspend fun savedAlbums(paginationStrategy: PaginationStrategy? = null) =
         authPlugin?.let { plugin ->
@@ -300,7 +343,7 @@ class LibraryRepository(
         isCollaborating: Boolean,
         imageBase64: String,
         trackIds: List<String>): MetadataPlaylist? {
-        return authPlugin?.let { plugin ->
+        val remoteResult = authPlugin?.let { plugin ->
             pluginManager.withScope {
                 plugin.use {
                     val result = metadataPlaylistAPI.createPlaylist(
@@ -316,6 +359,22 @@ class LibraryRepository(
                 }
             }
         }
+        if (remoteResult != null) return remoteResult
+
+        val local = MetadataPlaylist(
+            id = "local_${Clock.System.now().toEpochMilliseconds()}",
+            title = name,
+            description = description,
+            thumbnails = emptyList(),
+            trackCount = trackIds.size,
+            externalUri = null,
+            owner = MetadataUser(id = "user", username = "montanha_user", displayName = "Eu", thumbnails = emptyList(), externalUri = null)
+        )
+        val updated = localPlaylists.value + local
+        localPlaylists.value = updated
+        persistLocalPlaylists(updated)
+        savedPlaylistIds.value += local.id
+        return local
     }
 
     suspend fun updatePlaylist(

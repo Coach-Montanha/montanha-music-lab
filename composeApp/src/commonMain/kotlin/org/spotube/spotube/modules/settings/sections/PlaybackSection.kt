@@ -120,39 +120,7 @@ internal fun LazyListScope.playbackSection(
                 }
             )
         }
-        addAll(remoteControlSettingCards(settings, settingsViewModel, requestLocalNetworkPermission))
-        add {
-            val error_whole_number = stringResource(Res.string.settings_error_whole_number)
-            val error_port_range = stringResource(Res.string.settings_error_port_range)
-
-            TextInputSettingCard(
-                title = stringResource(Res.string.settings_playback_port_title),
-                subtitle = stringResource(
-                    Res.string.settings_playback_port_subtitle_current,
-                    settings.playbackProxyServerPort
-                ),
-                icon = {
-                    SettingsItemIcon(Iconsax.CustomServer, stringResource(Res.string.settings_playback_port_title))
-                },
-                value = settings.playbackProxyServerPort.toString(),
-                dialogDescription = stringResource(Res.string.settings_playback_port_description),
-                placeholder = stringResource(Res.string.settings_playback_port_placeholder),
-                normalize = { it.trim() },
-                validate = { value ->
-                    val port = value.toIntOrNull()
-                    when {
-                        port == null -> error_whole_number
-                        port !in 1..65535 -> error_port_range
-                        else -> null
-                    }
-                },
-                onValueSaved = { value ->
-                    settingsViewModel.updateSettings {
-                        copy(playbackProxyServerPort = value.toInt())
-                    }
-                }
-            )
-        }
+        add(remoteControlSettingCards(settings, settingsViewModel, requestLocalNetworkPermission).first())
         if (includeBlacklist) {
             add {
                 SettingCardItem(

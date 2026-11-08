@@ -66,20 +66,32 @@ class PlaylistRepository(
         playlistTracksCache.invalidateAll()
     }
 
-    suspend fun getPlaylistInfo(playlistId: String) = plugin?.let { plugin ->
-        playlistInfoCache.get(playlistId) {
-            pluginManager.withScope {
-                plugin.use {
-                    val playlist = metadataPlaylistAPI.getPlaylist(playlistId)
-                    val isSaved = libraryRepository.isSavedPlaylists(listOf(playlistId)).firstOrNull() ?: false
-                    playlist to isSaved
+    suspend fun getPlaylistInfo(playlistId: String): Pair<MetadataPlaylist, Boolean>? {
+        if (playlistId.startsWith("local_")) {
+            val local = libraryRepository.getLocalPlaylist(playlistId)
+            if (local != null) return local to true
+        }
+        return plugin?.let { plugin ->
+            playlistInfoCache.get(playlistId) {
+                pluginManager.withScope {
+                    plugin.use {
+                        val playlist = metadataPlaylistAPI.getPlaylist(playlistId)
+                        val isSaved = libraryRepository.isSavedPlaylists(listOf(playlistId)).firstOrNull() ?: false
+                        playlist to isSaved
+                    }
                 }
             }
         }
     }
 
-    suspend fun getPlaylistTracks(playlistId: String, paginationStrategy: PaginationStrategy? = null) =
-        plugin?.let { plugin ->
+    suspend fun getPlaylistTracks(playlistId: String, paginationStrategy: PaginationStrategy? = null): PaginationResult<MetadataTrack>? {
+        if (playlistId.startsWith("local_")) {
+            return PaginationResult(
+                items = emptyList(),
+                nextPagination = null
+            )
+        }
+        return plugin?.let { plugin ->
             playlistTracksCache.get(playlistId to (paginationStrategy ?: PaginationStrategy.Offset(0, 20))) {
                 pluginManager.withScope {
                     plugin.use {

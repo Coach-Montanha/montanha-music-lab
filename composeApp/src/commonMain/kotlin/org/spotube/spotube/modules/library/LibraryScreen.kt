@@ -117,7 +117,7 @@ fun LibraryScreen(libraryState: LibraryState = koinInject()) {
         }
         Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
             when (state.currentTab) {
-                LibraryTab.Playlists -> MetadataPluginGuard(showTopBar = false, requireLogin = true) {
+                LibraryTab.Playlists -> MetadataPluginGuard(showTopBar = false, requireLogin = false) {
                     LibraryPlaylistsScreen(
                         showCreatePlaylist = state.showCreatePlaylist,
                         viewMode = viewMode

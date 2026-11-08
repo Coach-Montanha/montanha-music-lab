@@ -20,6 +20,7 @@ on:
         options:
           - all
           - android
+          - android-and-windows
           - linux-x86_64
           - linux-aarch64
           - windows
@@ -189,7 +190,7 @@ jobs:
   build-android:
     name: Android
     needs: [validate-inputs, prepare-deps]
-    if: ${{ inputs.platform == 'all' || inputs.platform == 'android' }}
+    if: ${{ inputs.platform == 'all' || inputs.platform == 'android' || inputs.platform == 'android-and-windows' }}
     timeout-minutes: 120
     runs-on: ubuntu-latest
     steps:
@@ -252,13 +253,13 @@ jobs:
       - name: Rename APK
         run: |
           APK_FILE=$(find composeApp/build/outputs/apk -path "*elease*" -name "*.apk" -type f | head -1)
-          cp "$APK_FILE" Spotube-android-all-arch.apk
+          cp "$APK_FILE" Montanha-Music-Lab-android-all-arch.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v7
         with:
           name: android-apk
-          path: Spotube-android-all-arch.apk
+          path: Montanha-Music-Lab-android-all-arch.apk
 
       - name: Setup tmate session on failure
         if: ${{ inputs.debug_ssh && failure() }}
@@ -352,28 +353,28 @@ jobs:
         run: |
           DEB_FILE=$(find composeApp/build/compose/binaries/main/graalvm-deb -maxdepth 1 -name "*.deb" -type f | head -1)
           RPM_FILE=$(find composeApp/build/compose/binaries/main/graalvm-rpm -maxdepth 1 -name "*.rpm" -type f | head -1)
-          cp "$DEB_FILE" Spotube-linux-x86_64.deb
-          cp "$RPM_FILE" Spotube-linux-x86_64.rpm
+          cp "$DEB_FILE" Montanha-Music-Lab-linux-x86_64.deb
+          cp "$RPM_FILE" Montanha-Music-Lab-linux-x86_64.rpm
           APPIMAGE_FILE=$(find composeApp/build/compose/binaries/main -name "*.AppImage" -type f | head -1)
-          cp "$APPIMAGE_FILE" Spotube-linux-x86_64.AppImage
+          cp "$APPIMAGE_FILE" Montanha-Music-Lab-linux-x86_64.AppImage
 
       - name: Upload DEB
         uses: actions/upload-artifact@v7
         with:
           name: linux-deb
-          path: Spotube-linux-x86_64.deb
+          path: Montanha-Music-Lab-linux-x86_64.deb
 
       - name: Upload RPM
         uses: actions/upload-artifact@v7
         with:
           name: linux-rpm
-          path: Spotube-linux-x86_64.rpm
+          path: Montanha-Music-Lab-linux-x86_64.rpm
 
       - name: Upload AppImage
         uses: actions/upload-artifact@v7
         with:
           name: linux-appimage
-          path: Spotube-linux-x86_64.AppImage
+          path: Montanha-Music-Lab-linux-x86_64.AppImage
 
       - name: Setup tmate session on failure
         if: ${{ inputs.debug_ssh && failure() }}
@@ -474,28 +475,28 @@ jobs:
         run: |
           DEB_FILE=$(find composeApp/build/compose/binaries/main/graalvm-deb -maxdepth 1 -name "*.deb" -type f | head -1)
           RPM_FILE=$(find composeApp/build/compose/binaries/main/graalvm-rpm -maxdepth 1 -name "*.rpm" -type f | head -1)
-          cp "$DEB_FILE" Spotube-linux-aarch64.deb
-          cp "$RPM_FILE" Spotube-linux-aarch64.rpm
+          cp "$DEB_FILE" Montanha-Music-Lab-linux-aarch64.deb
+          cp "$RPM_FILE" Montanha-Music-Lab-linux-aarch64.rpm
           APPIMAGE_FILE=$(find composeApp/build/compose/binaries/main -name "*.AppImage" -type f | head -1)
-          cp "$APPIMAGE_FILE" Spotube-linux-aarch64.AppImage
+          cp "$APPIMAGE_FILE" Montanha-Music-Lab-linux-aarch64.AppImage
 
       - name: Upload DEB
         uses: actions/upload-artifact@v7
         with:
           name: linux-deb-arm64
-          path: Spotube-linux-aarch64.deb
+          path: Montanha-Music-Lab-linux-aarch64.deb
 
       - name: Upload RPM
         uses: actions/upload-artifact@v7
         with:
           name: linux-rpm-arm64
-          path: Spotube-linux-aarch64.rpm
+          path: Montanha-Music-Lab-linux-aarch64.rpm
 
       - name: Upload AppImage
         uses: actions/upload-artifact@v7
         with:
           name: linux-appimage-arm64
-          path: Spotube-linux-aarch64.AppImage
+          path: Montanha-Music-Lab-linux-aarch64.AppImage
 
       - name: Setup tmate session on failure
         if: ${{ inputs.debug_ssh && failure() }}
@@ -506,7 +507,7 @@ jobs:
   build-windows:
     name: Windows Desktop
     needs: [validate-inputs, prepare-deps]
-    if: ${{ inputs.platform == 'all' || inputs.platform == 'windows' }}
+    if: ${{ inputs.platform == 'all' || inputs.platform == 'windows' || inputs.platform == 'android-and-windows' }}
     timeout-minutes: 120
     runs-on: windows-latest
     steps:
@@ -553,13 +554,13 @@ jobs:
           # Top level only: subfolders hold the unpacked app, and __* are electron-builder helpers
           $EXE_FILE = Get-ChildItem -Path composeApp/build/compose/binaries/main/graalvm-exe -Filter "*.exe" |
             Where-Object { $_.Name -notlike '__*' } | Select-Object -First 1
-          Copy-Item $EXE_FILE.FullName Spotube-windows-x86_64-setup.exe
+          Copy-Item $EXE_FILE.FullName Montanha-Music-Lab-windows-x86_64-setup.exe
 
       - name: Upload EXE
         uses: actions/upload-artifact@v7
         with:
           name: windows-exe
-          path: Spotube-windows-x86_64-setup.exe
+          path: Montanha-Music-Lab-windows-x86_64-setup.exe
 
       - name: Setup tmate session on failure
         if: ${{ inputs.debug_ssh && failure() }}
@@ -622,13 +623,13 @@ jobs:
       - name: Rename macOS artifact
         run: |
           DMG_FILE=$(find composeApp/build/compose/binaries/main/graalvm-dmg -maxdepth 1 -name "*.dmg" -type f | head -1)
-          cp "$DMG_FILE" Spotube-macos-universal.dmg
+          cp "$DMG_FILE" Montanha-Music-Lab-macos-universal.dmg
 
       - name: Upload DMG
         uses: actions/upload-artifact@v7
         with:
           name: macos-dmg
-          path: Spotube-macos-universal.dmg
+          path: Montanha-Music-Lab-macos-universal.dmg
 
       - name: Setup tmate session on failure
         if: ${{ inputs.debug_ssh && failure() }}
@@ -692,13 +693,13 @@ jobs:
           APP=$(find build/ios/Build/Products/Release-iphoneos -maxdepth 1 -name "*.app" -type d | head -1)
           mkdir Payload
           cp -R "$APP" Payload/
-          zip -qry Spotube-ios.ipa Payload
+          zip -qry Montanha-Music-Lab-ios.ipa Payload
 
       - name: Upload IPA
         uses: actions/upload-artifact@v7
         with:
           name: ios-ipa
-          path: Spotube-ios.ipa
+          path: Montanha-Music-Lab-ios.ipa
 
       - name: Setup tmate session on failure
         if: ${{ inputs.debug_ssh && failure() }}
@@ -764,7 +765,7 @@ jobs:
         uses: actions/download-artifact@v8
 
       - name: Generate release notes
-        if: ${{ inputs.platform == 'all' }}
+        if: ${{ inputs.platform == 'all' || inputs.platform == 'android-and-windows' }}
         run: |
           echo "## Downloads" > release-notes.md
           echo "" >> release-notes.md
@@ -788,8 +789,8 @@ jobs:
           fail_on_unmatched_files: false
           # A single platform build only replaces that platform's assets (same file names are overwritten),
           # so leave the existing release's name and notes alone
-          name: ${{ inputs.platform == 'all' && steps.vars.outputs.release_name || '' }}
-          body_path: ${{ inputs.platform == 'all' && 'release-notes.md' || '' }}
+          name: ${{ (inputs.platform == 'all' || inputs.platform == 'android-and-windows') && steps.vars.outputs.release_name || '' }}
+          body_path: ${{ (inputs.platform == 'all' || inputs.platform == 'android-and-windows') && 'release-notes.md' || '' }}
           draft: ${{ steps.vars.outputs.is_draft }}
           prerelease: ${{ steps.vars.outputs.is_prerelease }}
           files: |

@@ -276,20 +276,6 @@ private fun HomeContent(
                 }
             }
             is HomeScreenState.Data -> {
-                if (state.featuredItems.isNotEmpty()) {
-                    item {
-                        FeaturedCarousel(items = state.featuredItems)
-                    }
-                }
-                if (state.genres.isNotEmpty()) {
-                    item {
-                        GenreTabs(
-                            genres = state.genres,
-                            selectedGenreId = state.selectedGenreId,
-                            onGenreSelected = onGenreSelected
-                        )
-                    }
-                }
                 val currentSections = state.selectedGenreId?.let { state.browseSections[it] }
                 if (currentSections == null) {
                     item {
@@ -320,9 +306,20 @@ private fun HomeContent(
                         }
                     }
                 } else {
-                    items(currentSections) { section ->
+                    val filteredSections = currentSections.filter { section ->
+                        val t = section.title.lowercase()
+                        t.contains("playlist") || t.contains("recent") || t.contains("recente") || t.contains("history") || t.contains("tocad")
+                    }
+                    val displaySections = if (filteredSections.isNotEmpty()) filteredSections else currentSections
+                    items(displaySections) { section ->
+                        val t = section.title.lowercase()
+                        val cleanTitle = when {
+                            t.contains("playlist") -> "Minhas playlists"
+                            t.contains("recent") || t.contains("recente") || t.contains("history") || t.contains("tocad") -> "Mais recente"
+                            else -> section.title
+                        }
                         HomeSection(
-                            title = section.title,
+                            title = cleanTitle,
                             subtitle = section.description,
                             items = section.items
                         )
