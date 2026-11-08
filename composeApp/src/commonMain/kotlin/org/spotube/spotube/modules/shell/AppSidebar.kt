@@ -114,11 +114,8 @@ fun AppSidebar(
             ) {
                 AnimatedVisibility(visible = expanded, enter = fadeIn(), exit = fadeOut()) {
                     Text(
-                        text = stringResource(Res.string.app_name),
-                        style = AppTheme.typography.headlineLarge.copy(
-                            fontWeight = FontWeight.Bold
-                            )
-                        ),
+                        text = "Montanha Music Lab",
+                        style = AppTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                         color = AppTheme.colors.onSurface
                     )
                 }

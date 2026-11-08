@@ -133,11 +133,8 @@ fun HomeScreen(viewModel: HomeScreenViewModel) {
             title = {
                 if (isSmallScreen) {
                     Text(
-                        stringResource(Res.string.app_name),
-                        style = AppTheme.typography.headlineLarge.copy(
-                            fontWeight = FontWeight.Bold
-                            )
-                        ),
+                        "Montanha Music Lab",
+                        style = AppTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                         color = AppTheme.colors.onSurface
                     )
                 } else {
