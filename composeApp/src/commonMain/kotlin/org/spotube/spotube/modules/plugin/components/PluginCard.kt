@@ -131,7 +131,7 @@ internal fun PluginCard(
                         color = AppTheme.colors.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false)
+                        modifier = Modifier.weight(1f)
                     )
                     // "Active" chip
                     if (isSelected) {
@@ -183,7 +183,7 @@ internal fun PluginCard(
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.weight(1f, fill = false)
+                modifier = Modifier.weight(1f)
             ) {
                 // Author
                 Row(

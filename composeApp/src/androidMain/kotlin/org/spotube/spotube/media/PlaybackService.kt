@@ -452,7 +452,7 @@ class PlaybackService : MediaLibraryService(), KoinComponent {
 
     companion object {
         private const val TAG = "PlaybackService"
-        private const val CHANNEL_ID = "spotube_playback"
+        private const val CHANNEL_ID = "montanha_music_lab_playback"
         private const val NOTIFICATION_ID = 1
     }
 }

@@ -73,7 +73,7 @@ class AppUpdateService(
 
             val release = httpClient.get(AppBuildInfo.LATEST_RELEASE_API_URL) {
                 header(HttpHeaders.Accept, "application/vnd.github+json")
-                header(HttpHeaders.UserAgent, "Spotube/${AppBuildInfo.VERSION}")
+                header(HttpHeaders.UserAgent, "MontanhaMusicLab/${AppBuildInfo.VERSION}")
             }.body<GitHubRelease>()
 
             val latestVersion = parseVersion(release.tagName.removePrefix("v"))

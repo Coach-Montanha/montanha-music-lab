@@ -26,8 +26,8 @@ val NEWPIPE_YOUTUBE_BUILT_IN_PLUGIN = PluginEntry(
     name = "NewPipe YouTube",
     version = "0.1.0",
     apiVersion = PLUGIN_API_VERSION,
-    description = "NewPipe's YouTube plugin for fetching audio streams.",
-    author = "Spotube Team",
+    description = "Plugin NewPipe para reproducao direta de audio.",
+    author = "Montanha Team",
     capabilities = listOf(
         PluginCapability.NETWORK_REQUESTS,
         PluginCapability.PERSISTENT_STORAGE
@@ -42,7 +42,7 @@ val LRCLIB_BUILT_IN_PLUGIN = PluginEntry(
     version = "0.1.0",
     apiVersion = PLUGIN_API_VERSION,
     description = "LRCLib Lyrics plugin for fetching lyrics.",
-    author = "Spotube Team",
+    author = "Montanha Team",
     capabilities = listOf(
         PluginCapability.NETWORK_REQUESTS),
     abilities = listOf(PluginAbility.LYRICS),

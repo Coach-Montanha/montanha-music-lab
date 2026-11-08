@@ -929,4 +929,14 @@
     <string name="media_browser_featured">Em destaque</string>
     <string name="media_browser_saved_tracks">Faixas salvas</string>
     <string name="media_browser_top_tracks">Mais tocadas</string>
+    <string name="no_metadata_plugin_title">Nenhum plugin de metadados selecionado</string>
+    <string name="no_metadata_plugin_description_install">O Montanha Music Lab precisa de um plugin de catálogo para buscar, navegar e tocar suas músicas. Instale um para começar.</string>
+    <string name="no_metadata_plugin_description_select">Você já tem plugins instalados, mas nenhum está ativo como fonte de músicas. Selecione um para começar.</string>
+    <string name="no_metadata_plugin_step_discover">Descubra um plugin de catálogo</string>
+    <string name="no_metadata_plugin_step_install">Revise as permissões e instale</string>
+    <string name="no_metadata_plugin_step_select">Selecione-o como sua fonte</string>
+    <string name="no_metadata_plugin_action_install">Instalar um plugin</string>
+    <string name="no_metadata_plugin_action_select">Escolher um plugin</string>
+    <string name="no_metadata_plugin_action_local">Ouvir músicas locais</string>
+    <string name="no_metadata_plugin_local_hint">Suas faixas e downloads locais funcionam sem necessidade de plugin.</string>
 </resources>

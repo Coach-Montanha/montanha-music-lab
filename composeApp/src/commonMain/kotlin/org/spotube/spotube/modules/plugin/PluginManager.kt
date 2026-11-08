@@ -127,6 +127,34 @@ class PluginManager(
     val pluginsDirPath: Path get() = pluginsDir
     private val httpClient get() = httpClientFactory.default
 
+    init {
+        scope.launch(Dispatchers.IO) {
+            try {
+                val bundledFiles = listOf(
+                    "files/youtube-plugin.smplug",
+                    "files/deezer-plugin.smplug",
+                    "files/spotify-plugin.smplug"
+                )
+                for (file in bundledFiles) {
+                    try {
+                        val bytes = Res.readBytes(file)
+                        addPluginFromByteArray(bytes = bytes, allowReplacingInstalled = false)
+                    } catch (_: Exception) {
+                    }
+                }
+                val cur = state.value
+                if (cur is PluginManagerStates.Data && PluginAbility.METADATA !in cur.selectedPlugins) {
+                    val meta = cur.plugins.firstOrNull { PluginAbility.METADATA in it.abilities }
+                    if (meta != null) {
+                        setSelectedPlugin(PluginAbility.METADATA, meta)
+                    }
+                }
+            } catch (e: Exception) {
+                logger.d { "autoInstallBundledPlugins error: ${e.message}" }
+            }
+        }
+    }
+
     enum class InstallPromptKind {
         INSTALL,
         UPDATE,
@@ -343,10 +371,31 @@ class PluginManager(
     /** Automatically installs and selects the default metadata plugin (Spotify) without prompt. */
     suspend fun autoSetupDefaultMetadataPlugin() {
         withContext(Dispatchers.IO) {
-            val url = "https://github.com/sonic-liberation/spotube-plugin-spotify/releases/download/1.0.1/plugin.smplug"
-            val response = httpClient.get(url)
-            val bytes = response.bodyAsChannel().readRemaining().readByteArray()
-            addPluginFromByteArray(bytes = bytes, allowReplacingInstalled = true)
+            val bundledOrder = listOf(
+                "files/youtube-plugin.smplug",
+                "files/spotify-plugin.smplug",
+                "files/deezer-plugin.smplug"
+            )
+            var installedFromBundle = false
+            for (assetPath in bundledOrder) {
+                try {
+                    val bytes = Res.readBytes(assetPath)
+                    addPluginFromByteArray(bytes = bytes, allowReplacingInstalled = true)
+                    installedFromBundle = true
+                    break
+                } catch (e: Exception) {
+                    logger.d { "Could not unpack bundled plugin: ${e.message}" }
+                }
+            }
+
+            if (!installedFromBundle) {
+                val url = "https://github.com/Coach-Montanha/montanha-plugin-youtube/releases/download/v1.0.0/plugin.smplug"
+                val client = httpClientFactory.create { followRedirects = true }
+                val response = client.get(url)
+                val bytes = response.bodyAsChannel().readRemaining().readByteArray()
+                addPluginFromByteArray(bytes = bytes, allowReplacingInstalled = true)
+            }
+
             val currentState = state.value
             if (currentState is PluginManagerStates.Data) {
                 val metadataPlugin = currentState.plugins.firstOrNull { PluginAbility.METADATA in it.abilities }

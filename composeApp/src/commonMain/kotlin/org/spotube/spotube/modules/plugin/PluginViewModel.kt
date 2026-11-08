@@ -588,6 +588,7 @@ class PluginViewModel(
                     ?.trim()
                 repo.copy(description = cleanDesc)
             }
+            .sortedByDescending { it.owner.login.equals("Coach-Montanha", ignoreCase = true) }
     }
 
     fun retryDiscovery() {

@@ -63,7 +63,7 @@ class RealLRCLibLyricsAPI : LyricsAPI, KoinComponent {
             defaultRequest {
                 url("https://lrclib.net/api/get")
                 // TODO: Add the actual version of Spotube instead of hardcoding it
-                userAgent("Spotube/v6.0.0 LRCLib Lyric Plugin")
+                userAgent("MontanhaMusicLab/v6.0.0 LRCLib Lyric Plugin")
             }
         }
     }
