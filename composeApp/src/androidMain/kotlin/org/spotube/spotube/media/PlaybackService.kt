@@ -146,7 +146,7 @@ class PlaybackService : MediaLibraryService(), KoinComponent {
                 setShowBadge(false)
             }
 
-        manager.createNotificationChannel(channel("Spotube"))
+        manager.createNotificationChannel(channel("Montanha Music Lab"))
         serviceScope.launch {
             // Re-creating a channel with the same ID updates its name and description.
             manager.createNotificationChannel(

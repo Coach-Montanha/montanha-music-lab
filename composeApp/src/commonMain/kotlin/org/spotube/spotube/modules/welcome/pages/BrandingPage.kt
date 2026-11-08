@@ -9,7 +9,6 @@ import com.composeunstyled.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -30,7 +29,7 @@ fun BrandingPage(modifier: Modifier = Modifier) {
         Spacer(Modifier.height(24.dp))
         Text(
             stringResource(Res.string.welcome_brand_freedom),
-            style = AppTheme.typography.displaySmall.copy(fontFamily = FontFamily.Serif),
+            style = AppTheme.typography.displaySmall,
             textAlign = TextAlign.Center)
         Spacer(Modifier.height(16.dp))
         Text(

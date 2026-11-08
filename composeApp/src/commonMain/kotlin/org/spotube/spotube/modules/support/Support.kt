@@ -33,13 +33,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.Text
 import org.spotube.spotube.core.ui.theming.AppTheme
 import org.spotube.spotube.openUrlInBrowser
-import org.spotube.spotube.resources.iconsax.BrandBuyMeACoffee
-import org.spotube.spotube.resources.iconsax.BrandOpencollective
-import org.spotube.spotube.resources.iconsax.BrandPatreon
+import org.spotube.spotube.resources.iconsax.BrandInstagram
+import org.spotube.spotube.resources.iconsax.BrandPix
+import org.spotube.spotube.resources.iconsax.BrandWhatsapp
 import org.spotube.spotube.resources.iconsax.Iconsax
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
@@ -70,23 +72,23 @@ data class DonationOption(
 /** The donation destinations shown in onboarding, settings and the support prompt. */
 val donationOptions: List<DonationOption> = listOf(
     DonationOption(
-        id = "patreon",
+        id = "instagram",
         title = Res.string.welcome_donate_patreon_title,
         subtitle = Res.string.welcome_donate_patreon_subtitle,
-        url = "https://patreon.com/krtirtho",
-        icon = Iconsax.BrandPatreon),
+        url = "https://instagram.com/coachmontanha1",
+        icon = Iconsax.BrandInstagram),
     DonationOption(
-        id = "buymeacoffee",
+        id = "pix",
         title = Res.string.welcome_donate_bmac_title,
         subtitle = Res.string.welcome_donate_bmac_subtitle,
-        url = "https://www.buymeacoffee.com/krtirtho",
-        icon = Iconsax.BrandBuyMeACoffee),
+        url = "https://wa.me/5583999259385?text=Chave%20PIX%20CPF%3A%2000891652418",
+        icon = Iconsax.BrandPix),
     DonationOption(
-        id = "opencollective",
+        id = "whatsapp",
         title = Res.string.welcome_donate_opencollective_title,
         subtitle = Res.string.welcome_donate_opencollective_subtitle,
-        url = "https://opencollective.com/spotube",
-        icon = Iconsax.BrandOpencollective))
+        url = "https://wa.me/5583999259385",
+        icon = Iconsax.BrandWhatsapp))
 
 /** Minimum time between two automatic support reminders. */
 const val SupportReminderIntervalMillis: Long = 7L * 24 * 60 * 60 * 1000
@@ -109,6 +111,7 @@ fun SupportDialog(
     onDismissRequest: () -> Unit,
     isReminder: Boolean = false) {
     if (!visible) return
+    val clipboardManager = LocalClipboardManager.current
     MillenniumDialog(visible = true, onDismissRequest = onDismissRequest) {
         MillenniumDialogHeader {
             MillenniumDialogTitle(stringResource(Res.string.support_dialog_title))
@@ -125,6 +128,9 @@ fun SupportDialog(
             donationOptions.forEach { option ->
                 MillenniumButton(
                     onClick = {
+                        if (option.id == "pix") {
+                            clipboardManager.setText(AnnotatedString("00891652418"))
+                        }
                         openDonation(option)
                         onDismissRequest()
                     },
@@ -137,11 +143,7 @@ fun SupportDialog(
                             imageVector = option.icon,
                             contentDescription = null,
                             modifier = Modifier.size(20.dp),
-                            tint = if (option.id == "patreon") {
-                                AppTheme.colors.onSurface
-                            } else {
-                                Color.Unspecified
-                            })
+                            tint = Color.Unspecified)
                         Text(stringResource(option.title))
                     }
                 }

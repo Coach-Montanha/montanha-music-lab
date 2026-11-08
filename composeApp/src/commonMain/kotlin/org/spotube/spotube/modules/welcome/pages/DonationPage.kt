@@ -1,6 +1,5 @@
 package org.spotube.spotube.modules.welcome.pages
 
-
 import org.spotube.millennium.composables.MillenniumButton
 import org.spotube.millennium.composables.MillenniumButtonStyle
 import org.spotube.millennium.composables.MillenniumIcon
@@ -14,7 +13,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import org.spotube.spotube.modules.support.DonationOption
@@ -27,13 +27,14 @@ fun DonationPage(
     donations: List<DonationOption>,
     onDonate: (String) -> Unit,
     modifier: Modifier = Modifier) {
+    val clipboardManager = LocalClipboardManager.current
     Column(
         modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center) {
         Text(
             stringResource(Res.string.welcome_donate_quiet_title),
-            style = AppTheme.typography.displaySmall.copy(fontFamily = FontFamily.Serif),
+            style = AppTheme.typography.displaySmall,
             textAlign = TextAlign.Center)
         Spacer(Modifier.height(20.dp))
         Text(
@@ -48,14 +49,19 @@ fun DonationPage(
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
             donations.forEach { option ->
                 MillenniumButton(
-                    onClick = { onDonate(option.url) },
+                    onClick = {
+                        if (option.id == "pix") {
+                            clipboardManager.setText(AnnotatedString("00891652418"))
+                        }
+                        onDonate(option.url)
+                    },
                     style = MillenniumButtonStyle.Secondary) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         MillenniumIcon(
                             option.icon, null, Modifier.size(24.dp),
-                            tint = if (option.id == "patreon") AppTheme.colors.onSurface else Color.Unspecified)
+                            tint = Color.Unspecified)
                         Text(stringResource(option.title))
                     }
                 }

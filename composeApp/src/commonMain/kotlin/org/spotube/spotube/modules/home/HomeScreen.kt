@@ -14,10 +14,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
 package org.spotube.spotube.modules.home
-
-
 import org.spotube.millennium.composables.MillenniumIcon
 import org.spotube.millennium.composables.MillenniumIconButton
 import org.spotube.millennium.composables.MillenniumIconButtonStyle
@@ -38,7 +35,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-
 import org.spotube.spotube.core.ui.theming.AppTheme
 import com.composeunstyled.Text
 import org.spotube.millennium.composables.MillenniumPullToRefreshBox
@@ -95,8 +91,6 @@ import kotlinx.coroutines.flow.map
 import org.jetbrains.compose.resources.Font
 import org.spotube.millennium.adaptive.WindowBreakpoints
 import org.spotube.spotube.resources.iconsax.IconsaxMirrorScreenRegular
-import spotube.composeapp.generated.resources.cookie_regular
-
 @Composable
 fun HomeScreen(viewModel: HomeScreenViewModel) {
     val navigationCommands = koinInject<NavigationCommands>()
@@ -104,16 +98,13 @@ fun HomeScreen(viewModel: HomeScreenViewModel) {
     val isSmallScreen = currentWindowWidthBreakpoint() isBelow WindowBreakpoints.Medium
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
-
     val selectedGenreId = when (val s = state) {
         is HomeScreenState.Data -> s.selectedGenreId
         else -> null
     }
-
     LaunchedEffect(selectedGenreId) {
         listState.scrollToItem(0)
     }
-
     LaunchedEffect(listState) {
         snapshotFlow { listState.layoutInfo }
             .map { layoutInfo ->
@@ -132,7 +123,6 @@ fun HomeScreen(viewModel: HomeScreenViewModel) {
                 }
             }
     }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -143,10 +133,9 @@ fun HomeScreen(viewModel: HomeScreenViewModel) {
             title = {
                 if (isSmallScreen) {
                     Text(
-                        "Spotube",
+                        stringResource(Res.string.app_name),
                         style = AppTheme.typography.headlineLarge.copy(
-                            fontFamily = FontFamily(
-                                listOf(Font(Res.font.cookie_regular, weight = FontWeight.Normal))
+                            fontWeight = FontWeight.Bold
                             )
                         ),
                         color = AppTheme.colors.onSurface
@@ -154,7 +143,6 @@ fun HomeScreen(viewModel: HomeScreenViewModel) {
                 } else {
                     Text(stringResource(Res.string.home_title_browse))
                 }
-
             },
             actions = {
                 if (isSmallScreen) {
@@ -220,7 +208,6 @@ fun HomeScreen(viewModel: HomeScreenViewModel) {
                         onGenreSelected = { viewModel.selectGenre(it) })
                 }
             }
-
             VerticalScrollbar(
                 listState = listState,
                 modifier = Modifier
@@ -229,7 +216,6 @@ fun HomeScreen(viewModel: HomeScreenViewModel) {
         }
     }
 }
-
 @Composable
 private fun HomeContent(
     listState: androidx.compose.foundation.lazy.LazyListState,
@@ -241,7 +227,6 @@ private fun HomeContent(
     val contentPadding = remember(shellBottomInset) {
         PaddingValues(top = 16.dp, bottom = 16.dp + shellBottomInset)
     }
-
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
@@ -285,7 +270,6 @@ private fun HomeContent(
                     }
                 }
             }
-
             is HomeScreenState.Error -> {
                 item {
                     ErrorDisplay(
@@ -294,14 +278,12 @@ private fun HomeContent(
                     )
                 }
             }
-
             is HomeScreenState.Data -> {
                 if (state.featuredItems.isNotEmpty()) {
                     item {
                         FeaturedCarousel(items = state.featuredItems)
                     }
                 }
-
                 if (state.genres.isNotEmpty()) {
                     item {
                         GenreTabs(
@@ -311,9 +293,7 @@ private fun HomeContent(
                         )
                     }
                 }
-
                 val currentSections = state.selectedGenreId?.let { state.browseSections[it] }
-
                 if (currentSections == null) {
                     item {
                         SkeletonTree(true) {
@@ -351,7 +331,6 @@ private fun HomeContent(
                         )
                     }
                 }
-
                 if (state is HomeScreenState.Data.LoadingMore) {
                     item {
                         SkeletonTree(true) {
@@ -383,10 +362,8 @@ private fun HomeContent(
                 }
             }
         }
-
     }
 }
-
 @Composable
 private fun HomeSection(
     title: String,
@@ -395,7 +372,6 @@ private fun HomeSection(
     modifier: Modifier = Modifier
 ) {
     val rowState = rememberLazyListState()
-
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -414,7 +390,6 @@ private fun HomeSection(
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.padding(horizontal = 16.dp).offset(y = (-12).dp)
         )
-
         LazyRow(
             state = rowState,
             modifier = Modifier.dragScrollable(rowState),
@@ -434,7 +409,6 @@ private fun HomeSection(
         }
     }
 }
-
 @Composable
 private fun GenreTabs(
     genres: List<MetadataBrowseGenre>,
@@ -442,7 +416,6 @@ private fun GenreTabs(
     onGenreSelected: (String) -> Unit
 ) {
     val rowState = rememberLazyListState()
-
     LazyRow(
         state = rowState,
         modifier = Modifier.dragScrollable(rowState),

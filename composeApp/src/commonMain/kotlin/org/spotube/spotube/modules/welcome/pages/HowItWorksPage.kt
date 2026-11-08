@@ -15,7 +15,6 @@ import com.composeunstyled.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import org.spotube.spotube.resources.iconsax.Iconsax
 import org.spotube.spotube.resources.iconsax.IconsaxDocumentDownload
@@ -51,7 +50,7 @@ fun HowItWorksPage(modifier: Modifier = Modifier) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
                 stringResource(Res.string.welcome_guide_title),
-                style = AppTheme.typography.headlineMedium.copy(fontFamily = FontFamily.Serif))
+                style = AppTheme.typography.headlineMedium)
             Text(
                 stringResource(Res.string.welcome_guide_subtitle),
                 style = AppTheme.typography.bodyLarge,

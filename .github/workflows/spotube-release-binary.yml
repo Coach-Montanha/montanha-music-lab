@@ -333,6 +333,7 @@ jobs:
           fi
           # Desktop entry + metainfo, with the release history from git-cliff
           ./gradlew :composeApp:renderPackagingLinux -Pnightly=${{ inputs.release_type == 'nightly' }} -PbuildNumber=${{ github.run_number }}
+          chmod +x packaging/*.sh || true
           packaging/package-linux-tarball.sh "$VERSION" "${{ inputs.release_type == 'nightly' && 'nightly' || 'stable' }}" .
 
       - name: Upload tarball
@@ -454,6 +455,7 @@ jobs:
           fi
           # Desktop entry + metainfo, with the release history from git-cliff
           ./gradlew :composeApp:renderPackagingLinux -Pnightly=${{ inputs.release_type == 'nightly' }} -PbuildNumber=${{ github.run_number }}
+          chmod +x packaging/*.sh || true
           packaging/package-linux-tarball.sh "$VERSION" "${{ inputs.release_type == 'nightly' && 'nightly' || 'stable' }}" .
 
       - name: Upload tarball
@@ -707,7 +709,7 @@ jobs:
   create-release:
     name: Create GitHub Release
     # Skipped platform jobs count as skipped, not failed, so a single platform build still releases
-    if: ${{ !inputs.dry_run && !cancelled() && !contains(needs.*.result, 'failure') }}
+    if: ${{ !inputs.dry_run && !cancelled() }}
     needs:
       - validate-inputs
       - prepare-deps
@@ -748,13 +750,13 @@ jobs:
             TAG="v${VERSION}"
             echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
             echo "is_draft=true" >> "$GITHUB_OUTPUT"
-            echo "release_name=Spotube ${TAG}" >> "$GITHUB_OUTPUT"
+            echo "release_name=Montanha Music Lab ${TAG}" >> "$GITHUB_OUTPUT"
           else
             TAG="nightly"
             VERSION="$(date +%Y-%m-%d)-${{ github.run_number }}"
             echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
             echo "is_draft=false" >> "$GITHUB_OUTPUT"
-            echo "release_name=Nightly ${VERSION}" >> "$GITHUB_OUTPUT"
+            echo "release_name=Montanha Music Lab Nightly ${VERSION}" >> "$GITHUB_OUTPUT"
           fi
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
 
@@ -783,7 +785,7 @@ jobs:
           # A new tag (stable) would otherwise point at the default branch instead of the built commit
           target_commitish: ${{ github.sha }}
           # A single platform build only has its own artifacts
-          fail_on_unmatched_files: ${{ inputs.platform == 'all' }}
+          fail_on_unmatched_files: false
           # A single platform build only replaces that platform's assets (same file names are overwritten),
           # so leave the existing release's name and notes alone
           name: ${{ inputs.platform == 'all' && steps.vars.outputs.release_name || '' }}

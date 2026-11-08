@@ -33,7 +33,7 @@ actual class Paths {
     }
 
     actual fun getUserDownloadsDirPath(): String {
-        return Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).absolutePath + java.io.File.separator + "Spotube"
+        return Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).absolutePath + java.io.File.separator + "Montanha Music Lab"
     }
 
     actual fun getMusicCacheDirPath(): String {
