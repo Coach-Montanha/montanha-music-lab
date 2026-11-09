@@ -161,16 +161,7 @@ fun HomeScreen(viewModel: HomeScreenViewModel) {
                             contentDescription = stringResource(Res.string.jam_screen_title)
                         )
                     }
-                    val supportLabel = stringResource(Res.string.support_button_label)
-                    MillenniumIconButton(
-                        onClick = openSupport,
-                        style = MillenniumIconButtonStyle.Quiet
-                    ) {
-                        MillenniumIcon(
-                            imageVector = Iconsax.IconsaxHeart2,
-                            contentDescription = supportLabel
-                        )
-                    }
+
                 }
             })
         if (isSmallScreen) {
@@ -310,7 +301,7 @@ private fun HomeContent(
                         val t = section.title.lowercase()
                         t.contains("playlist") || t.contains("recent") || t.contains("recente") || t.contains("history") || t.contains("tocad")
                     }
-                    val displaySections = if (filteredSections.isNotEmpty()) filteredSections else currentSections
+                    val displaySections = filteredSections
                     items(displaySections) { section ->
                         val t = section.title.lowercase()
                         val cleanTitle = when {

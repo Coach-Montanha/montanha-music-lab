@@ -46,6 +46,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import compose.icons.FeatherIcons
+import compose.icons.feathericons.RotateCcw
+import compose.icons.feathericons.RotateCw
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
@@ -198,6 +201,22 @@ fun AppLargePlayer(
     fun onSkipNext() {
         if (isJamGuest) return
         scope.launch { audioPlayer.skipToNext() }
+    }
+
+    fun onRewind10s() {
+        if (isJamGuest) return
+        val current = playerUiState.position
+        val newPos = (current.inWholeMilliseconds - 10000L).coerceAtLeast(0L).milliseconds
+        scope.launch { audioPlayer.seekTo(newPos) }
+    }
+
+    fun onForward10s() {
+        if (isJamGuest) return
+        val current = playerUiState.position
+        val durationMillis = playerUiState.seekDuration.inWholeMilliseconds
+        val maxPos = if (durationMillis > 0L) durationMillis else Long.MAX_VALUE
+        val newPos = (current.inWholeMilliseconds + 10000L).coerceAtMost(maxPos).milliseconds
+        scope.launch { audioPlayer.seekTo(newPos) }
     }
 
     fun onShuffleToggle() {
@@ -357,6 +376,13 @@ fun AppLargePlayer(
                             MillenniumIcon(Iconsax.IconsaxPrevious, contentDescription = stringResource(Res.string.player_previous_content_description))
                         }
                         MillenniumIconButton(
+                            onClick = ::onRewind10s,
+                            enabled = !isJamGuest,
+                            style = MillenniumIconButtonStyle.Quiet
+                        ) {
+                            MillenniumIcon(FeatherIcons.RotateCcw, contentDescription = "Retroceder 10s")
+                        }
+                        MillenniumIconButton(
                             onClick = ::onPlayPause,
                             style = MillenniumIconButtonStyle.Primary
                         ) {
@@ -365,6 +391,13 @@ fun AppLargePlayer(
                                 contentDescription = stringResource(if (playerUiState.isPlaying) Res.string.player_pause_content_description else Res.string.player_play_or_pause_content_description),
                                 tint = LocalTextStyle.current.color
                             )
+                        }
+                        MillenniumIconButton(
+                            onClick = ::onForward10s,
+                            enabled = !isJamGuest,
+                            style = MillenniumIconButtonStyle.Quiet
+                        ) {
+                            MillenniumIcon(FeatherIcons.RotateCw, contentDescription = "Avançar 10s")
                         }
                         MillenniumIconButton(
                             onClick = ::onSkipNext,

@@ -69,6 +69,10 @@ import spotube.composeapp.generated.resources.player_play_content_description
 import spotube.composeapp.generated.resources.player_pause_content_description
 import spotube.composeapp.generated.resources.player_nothing_playing
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
+import compose.icons.FeatherIcons
+import compose.icons.feathericons.RotateCcw
+import compose.icons.feathericons.RotateCw
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
@@ -121,6 +125,20 @@ fun AppFloatingPlayer(
         scope.launch { audioPlayer.skipToNext() }
     }
 
+    fun onRewind10s() {
+        val current = playerUiState.position
+        val newPos = (current.inWholeMilliseconds - 10000L).coerceAtLeast(0L).milliseconds
+        scope.launch { audioPlayer.seekTo(newPos) }
+    }
+
+    fun onForward10s() {
+        val current = playerUiState.position
+        val durationMillis = playerUiState.seekDuration.inWholeMilliseconds
+        val maxPos = if (durationMillis > 0L) durationMillis else Long.MAX_VALUE
+        val newPos = (current.inWholeMilliseconds + 10000L).coerceAtMost(maxPos).milliseconds
+        scope.launch { audioPlayer.seekTo(newPos) }
+    }
+
     FloatingPlayerContent(
         playerUiState = playerUiState,
         modifier = modifier,
@@ -128,6 +146,8 @@ fun AppFloatingPlayer(
         onPlayPause = ::onPlayPause,
         onPrevious = ::onPrevious,
         onNext = ::onNext,
+        onRewind10s = ::onRewind10s,
+        onForward10s = ::onForward10s,
         heartButton = {
             PlayerHeartButton(
                 audioPlayerQueue = audioPlayerQueue,
@@ -236,6 +256,16 @@ internal fun FloatingPlayerContent(
                         )
                     }
                     MillenniumIconButton(
+                        onClick = onRewind10s,
+                        enabled = playerUiState.queue.isNotEmpty(),
+                        style = MillenniumIconButtonStyle.Quiet
+                    ) {
+                        MillenniumIcon(
+                            FeatherIcons.RotateCcw,
+                            contentDescription = "Retroceder 10s"
+                        )
+                    }
+                    MillenniumIconButton(
                         onClick = onPlayPause,
                         enabled = playerUiState.queue.isNotEmpty(),
                         style = MillenniumIconButtonStyle.Secondary
@@ -243,6 +273,16 @@ internal fun FloatingPlayerContent(
                         MillenniumIcon(
                             if (playerUiState.isPlaying) Iconsax.IconsaxPause else Iconsax.IconsaxPlay,
                             contentDescription = stringResource(if (playerUiState.isPlaying) Res.string.player_pause_content_description else Res.string.player_play_content_description)
+                        )
+                    }
+                    MillenniumIconButton(
+                        onClick = onForward10s,
+                        enabled = playerUiState.queue.isNotEmpty(),
+                        style = MillenniumIconButtonStyle.Quiet
+                    ) {
+                        MillenniumIcon(
+                            FeatherIcons.RotateCw,
+                            contentDescription = "Avançar 10s"
                         )
                     }
                     MillenniumIconButton(

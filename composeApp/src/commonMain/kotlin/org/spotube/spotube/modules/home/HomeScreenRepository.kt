@@ -72,25 +72,9 @@ class HomeScreenRepository(
         sublistItemCache.invalidateAll()
     }
 
-    suspend fun featuredItems() = plugin?.let { plugin ->
-        featuredItemCache.get("featured_items") {
-            pluginManager.withScope {
-                plugin.use {
-                    metadataBrowseAPI.featured()
-                }
-            }
-        }
-    }
+    suspend fun featuredItems(): List<MetadataBrowseItem>? = emptyList()
 
-    suspend fun genres() = plugin?.let { plugin ->
-        genresCache.get("genres") {
-            pluginManager.withScope {
-                plugin.use {
-                    metadataBrowseAPI.genres()
-                }
-            }
-        }
-    }
+    suspend fun genres(): List<MetadataBrowseGenre>? = listOf(MetadataBrowseGenre(id = "home_main", name = "Início"))
 
     suspend fun list(genreId: String, paginationStrategy: PaginationStrategy? = null) =
         plugin?.let { plugin ->
@@ -99,7 +83,33 @@ class HomeScreenRepository(
             ) {
                 pluginManager.withScope {
                     plugin.use {
-                        metadataBrowseAPI.list(genreId, paginationStrategy)
+                        val result = metadataBrowseAPI.list(genreId, paginationStrategy)
+                    val blockedKeywords = listOf(
+                        "made for you", "verão", "verao", "summer", "popular",
+                        "artist", "album", "radio", "chart", "before you watch",
+                        "new release", "podcast", "audiobook"
+                    )
+                    val filteredItems = result.items.filter { section ->
+                        val t = section.title.lowercase()
+                        val isBlocked = blockedKeywords.any { t.contains(it) }
+                        !isBlocked && (
+                            t.contains("playlist") ||
+                            t.contains("recent") ||
+                            t.contains("recente") ||
+                            t.contains("history") ||
+                            t.contains("tocad") ||
+                            t.contains("minha")
+                        )
+                    }.map { section ->
+                        val t = section.title.lowercase()
+                        val cleanTitle = when {
+                            t.contains("playlist") || t.contains("minha") -> "Minhas playlists"
+                            t.contains("recent") || t.contains("recente") || t.contains("history") || t.contains("tocad") -> "Mais recente"
+                            else -> section.title
+                        }
+                        section.copy(title = cleanTitle)
+                    }
+                    result.copy(items = filteredItems)
                     }
                 }
             }

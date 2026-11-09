@@ -127,7 +127,6 @@ internal enum class SettingsTab(
     Caching(Res.string.settings_section_caching, Iconsax.IconsaxDocumentDownload),
     Downloads(Res.string.settings_section_downloads, Iconsax.IconsaxDirectboxReceive),
     Desktop(Res.string.settings_section_desktop, Iconsax.IconsaxImportArrow2),
-    Support(Res.string.settings_section_support, Iconsax.IconsaxHeart2),
     About(Res.string.settings_section_about, Iconsax.IconsaxInformation),
 }
 
@@ -321,12 +320,6 @@ private fun SettingsTabContent(
 
                             SettingsTab.Desktop ->
                                 desktopSection(settings, settingsViewModel, includeHeader = false)
-
-                            SettingsTab.Support ->
-                                supportSection(
-                                    settings = settings,
-                                    settingsViewModel = settingsViewModel,
-                                    includeHeader = false)
 
                             SettingsTab.About ->
                                 updatesSection(settings, settingsViewModel, includeHeader = false)

@@ -185,13 +185,6 @@ fun AppSidebar(
             contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
             contentSpacing = 2.dp
         ) {
-            val supportLabel = stringResource(Res.string.support_button_label)
-            MillenniumSidebarItem(
-                label = supportLabel,
-                onClick = { openSupport() },
-                contentDescription = supportLabel,
-                icon = Iconsax.IconsaxHeart2
-            )
             MillenniumSidebarItem(
                 label = stringResource(Res.string.settings_screen_title),
                 onClick = { navigator.navigate(Routes.Settings) },
