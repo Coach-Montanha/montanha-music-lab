@@ -165,6 +165,8 @@ internal fun FloatingPlayerContent(
     onPlayPause: () -> Unit,
     onPrevious: () -> Unit = {},
     onNext: () -> Unit = {},
+    onRewind10s: () -> Unit = {},
+    onForward10s: () -> Unit = {},
     heartButton: @Composable () -> Unit
 ) {
     val coverModel = playerUiState.coverModel

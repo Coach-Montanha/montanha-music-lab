@@ -143,10 +143,26 @@ class PluginManager(
                     }
                 }
                 val cur = state.value
-                if (cur is PluginManagerStates.Data && PluginAbility.METADATA !in cur.selectedPlugins) {
-                    val meta = cur.plugins.firstOrNull { PluginAbility.METADATA in it.abilities }
-                    if (meta != null) {
-                        setSelectedPlugin(PluginAbility.METADATA, meta)
+                if (cur is PluginManagerStates.Data) {
+                    if (PluginAbility.METADATA !in cur.selectedPlugins) {
+                        val meta = cur.plugins.firstOrNull { PluginAbility.METADATA in it.abilities }
+                        if (meta != null) {
+                            setSelectedPlugin(PluginAbility.METADATA, meta)
+                        }
+                    }
+                    if (PluginAbility.AUDIO !in cur.selectedPlugins) {
+                        val audio = cur.plugins.firstOrNull { PluginAbility.AUDIO in it.abilities }
+                            ?: BUILT_IN_PLUGINS.firstOrNull { PluginAbility.AUDIO in it.abilities }
+                        if (audio != null) {
+                            setSelectedPlugin(PluginAbility.AUDIO, audio)
+                        }
+                    }
+                    if (PluginAbility.LYRICS !in cur.selectedPlugins) {
+                        val lyrics = cur.plugins.firstOrNull { PluginAbility.LYRICS in it.abilities }
+                            ?: BUILT_IN_PLUGINS.firstOrNull { PluginAbility.LYRICS in it.abilities }
+                        if (lyrics != null) {
+                            setSelectedPlugin(PluginAbility.LYRICS, lyrics)
+                        }
                     }
                 }
             } catch (e: Exception) {
@@ -205,7 +221,8 @@ class PluginManager(
                     // Drop selections for plugins that don't actually declare the ability
                     // (e.g. a scrobble selection left over from a removed built-in plugin)
                     // and always point selections at the resolved plugin entry.
-                    val selectedPlugins = res.selectedPlugins.ifEmpty { defaultSelectedPlugins }
+                    val mergedSelected = defaultSelectedPlugins + res.selectedPlugins
+                    val selectedPlugins = mergedSelected
                         .mapNotNull { (ability, selected) ->
                             val plugin = resolvedPluginsById[selected.id] ?: return@mapNotNull null
                             if (ability in plugin.abilities) ability to plugin else null
