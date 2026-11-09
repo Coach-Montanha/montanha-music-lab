@@ -301,7 +301,7 @@ internal fun DownloadListRow(
                 MillenniumIcon(
                     Iconsax.IconsaxAddSquare,
                     contentDescription = "Adicionar à Playlist",
-                    tint = colors.textPrimary,
+                    tint = colors.text,
                     modifier = Modifier.size(20.dp)
                 )
             }

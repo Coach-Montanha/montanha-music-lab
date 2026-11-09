@@ -447,7 +447,12 @@ class LibraryRepository(
                     artists = emptyList(),
                     album = null,
                     durationMs = 0L,
+                    trackNumber = null,
+                    discNumber = null,
                     thumbnails = emptyList(),
+                    explicit = false,
+                    popularity = null,
+                    isrcCode = null,
                     externalUri = null
                 )
             }
