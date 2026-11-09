@@ -60,7 +60,7 @@ actual class Paths {
             create = false,
             error = null)
 
-        return (downloadsDirectory?.path ?: getApplicationDataDirPath()) + "/Spotube"
+        return (downloadsDirectory?.path ?: getApplicationDataDirPath()) + "/Montanha Music Lab"
     }
 
     actual fun getMusicCacheDirPath(): String {

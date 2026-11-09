@@ -124,10 +124,10 @@ fun LibraryScreen(libraryState: LibraryState = koinInject()) {
                     )
                 }
 
-                LibraryTab.Albums -> MetadataPluginGuard(showTopBar = false, requireLogin = true) {
+                LibraryTab.Albums -> MetadataPluginGuard(showTopBar = false, requireLogin = false) {
                     LibraryAlbumsScreen(viewMode = viewMode)
                 }
-                LibraryTab.Artists -> MetadataPluginGuard(showTopBar = false, requireLogin = true) {
+                LibraryTab.Artists -> MetadataPluginGuard(showTopBar = false, requireLogin = false) {
                     LibraryArtistsScreen(viewMode = viewMode)
                 }
                 LibraryTab.LocalTracks -> LibraryLocalTracksScreen()

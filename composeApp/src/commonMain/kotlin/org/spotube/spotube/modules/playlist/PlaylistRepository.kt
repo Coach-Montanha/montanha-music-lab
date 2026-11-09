@@ -86,9 +86,10 @@ class PlaylistRepository(
 
     suspend fun getPlaylistTracks(playlistId: String, paginationStrategy: PaginationStrategy? = null): PaginationResult<MetadataTrack>? {
         if (playlistId.startsWith("local_")) {
+            val tracks = libraryRepository.getLocalPlaylistTracks(playlistId)
             return PaginationResult(
-                items = emptyList(),
-                totalCount = 0,
+                items = tracks,
+                totalCount = tracks.size,
                 nextPagination = null
             )
         }

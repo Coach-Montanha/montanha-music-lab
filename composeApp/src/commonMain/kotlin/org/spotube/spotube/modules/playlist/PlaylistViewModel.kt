@@ -365,13 +365,32 @@ class PlaylistViewModel(
     fun addTracksToPlaylist(playlistId: String) {
         viewModelScope.launch {
             runCatching {
-                libraryRepository.addTracksToPlaylist(
-                    playlistId,
-                    _tracksToAddToPlaylist.value.map { it.id })
+                if (playlistId.startsWith("local_")) {
+                    libraryRepository.addTrackObjectsToPlaylist(playlistId, _tracksToAddToPlaylist.value)
+                } else {
+                    libraryRepository.addTracksToPlaylist(
+                        playlistId,
+                        _tracksToAddToPlaylist.value.map { it.id })
+                }
             }.onFailure { e ->
                 logger.e(e) { "Failed to add tracks to playlist" }
             }.onSuccess {
                 _showAddToPlaylistPicker.value = false
+            }
+        }
+    }
+
+    fun saveAsPersonalPlaylist() {
+        viewModelScope.launch {
+            val current = _state.value
+            val playlist = (current as? PlaylistScreenState.Data)?.playlist ?: return@launch
+            val tracks = (current as? PlaylistScreenState.Data)?.tracks ?: emptyList()
+            runCatching {
+                libraryRepository.savePlaylistAsPersonal(playlist, tracks)
+            }.onSuccess {
+                logger.i { "Saved playlist '${playlist.title}' as personal playlist with ${tracks.size} tracks" }
+            }.onFailure { e ->
+                logger.e(e) { "Failed to save personal playlist" }
             }
         }
     }

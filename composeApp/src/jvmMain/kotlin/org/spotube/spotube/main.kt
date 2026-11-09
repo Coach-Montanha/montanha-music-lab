@@ -229,7 +229,7 @@ fun main() {
                     exitApplication()
                 }
             },
-            title = "Spotube",
+            title = "Montanha Music Lab",
             icon = painterResource(Res.drawable.spotube_logo),
             visible = isWindowVisible
         ) {

@@ -42,6 +42,7 @@ internal fun <T> LibraryMediaCollection(
     val listState = rememberLazyListState()
     val reportViewport by rememberUpdatedState(onViewportChanged)
     val padding = PaddingValues(top = 16.dp, bottom = LocalAppShellBottomInset.current + 16.dp)
+    val distinctItems = androidx.compose.runtime.remember(items) { items.distinctBy { itemKey(it) } }
     LaunchedEffect(viewMode, gridState, listState) {
         val positions = if (viewMode == LibraryViewMode.List) snapshotFlow {
             listState.layoutInfo.let { it.visibleItemsInfo.lastOrNull()?.index to it.totalItemsCount }
@@ -58,7 +59,7 @@ internal fun <T> LibraryMediaCollection(
             if (loading) items(8) { SkeletonTree(true) { skeleton(true) } }
             else {
                 if (header != null) item(key = "library_header") { header(true) }
-                items(items, key = { "media:${itemKey(it)}" }) { itemContent(it, true) }
+                items(distinctItems, key = { "media:${itemKey(it)}" }) { itemContent(it, true) }
                 if (loadingMore) items(4) { SkeletonTree(true) { skeleton(true) } }
             }
         }
@@ -71,7 +72,7 @@ internal fun <T> LibraryMediaCollection(
             if (loading) items(8) { SkeletonTree(true) { skeleton(false) } }
             else {
                 if (header != null) item(key = "library_header") { header(false) }
-                items(items, key = { "media:${itemKey(it)}" }) { itemContent(it, false) }
+                items(distinctItems, key = { "media:${itemKey(it)}" }) { itemContent(it, false) }
                 if (loadingMore) items(4) { SkeletonTree(true) { skeleton(false) } }
             }
         }

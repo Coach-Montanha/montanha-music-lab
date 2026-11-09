@@ -94,23 +94,46 @@ fun PlaylistScreen(
     val errorMessage = (state as? PlaylistScreenState.Error)?.message
     val isLoading = state is PlaylistScreenState.Loading && (dataState == null || dataState.tracks.isEmpty())
 
-    val footerContent: (@Composable () -> Unit)? = if (isOwner && dataState != null) {
-        {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 16.dp),
-                horizontalArrangement = Arrangement.Center) {
-                MillenniumButton(
-                    onClick = { showAddTracksDialog = true },
-                    style = MillenniumButtonStyle.Secondary) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        MillenniumIcon(
-                            imageVector = Iconsax.IconsaxAddSquare,
-                            contentDescription = null)
-                        Text(stringResource(Res.string.playlist_add_tracks_button))
+    val footerContent: (@Composable () -> Unit)? = if (dataState != null) {
+        if (isOwner) {
+            {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 16.dp),
+                    horizontalArrangement = Arrangement.Center) {
+                    MillenniumButton(
+                        onClick = { showAddTracksDialog = true },
+                        style = MillenniumButtonStyle.Secondary) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            MillenniumIcon(
+                                imageVector = Iconsax.IconsaxAddSquare,
+                                contentDescription = null)
+                            Text(stringResource(Res.string.playlist_add_tracks_button))
+                        }
+                    }
+                }
+            }
+        } else {
+            {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 16.dp),
+                    horizontalArrangement = Arrangement.Center) {
+                    MillenniumButton(
+                        onClick = { viewModel.saveAsPersonalPlaylist() },
+                        style = MillenniumButtonStyle.Primary) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            MillenniumIcon(
+                                imageVector = Iconsax.IconsaxAddSquare,
+                                contentDescription = null)
+                            Text("Salvar como Playlist Pessoal")
+                        }
                     }
                 }
             }

@@ -36,6 +36,12 @@ import org.spotube.spotube.resources.iconsax.IconsaxDirectboxReceive
 import org.spotube.spotube.resources.iconsax.IconsaxCloseSquare
 import org.spotube.spotube.resources.iconsax.IconsaxRefreshRight
 import org.spotube.spotube.resources.iconsax.IconsaxTrash
+import org.spotube.spotube.resources.iconsax.IconsaxAddSquare
+import org.spotube.spotube.modules.library.playlist.AddToPlaylistPicker
+import org.spotube.plugin_interfaces.plugin_apis.metadata.track.MetadataTrack
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import org.spotube.millennium.composables.MillenniumButton
@@ -56,27 +62,49 @@ fun DownloadsScreen(
     topContent: @Composable () -> Unit = {}
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    var tracksToAddToPlaylist by remember { mutableStateOf<List<MetadataTrack>?>(null) }
+
     Column(modifier.fillMaxSize()) {
         if (headerInAppBar) {
             ApplicationMainBar(
                 backButton = false,
                 title = { DownloadsToolbarTitle() },
                 subtitle = { DownloadsToolbarSummary(state) },
-                actions = { DownloadsToolbarActions(state, viewModel::clearCompleted) }
+                actions = {
+                    DownloadsToolbarActions(
+                        state = state,
+                        onClearCompleted = viewModel::clearCompleted,
+                        onSaveAllToPlaylist = { tracksToAddToPlaylist = viewModel.getCompletedTracks() }
+                    )
+                }
             )
             topContent()
         }
         DownloadsContent(
-            state,
-            viewModel::cancel,
-            viewModel::retry,
-            viewModel::remove,
-            viewModel::clearCompleted,
-            Modifier.weight(1f)
+            state = state,
+            onCancel = viewModel::cancel,
+            onRetry = viewModel::retry,
+            onRemove = viewModel::remove,
+            onClearCompleted = viewModel::clearCompleted,
+            onSaveAllToPlaylist = { tracksToAddToPlaylist = viewModel.getCompletedTracks() },
+            onAddToPlaylist = { track -> tracksToAddToPlaylist = listOf(track) },
+            modifier = Modifier.weight(1f)
                 .then(if (headerInAppBar) Modifier.padding(horizontal = 12.dp) else Modifier),
             showHeader = !headerInAppBar
         )
     }
+
+    AddToPlaylistPicker(
+        visible = tracksToAddToPlaylist != null,
+        currentUserId = null,
+        onDismiss = { tracksToAddToPlaylist = null },
+        onPlaylistSelected = { playlistId ->
+            tracksToAddToPlaylist?.let { tracks ->
+                viewModel.addTracksToPlaylist(playlistId, tracks)
+            }
+            tracksToAddToPlaylist = null
+        }
+    )
 }
 
 @Composable
@@ -115,15 +143,32 @@ internal fun DownloadsToolbarSummary(state: DownloadsUiState) {
 }
 
 @Composable
-internal fun DownloadsToolbarActions(state: DownloadsUiState, onClearCompleted: () -> Unit) {
-    if (state.canClearCompleted) MillenniumButton(
-        onClick = onClearCompleted,
-        style = MillenniumButtonStyle.Secondary
-    ) {
-        Text(
-            stringResource(Res.string.downloads_clear_completed),
-            style = AppTheme.typography.labelMedium
-        )
+internal fun DownloadsToolbarActions(
+    state: DownloadsUiState,
+    onClearCompleted: () -> Unit,
+    onSaveAllToPlaylist: () -> Unit = {}
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (state.completedCount > 0) {
+            MillenniumButton(
+                onClick = onSaveAllToPlaylist,
+                style = MillenniumButtonStyle.Secondary
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    MillenniumIcon(Iconsax.IconsaxAddSquare, null, modifier = Modifier.size(16.dp))
+                    Text("Salvar em Playlist", style = AppTheme.typography.labelMedium)
+                }
+            }
+        }
+        if (state.canClearCompleted) MillenniumButton(
+            onClick = onClearCompleted,
+            style = MillenniumButtonStyle.Secondary
+        ) {
+            Text(
+                stringResource(Res.string.downloads_clear_completed),
+                style = AppTheme.typography.labelMedium
+            )
+        }
     }
 }
 
@@ -134,6 +179,8 @@ internal fun DownloadsContent(
     onRetry: (String) -> Unit,
     onRemove: (String) -> Unit,
     onClearCompleted: () -> Unit,
+    onSaveAllToPlaylist: () -> Unit = {},
+    onAddToPlaylist: (MetadataTrack) -> Unit = {},
     modifier: Modifier = Modifier,
     showHeader: Boolean = true
 ) {
@@ -149,7 +196,11 @@ internal fun DownloadsContent(
                     DownloadsToolbarTitle()
                     DownloadsToolbarSummary(state)
                 }
-                DownloadsToolbarActions(state, onClearCompleted)
+                DownloadsToolbarActions(
+                    state = state,
+                    onClearCompleted = onClearCompleted,
+                    onSaveAllToPlaylist = onSaveAllToPlaylist
+                )
             }
             if (state.items.isEmpty()) MediaEmptyState(
                 Iconsax.IconsaxDirectboxReceive,
@@ -166,10 +217,12 @@ internal fun DownloadsContent(
             ) {
                 items(state.items, key = { it.id }) { row ->
                     DownloadListRow(
-                        row,
-                        { onCancel(row.id) },
-                        { onRetry(row.id) },
-                        { onRemove(row.id) })
+                        item = row,
+                        onCancel = { onCancel(row.id) },
+                        onRetry = { onRetry(row.id) },
+                        onRemove = { onRemove(row.id) },
+                        onAddToPlaylist = { row.track?.let(onAddToPlaylist) }
+                    )
                 }
             }
         }
@@ -181,7 +234,8 @@ internal fun DownloadListRow(
     item: DownloadRowUiState,
     onCancel: () -> Unit,
     onRetry: () -> Unit,
-    onRemove: () -> Unit
+    onRemove: () -> Unit,
+    onAddToPlaylist: () -> Unit = {}
 ) {
     val colors = MillenniumTheme.colors
     Row(
@@ -237,6 +291,20 @@ internal fun DownloadListRow(
                 modifier = Modifier.fillMaxWidth(),
                 height = 6.dp
             )
+        }
+        if (item.status == DownloadStatus.Completed && item.track != null) {
+            MillenniumIconButton(
+                onClick = onAddToPlaylist,
+                modifier = Modifier.size(40.dp),
+                style = MillenniumIconButtonStyle.Quiet
+            ) {
+                MillenniumIcon(
+                    Iconsax.IconsaxAddSquare,
+                    contentDescription = "Adicionar à Playlist",
+                    tint = colors.textPrimary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
         }
         MillenniumIconButton(
             onClick = when (item.action) {

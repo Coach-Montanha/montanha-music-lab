@@ -22,6 +22,7 @@ import org.spotube.plugin_interfaces.plugin_apis.metadata.artist.MetadataArtist
 import org.spotube.plugin_interfaces.plugin_apis.metadata.common.PaginationResult
 import org.spotube.plugin_interfaces.plugin_apis.metadata.common.PaginationStrategy
 import org.spotube.plugin_interfaces.plugin_apis.metadata.playlist.MetadataPlaylist
+import org.spotube.plugin_interfaces.plugin_apis.metadata.track.MetadataTrack
 import org.spotube.plugin_interfaces.plugin_apis.metadata.user.MetadataUser
 import org.spotube.spotube.modules.plugin.PluginManager
 import io.github.reactivecircus.cache4k.Cache
@@ -95,6 +96,30 @@ class LibraryRepository(
     fun getLocalPlaylist(id: String): MetadataPlaylist? =
         localPlaylists.value.find { it.id == id }
 
+    private val localTracksPath = runCatching {
+        "${Paths().getApplicationDataDirPath()}/montanha_playlist_tracks.json".toPath()
+    }.getOrNull()
+
+    private fun loadLocalPlaylistTracks(): Map<String, List<MetadataTrack>> = runCatching {
+        val path = localTracksPath ?: return emptyMap()
+        if (!FileSystem.SYSTEM.exists(path)) return emptyMap()
+        val content = FileSystem.SYSTEM.read(path) { readUtf8() }
+        json.decodeFromString<Map<String, List<MetadataTrack>>>(content)
+    }.getOrDefault(emptyMap())
+
+    private fun persistLocalPlaylistTracks(tracksMap: Map<String, List<MetadataTrack>>) {
+        val path = localTracksPath ?: return
+        runCatching {
+            val content = json.encodeToString(tracksMap)
+            FileSystem.SYSTEM.write(path) { writeUtf8(content) }
+        }
+    }
+
+    private val playlistTracksMap = MutableStateFlow<Map<String, List<MetadataTrack>>>(loadLocalPlaylistTracks())
+
+    fun getLocalPlaylistTracks(playlistId: String): List<MetadataTrack> =
+        playlistTracksMap.value[playlistId].orEmpty()
+
     init {
         savedPlaylistIds.value += localPlaylists.value.map { it.id }.toSet()
 
@@ -149,7 +174,7 @@ class LibraryRepository(
         )
     }
 
-    suspend fun savedAlbums(paginationStrategy: PaginationStrategy? = null) =
+    suspend fun savedAlbums(paginationStrategy: PaginationStrategy? = null) = runCatching {
         authPlugin?.let { plugin ->
             albumCache.get(
                 key = paginationStrategy ?: PaginationStrategy.Offset(0, 20)
@@ -163,8 +188,9 @@ class LibraryRepository(
                 }
             }
         }
+    }.getOrNull()
 
-    suspend fun savedArtists(paginationStrategy: PaginationStrategy? = null) =
+    suspend fun savedArtists(paginationStrategy: PaginationStrategy? = null) = runCatching {
         authPlugin?.let { plugin ->
             artistCache.get(
                 key = paginationStrategy ?: PaginationStrategy.Offset(0, 20)
@@ -178,6 +204,7 @@ class LibraryRepository(
                 }
             }
         }
+    }.getOrNull()
 
     suspend fun isSavedPlaylists(ids: List<String>): List<Boolean> {
         val unknownIds = ids.filterNot { savedPlaylistIds.value.contains(it) }
@@ -345,25 +372,7 @@ class LibraryRepository(
         isPublic: Boolean,
         isCollaborating: Boolean,
         imageBase64: String,
-        trackIds: List<String>): MetadataPlaylist? {
-        val remoteResult = authPlugin?.let { plugin ->
-            pluginManager.withScope {
-                plugin.use {
-                    val result = metadataPlaylistAPI.createPlaylist(
-                        name = name,
-                        description = description,
-                        isPublic = isPublic,
-                        isCollaborating = isCollaborating,
-                        imageBase64 = imageBase64,
-                        trackIds = trackIds)
-                    playlistCache.invalidateAll()
-                    savedPlaylistIds.value += result.id
-                    result
-                }
-            }
-        }
-        if (remoteResult != null) return remoteResult
-
+        trackIds: List<String>): MetadataPlaylist {
         val local = MetadataPlaylist(
             id = "local_${Clock.System.now().toEpochMilliseconds()}",
             title = name,
@@ -376,6 +385,28 @@ class LibraryRepository(
         val updated = localPlaylists.value + local
         localPlaylists.value = updated
         persistLocalPlaylists(updated)
+        savedPlaylistIds.value += local.id
+        return local
+    }
+
+    suspend fun savePlaylistAsPersonal(playlist: MetadataPlaylist, tracks: List<MetadataTrack>): MetadataPlaylist {
+        val local = MetadataPlaylist(
+            id = "local_${Clock.System.now().toEpochMilliseconds()}",
+            title = playlist.title,
+            description = playlist.description ?: "Playlist Pessoal",
+            thumbnails = playlist.thumbnails,
+            trackCount = tracks.size,
+            externalUri = playlist.externalUri,
+            owner = MetadataUser(id = "user", username = "montanha_user", displayName = "Eu", thumbnails = emptyList(), externalUri = null)
+        )
+        val updatedPlaylists = localPlaylists.value + local
+        localPlaylists.value = updatedPlaylists
+        persistLocalPlaylists(updatedPlaylists)
+
+        val updatedMap = playlistTracksMap.value + (local.id to tracks)
+        playlistTracksMap.value = updatedMap
+        persistLocalPlaylistTracks(updatedMap)
+
         savedPlaylistIds.value += local.id
         return local
     }
@@ -407,6 +438,32 @@ class LibraryRepository(
     }
 
     suspend fun addTracksToPlaylist(playlistId: String, trackIds: List<String>) {
+        if (playlistId.startsWith("local_")) {
+            val existing = playlistTracksMap.value[playlistId].orEmpty()
+            val newTracks = trackIds.map { trackId ->
+                MetadataTrack(
+                    id = trackId,
+                    title = trackId,
+                    artists = emptyList(),
+                    album = null,
+                    durationMs = 0L,
+                    thumbnails = emptyList(),
+                    externalUri = null
+                )
+            }
+            val combined = (existing + newTracks).distinctBy { it.id }
+            val updatedMap = playlistTracksMap.value + (playlistId to combined)
+            playlistTracksMap.value = updatedMap
+            persistLocalPlaylistTracks(updatedMap)
+
+            val updatedPlaylists = localPlaylists.value.map { pl ->
+                if (pl.id == playlistId) pl.copy(trackCount = combined.size) else pl
+            }
+            localPlaylists.value = updatedPlaylists
+            persistLocalPlaylists(updatedPlaylists)
+            return
+        }
+
         authPlugin?.let { plugin ->
             pluginManager.withScope {
                 plugin.use {
@@ -414,6 +471,22 @@ class LibraryRepository(
                 }
             }
             playlistCache.invalidateAll()
+        }
+    }
+
+    suspend fun addTrackObjectsToPlaylist(playlistId: String, tracks: List<MetadataTrack>) {
+        if (playlistId.startsWith("local_")) {
+            val existing = playlistTracksMap.value[playlistId].orEmpty()
+            val combined = (existing + tracks).distinctBy { it.id }
+            val updatedMap = playlistTracksMap.value + (playlistId to combined)
+            playlistTracksMap.value = updatedMap
+            persistLocalPlaylistTracks(updatedMap)
+
+            val updatedPlaylists = localPlaylists.value.map { pl ->
+                if (pl.id == playlistId) pl.copy(trackCount = combined.size) else pl
+            }
+            localPlaylists.value = updatedPlaylists
+            persistLocalPlaylists(updatedPlaylists)
         }
     }
 }

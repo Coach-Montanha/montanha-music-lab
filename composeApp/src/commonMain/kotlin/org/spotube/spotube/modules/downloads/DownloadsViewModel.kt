@@ -20,6 +20,8 @@ package org.spotube.spotube.modules.downloads
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import org.spotube.plugin_interfaces.plugin_apis.metadata.track.MetadataTrack
+import org.spotube.spotube.modules.library.LibraryRepository
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -36,7 +38,8 @@ data class DownloadRowUiState(
     val progress: Float,
     val percent: Int,
     val error: String?,
-    val action: DownloadRowAction
+    val action: DownloadRowAction,
+    val track: MetadataTrack? = null
 )
 
 data class DownloadsUiState(
@@ -63,7 +66,8 @@ internal fun downloadsUiState(items: List<DownloadItem>, folder: String = ""): D
                     DownloadStatus.Completed -> DownloadRowAction.Remove
                     is DownloadStatus.Failed, DownloadStatus.Cancelled -> DownloadRowAction.Retry
                     else -> DownloadRowAction.Cancel
-                }
+                },
+                item.track
             )
         },
         activeCount = items.count { it.status == DownloadStatus.Downloading || it.status == DownloadStatus.Queued },
@@ -74,8 +78,25 @@ internal fun downloadsUiState(items: List<DownloadItem>, folder: String = ""): D
 }
 
 class DownloadsViewModel(
-    private val downloadManager: DownloadManager
+    private val downloadManager: DownloadManager,
+    private val libraryRepository: LibraryRepository
 ) : ViewModel() {
+
+    fun getCompletedTracks(): List<MetadataTrack> {
+        return downloads.value
+            .filter { it.status == DownloadStatus.Completed }
+            .mapNotNull { it.track }
+    }
+
+    fun addTracksToPlaylist(playlistId: String, tracks: List<MetadataTrack>) {
+        viewModelScope.launch {
+            if (playlistId.startsWith("local_")) {
+                libraryRepository.addTrackObjectsToPlaylist(playlistId, tracks)
+            } else {
+                libraryRepository.addTracksToPlaylist(playlistId, tracks.map { it.id })
+            }
+        }
+    }
     val downloads: StateFlow<List<DownloadItem>> = downloadManager.downloadsFlow.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5000),

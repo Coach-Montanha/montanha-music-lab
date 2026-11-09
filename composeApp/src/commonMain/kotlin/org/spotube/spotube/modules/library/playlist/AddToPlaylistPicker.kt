@@ -109,7 +109,7 @@ fun AddToPlaylistPicker(
             scope.launch {
                 val result = libraryRepository.savedPlaylists()
                 playlists = result?.items?.filter {
-                    currentUserId != null && it.owner?.id == currentUserId
+                    it.id.startsWith("local_") || (currentUserId != null && it.owner?.id == currentUserId)
                 } ?: emptyList()
                 isLoading = false
             }

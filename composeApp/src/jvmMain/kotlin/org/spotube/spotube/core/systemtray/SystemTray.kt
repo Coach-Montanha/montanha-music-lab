@@ -86,7 +86,7 @@ fun NucleusApplicationScope.SystemTray(
 
     Tray(
         icon = Iconsax.IconsaxMusic,
-        tooltip = "Spotube",
+        tooltip = "Montanha Music Lab",
         primaryAction = onToggleWindowVisibility) {
         Item(label = if (isWindowVisible) hideWindowLabel else showWindowLabel) {
             onToggleWindowVisibility()

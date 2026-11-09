@@ -22,18 +22,18 @@ import net.harawata.appdirs.AppDirsFactory
 @Suppress("EXPECT_ACTUAL_CLASSIFIERS_ARE_IN_BETA_WARNING")
 actual class Paths {
     actual fun getApplicationCacheDirPath(): String {
-        return AppDirsFactory.getInstance().getUserCacheDir("Spotube", null, "Spotube")
+        return AppDirsFactory.getInstance().getUserCacheDir("Montanha Music Lab", null, "Montanha Music Lab")
     }
 
     actual fun getApplicationDataDirPath(): String {
-        return AppDirsFactory.getInstance().getUserDataDir("Spotube", null, "Spotube")
+        return AppDirsFactory.getInstance().getUserDataDir("Montanha Music Lab", null, "Montanha Music Lab")
     }
 
     actual fun getUserDownloadsDirPath(): String {
-        return AppDirsFactory.getInstance().getUserDownloadsDir("Spotube", null, null)
+        return AppDirsFactory.getInstance().getUserDownloadsDir("Montanha Music Lab", null, null)
     }
 
     actual fun getMusicCacheDirPath(): String {
-        return AppDirsFactory.getInstance().getUserCacheDir("Spotube", null, "Spotube") + "/music_cache"
+        return AppDirsFactory.getInstance().getUserCacheDir("Montanha Music Lab", null, "Montanha Music Lab") + "/music_cache"
     }
 }
