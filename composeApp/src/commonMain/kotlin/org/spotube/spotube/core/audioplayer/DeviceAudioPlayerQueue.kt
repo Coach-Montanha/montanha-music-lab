@@ -493,8 +493,11 @@ class DeviceAudioPlayerQueue(
     }
 
     private suspend fun buildStreamingUrl(trackId: String, protocol: StreamProtocol): String {
-        val port: Int =
+        val localServer = runCatching { getKoin().getOrNull<LocalServer>() }.getOrNull()
+        val activePort = localServer?.port?.value
+        val fallbackPort =
             settingsProvider.settingsState.mapNotNull { it?.playbackProxyServerPort }.first()
+        val port = activePort ?: fallbackPort
         val baseUrl = "http://127.0.0.1:$port"
         return when (protocol) {
             StreamProtocol.HLS, StreamProtocol.DASH -> "${baseUrl.trimEnd('/')}/manifest/$trackId"

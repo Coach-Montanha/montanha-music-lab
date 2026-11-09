@@ -33,7 +33,19 @@ actual class Paths {
     }
 
     actual fun getUserDownloadsDirPath(): String {
-        return Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).absolutePath + java.io.File.separator + "Montanha Music Lab"
+        return try {
+            val publicDownloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            val montanhaDir = java.io.File(publicDownloads, "Montanha Music Lab")
+            if (montanhaDir.exists() || montanhaDir.mkdirs() || montanhaDir.canWrite()) {
+                montanhaDir.absolutePath
+            } else {
+                val appDownloads = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+                appDownloads?.absolutePath ?: context.filesDir.absolutePath
+            }
+        } catch (_: Exception) {
+            val appDownloads = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+            appDownloads?.absolutePath ?: context.filesDir.absolutePath
+        }
     }
 
     actual fun getMusicCacheDirPath(): String {

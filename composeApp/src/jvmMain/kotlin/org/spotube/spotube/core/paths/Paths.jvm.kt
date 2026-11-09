@@ -30,7 +30,12 @@ actual class Paths {
     }
 
     actual fun getUserDownloadsDirPath(): String {
-        return AppDirsFactory.getInstance().getUserDownloadsDir("Montanha Music Lab", null, null)
+        val baseDir = AppDirsFactory.getInstance().getUserDownloadsDir("Montanha Music Lab", null, null)
+        return if (baseDir.contains("Spotube", ignoreCase = true)) {
+            baseDir.replace("Spotube", "Montanha Music Lab", ignoreCase = true)
+        } else {
+            baseDir
+        }
     }
 
     actual fun getMusicCacheDirPath(): String {

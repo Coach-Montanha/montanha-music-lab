@@ -120,7 +120,14 @@ class DownloadManager(
 
     /** Where downloads are saved right now: the user's override, else the platform default. */
     val downloadFolder: StateFlow<String> = cachedDownloadFolder
-        .map { it?.takeIf(String::isNotBlank) ?: paths.getUserDownloadsDirPath() }
+        .map { folder ->
+            val path = folder?.takeIf(String::isNotBlank) ?: paths.getUserDownloadsDirPath()
+            if (path.contains("Spotube", ignoreCase = true)) {
+                path.replace("Spotube", "Montanha Music Lab", ignoreCase = true)
+            } else {
+                path
+            }
+        }
         .stateIn(scope, SharingStarted.Eagerly, paths.getUserDownloadsDirPath())
 
     private val activeJobs = mutableMapOf<String, Job>()
