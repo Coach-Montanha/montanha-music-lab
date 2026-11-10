@@ -240,6 +240,13 @@ jobs:
           release.signing.keyAlias=${KEYSTORE_KEY_ALIAS}
           release.signing.keyPassword=${KEYSTORE_KEY_PASSWORD}
           EOF
+          else
+            cat >> local.properties <<EOF
+          release.signing.storeFile=${{ github.workspace }}/composeApp/montanha-release.jks
+          release.signing.storePassword=montanha123
+          release.signing.keyAlias=montanha
+          release.signing.keyPassword=montanha123
+          EOF
           fi
 
       - name: Assemble Release

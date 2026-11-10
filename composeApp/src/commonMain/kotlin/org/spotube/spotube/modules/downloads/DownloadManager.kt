@@ -122,10 +122,15 @@ class DownloadManager(
     val downloadFolder: StateFlow<String> = cachedDownloadFolder
         .map { folder ->
             val path = folder?.takeIf(String::isNotBlank) ?: paths.getUserDownloadsDirPath()
-            if (path.contains("Spotube", ignoreCase = true)) {
+            val sanitized = if (path.contains("Spotube", ignoreCase = true)) {
                 path.replace("Spotube", "Montanha Music Lab", ignoreCase = true)
             } else {
                 path
+            }
+            if (!sanitized.endsWith("Montanha Music Lab") && !sanitized.contains("Montanha Music Lab")) {
+                "$sanitized/Montanha Music Lab"
+            } else {
+                sanitized
             }
         }
         .stateIn(scope, SharingStarted.Eagerly, paths.getUserDownloadsDirPath())

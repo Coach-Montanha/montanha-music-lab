@@ -43,6 +43,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
@@ -130,6 +131,9 @@ class PluginManager(
     init {
         scope.launch(Dispatchers.IO) {
             try {
+                // Await DataStore loaded state before installing bundled plugins
+                state.filterIsInstance<PluginManagerStates.Data>().first()
+
                 val bundledFiles = listOf(
                     "files/youtube-plugin.smplug",
                     "files/deezer-plugin.smplug",
@@ -139,30 +143,30 @@ class PluginManager(
                     try {
                         val bytes = Res.readBytes(file)
                         addPluginFromByteArray(bytes = bytes, allowReplacingInstalled = true)
-                    } catch (_: Exception) {
+                    } catch (e: Exception) {
+                        logger.d { "autoInstallBundledPlugins: skipped $file: ${e.message}" }
                     }
                 }
-                val cur = state.value
-                if (cur is PluginManagerStates.Data) {
-                    if (PluginAbility.METADATA !in cur.selectedPlugins) {
-                        val meta = cur.plugins.firstOrNull { PluginAbility.METADATA in it.abilities }
-                        if (meta != null) {
-                            setSelectedPlugin(PluginAbility.METADATA, meta)
-                        }
+                val cur = state.filterIsInstance<PluginManagerStates.Data>().first()
+                if (PluginAbility.METADATA !in cur.selectedPlugins) {
+                    val meta = cur.plugins.firstOrNull { it.id.contains("youtube", ignoreCase = true) }
+                        ?: cur.plugins.firstOrNull { PluginAbility.METADATA in it.abilities }
+                    if (meta != null) {
+                        setSelectedPlugin(PluginAbility.METADATA, meta)
                     }
-                    if (PluginAbility.AUDIO !in cur.selectedPlugins) {
-                        val audio = cur.plugins.firstOrNull { PluginAbility.AUDIO in it.abilities }
-                            ?: BUILT_IN_PLUGINS.firstOrNull { PluginAbility.AUDIO in it.abilities }
-                        if (audio != null) {
-                            setSelectedPlugin(PluginAbility.AUDIO, audio)
-                        }
+                }
+                if (PluginAbility.AUDIO !in cur.selectedPlugins) {
+                    val audio = cur.plugins.firstOrNull { PluginAbility.AUDIO in it.abilities }
+                        ?: BUILT_IN_PLUGINS.firstOrNull { PluginAbility.AUDIO in it.abilities }
+                    if (audio != null) {
+                        setSelectedPlugin(PluginAbility.AUDIO, audio)
                     }
-                    if (PluginAbility.LYRICS !in cur.selectedPlugins) {
-                        val lyrics = cur.plugins.firstOrNull { PluginAbility.LYRICS in it.abilities }
-                            ?: BUILT_IN_PLUGINS.firstOrNull { PluginAbility.LYRICS in it.abilities }
-                        if (lyrics != null) {
-                            setSelectedPlugin(PluginAbility.LYRICS, lyrics)
-                        }
+                }
+                if (PluginAbility.LYRICS !in cur.selectedPlugins) {
+                    val lyrics = cur.plugins.firstOrNull { PluginAbility.LYRICS in it.abilities }
+                        ?: BUILT_IN_PLUGINS.firstOrNull { PluginAbility.LYRICS in it.abilities }
+                    if (lyrics != null) {
+                        setSelectedPlugin(PluginAbility.LYRICS, lyrics)
                     }
                 }
             } catch (e: Exception) {
@@ -666,21 +670,22 @@ class PluginManager(
             throw IllegalArgumentException(getString(Res.string.plugin_error_builtin_add))
         }
 
-        val currentState = state.value
-        if (currentState is PluginManagerStates.Data) {
-            val updatedPlugins = currentState.plugins.filterNot { it.id == plugin.id } + plugin
-            val updatedSelectedPlugins =
-                currentState.selectedPlugins.mapValues { (_, selectedPlugin) ->
-                    if (selectedPlugin.id == plugin.id) plugin else selectedPlugin
-                }
-            val newState = PluginManagerStates.Data(
-                plugins = updatedPlugins,
-                selectedPlugins = updatedSelectedPlugins,
-                generation = currentState.generation + 1
-            )
-            logger.d { "addPlugin: bumped generation to ${newState.generation} for plugin ${plugin.id}" }
-            updatePluginsState(newState)
+        val currentState = state.filterIsInstance<PluginManagerStates.Data>().first()
+        val updatedPlugins = currentState.plugins.filterNot { it.id == plugin.id } + plugin
+        val updatedSelectedPlugins =
+            currentState.selectedPlugins.mapValues { (_, selectedPlugin) ->
+                if (selectedPlugin.id == plugin.id) plugin else selectedPlugin
+            }.toMutableMap()
+        if (PluginAbility.METADATA in plugin.abilities && !updatedSelectedPlugins.containsKey(PluginAbility.METADATA)) {
+            updatedSelectedPlugins[PluginAbility.METADATA] = plugin
         }
+        val newState = PluginManagerStates.Data(
+            plugins = updatedPlugins,
+            selectedPlugins = updatedSelectedPlugins,
+            generation = currentState.generation + 1
+        )
+        logger.d { "addPlugin: bumped generation to ${newState.generation} for plugin ${plugin.id}" }
+        updatePluginsState(newState)
     }
 
     suspend fun removePlugin(plugin: PluginEntry) {

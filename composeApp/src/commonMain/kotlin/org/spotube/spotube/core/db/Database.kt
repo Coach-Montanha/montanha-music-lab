@@ -29,6 +29,56 @@ import okio.SYSTEM
 
 @Suppress("EXPECT_ACTUAL_CLASSIFIERS_ARE_IN_BETA_WARNING")
 class Database(val paths: Paths) {
+    init {
+        restoreIfCleanInstall()
+    }
+
+    private fun restoreIfCleanInstall() {
+        runCatching {
+            val dataDirPath = paths.getApplicationDataDirPath().toPath()
+            val backupDirPath = "${paths.getUserDownloadsDirPath()}/.backup".toPath()
+            if (!FileSystem.SYSTEM.exists(backupDirPath)) return@runCatching
+
+            val probePlugins = dataDirPath / "spotube_plugins.preferences_pb"
+            val probeSettings = dataDirPath / "spotube.preferences_pb"
+            val hasExistingData = (FileSystem.SYSTEM.exists(probePlugins) && (FileSystem.SYSTEM.metadataOrNull(probePlugins)?.size ?: 0L) > 0L) ||
+                (FileSystem.SYSTEM.exists(probeSettings) && (FileSystem.SYSTEM.metadataOrNull(probeSettings)?.size ?: 0L) > 0L)
+
+            if (!hasExistingData) {
+                if (!FileSystem.SYSTEM.exists(dataDirPath)) {
+                    FileSystem.SYSTEM.createDirectories(dataDirPath)
+                }
+                FileSystem.SYSTEM.list(backupDirPath).forEach { backupFile ->
+                    if (backupFile.name.endsWith(".preferences_pb") || backupFile.name.endsWith(".json")) {
+                        val target = dataDirPath / backupFile.name
+                        FileSystem.SYSTEM.copy(backupFile, target)
+                    }
+                }
+            }
+        }
+    }
+
+    fun backupPreferences() {
+        runCatching {
+            val dataDirPath = paths.getApplicationDataDirPath().toPath()
+            val backupDirPath = "${paths.getUserDownloadsDirPath()}/.backup".toPath()
+            if (!FileSystem.SYSTEM.exists(backupDirPath)) {
+                FileSystem.SYSTEM.createDirectories(backupDirPath)
+            }
+            if (FileSystem.SYSTEM.exists(dataDirPath)) {
+                FileSystem.SYSTEM.list(dataDirPath).forEach { file ->
+                    if (file.name.endsWith(".preferences_pb") || file.name.endsWith(".json")) {
+                        val dest = backupDirPath / file.name
+                        if (FileSystem.SYSTEM.exists(dest)) {
+                            FileSystem.SYSTEM.delete(dest)
+                        }
+                        FileSystem.SYSTEM.copy(file, dest)
+                    }
+                }
+            }
+        }
+    }
+
     /**
      * True when Spotube had already written its own data before this process started. Captured
      * synchronously at construction time — the earliest point, before any eager service can

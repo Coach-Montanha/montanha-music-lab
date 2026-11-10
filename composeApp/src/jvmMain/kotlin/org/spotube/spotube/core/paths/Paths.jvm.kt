@@ -31,11 +31,20 @@ actual class Paths {
 
     actual fun getUserDownloadsDirPath(): String {
         val baseDir = AppDirsFactory.getInstance().getUserDownloadsDir("Montanha Music Lab", null, null)
-        return if (baseDir.contains("Spotube", ignoreCase = true)) {
+        val sanitized = if (baseDir.contains("Spotube", ignoreCase = true)) {
             baseDir.replace("Spotube", "Montanha Music Lab", ignoreCase = true)
         } else {
             baseDir
         }
+        val target = if (!sanitized.endsWith("Montanha Music Lab")) {
+            "$sanitized/Montanha Music Lab"
+        } else {
+            sanitized
+        }
+        try {
+            java.io.File(target).mkdirs()
+        } catch (_: Exception) {}
+        return target
     }
 
     actual fun getMusicCacheDirPath(): String {

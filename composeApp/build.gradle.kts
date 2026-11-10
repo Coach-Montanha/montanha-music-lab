@@ -50,9 +50,9 @@ val bundleId = "com.montanha.musiclab"
 val version = "6.0.0"
 // Set to N to release <version>-beta.N (same app id, icons and name as stable); null for a plain stable release.
 // Installer metadata (packageVersion) must stay numeric, so it keeps using plain `version`.
-val betaNumber: Int? = 5
+val betaNumber: Int? = 6
 // Betas share the stable app id, so bump this for every beta: Android only updates to a higher versionCode.
-val buildNumber = 49
+val buildNumber = 50
 // Desktop icon channel; Android picks its icons via the stable/nightly product flavor. Use -Pnightly=true.
 val isNightly = providers.gradleProperty("nightly").map { it.toBoolean() }.getOrElse(false)
 val desktopIconDir = if (isNightly) "icons/nightly" else "icons/stable"
@@ -72,8 +72,8 @@ val isProductionBuild = providers.gradleProperty("production").map { it.toBoolea
     }
 )
 val targetName = "Montanha Music Lab"
-val homePageUrl = "https://spotube.cc"
-val repositoryUrl = "https://github.com/team-spotube/spotube"
+val homePageUrl = "https://github.com/Coach-Montanha/montanha-music-lab"
+val repositoryUrl = "https://github.com/Coach-Montanha/montanha-music-lab"
 val appVersionName = if (betaNumber != null) "$version-beta.$betaNumber" else version
 val appBuildNumber = if (isNightly) nightlyBuildNumber else buildNumber
 val appRepositoryUrl = repositoryUrl
@@ -412,14 +412,17 @@ android {
     signingConfigs {
         create("release") {
             val storeFilePath = secretProps.getProperty("release.signing.storeFile")
-            if (!storeFilePath.isNullOrEmpty()) {
-                val f = file(storeFilePath)
-                if (f.exists() && f.length() > 0) {
-                    storeFile = f
-                    storePassword = secretProps.getProperty("release.signing.storePassword")
-                    keyAlias = secretProps.getProperty("release.signing.keyAlias")
-                    keyPassword = secretProps.getProperty("release.signing.keyPassword")
-                }
+            val defaultKeystore = project.file("montanha-release.jks")
+            if (!storeFilePath.isNullOrEmpty() && file(storeFilePath).let { it.exists() && it.length() > 0 }) {
+                storeFile = file(storeFilePath)
+                storePassword = secretProps.getProperty("release.signing.storePassword")
+                keyAlias = secretProps.getProperty("release.signing.keyAlias")
+                keyPassword = secretProps.getProperty("release.signing.keyPassword")
+            } else if (defaultKeystore.exists() && defaultKeystore.length() > 0) {
+                storeFile = defaultKeystore
+                storePassword = "montanha123"
+                keyAlias = "montanha"
+                keyPassword = "montanha123"
             }
         }
     }
