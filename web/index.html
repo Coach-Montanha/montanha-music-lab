@@ -5,15 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Montanha Music Lab</title>
     
-    <!-- PWA & Mobile Web Standards (iOS & Android) -->
+    <!-- Favicon Oficial Montanha Music Lab (Múltiplos Formatos para Edge, Chrome e Safari) -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="shortcut icon" href="/favicon.ico" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/app.png" />
+    <link rel="apple-touch-icon" href="/app.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <!-- PWA & Mobile Web Standards -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Montanha Music" />
     <meta name="theme-color" content="#060709" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <link rel="icon" type="image/png" href="/app.png" />
-    <link rel="apple-touch-icon" href="/app.png" />
-    <link rel="manifest" href="/manifest.webmanifest" />
 
     <style>
       html, body {
@@ -31,10 +37,15 @@
     </style>
 
     <script>
-      // Self-healing service worker cache buster
+      // Anti-Cache Trap & Auto-Healing: se ocorrer erro de chunk 404 antigo, desregistra SW e recarrega
       window.addEventListener('error', function(e) {
         var msg = (e && e.message) ? e.message.toLowerCase() : '';
-        if (msg.indexOf('dynamically imported') !== -1 || msg.indexOf('unexpected token') !== -1 || msg.indexOf('failed to fetch') !== -1) {
+        if (
+          msg.indexOf('dynamically imported') !== -1 ||
+          msg.indexOf('unexpected token') !== -1 ||
+          msg.indexOf('failed to fetch') !== -1 ||
+          msg.indexOf('loading chunk') !== -1
+        ) {
           if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(function(regs) {
               regs.forEach(function(r) { r.unregister(); });
@@ -54,12 +65,18 @@
   </head>
   <body class="bg-[#060709] text-slate-100 antialiased selection:bg-emerald-500/20 selection:text-emerald-300 overflow-x-hidden">
     <div id="root">
-      <!-- Fallback splash screen before hydration to eliminate any white flash -->
+      <!-- Splash screen escuro para impedir tela branca antes da hidratação do React -->
       <div style="display:flex;height:100vh;align-items:center;justify-content:center;background-color:#060709;color:#fff;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;">
         <div style="text-align:center;padding:24px;">
-          <div style="width:48px;height:48px;margin:0 auto 16px auto;background:#10b981;border-radius:14px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:24px;color:#000;">M</div>
-          <div style="font-size:12px;text-transform:uppercase;letter-spacing:0.25em;color:#34d399;font-weight:700;">Montanha Music Lab</div>
-          <div style="margin-top:8px;font-size:14px;color:#9ca3af;">Iniciando player...</div>
+          <div style="width:52px;height:52px;margin:0 auto 16px auto;background:linear-gradient(135deg,#0066cc,#0284c7);border-radius:16px;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(2,132,199,0.35);">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 18V5l12-2v13"></path>
+              <circle cx="6" cy="18" r="3"></circle>
+              <circle cx="18" cy="16" r="3"></circle>
+            </svg>
+          </div>
+          <div style="font-size:13px;text-transform:uppercase;letter-spacing:0.25em;color:#38bdf8;font-weight:700;">Montanha Music Lab</div>
+          <div style="margin-top:8px;font-size:13px;color:#94a3b8;">Iniciando aplicativo...</div>
         </div>
       </div>
     </div>

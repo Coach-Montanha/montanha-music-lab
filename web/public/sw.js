@@ -1,4 +1,5 @@
-const CACHE_NAME = 'montanha-music-v3';
+// Service Worker para Montanha Music Lab PWA - Versão 4.0 Resiliente Anti-Cache Trap
+const CACHE_NAME = 'montanha-music-v4';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -10,6 +11,7 @@ self.addEventListener('activate', (event) => {
       Promise.all(
         keys.map((key) => {
           if (key !== CACHE_NAME) {
+            console.log('[SW] Deletando cache antigo:', key);
             return caches.delete(key);
           }
         })
@@ -18,21 +20,23 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+// Network-First para absolutamente tudo, com fallback gracioso para não deixar tela branca
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   const url = event.request.url;
 
-  // Let media, stream, and APIs pass straight to network
+  // Não interceptar APIs externas, streams de áudio ou YouTube
   if (
     url.includes('/api/') ||
     url.includes('googlevideo') ||
     url.includes('youtube') ||
-    url.includes(':3001')
+    url.includes(':3001') ||
+    url.includes('supabase.co')
   ) {
     return;
   }
 
-  // Navigation (HTML page loading): NETWORK FIRST
+  // Requisição de navegação HTML (abrir página ou recarregar)
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request)
@@ -43,12 +47,18 @@ self.addEventListener('fetch', (event) => {
           }
           return networkResponse;
         })
-        .catch(() => caches.match(event.request).then((res) => res || caches.match('/index.html')))
+        .catch(async () => {
+          const cached = await caches.match(event.request);
+          if (cached) return cached;
+          const fallback = await caches.match('/index.html');
+          if (fallback) return fallback;
+          return fetch(event.request);
+        })
     );
     return;
   }
 
-  // Static Assets: Network first with cache fallback
+  // Assets estáticos (JS, CSS, Imagens)
   event.respondWith(
     fetch(event.request)
       .then((networkResponse) => {
@@ -58,6 +68,11 @@ self.addEventListener('fetch', (event) => {
         }
         return networkResponse;
       })
-      .catch(() => caches.match(event.request))
+      .catch(async () => {
+        const cached = await caches.match(event.request);
+        if (cached) return cached;
+        // Nunca retornar undefined para evitar ERR_FAILED que gera tela branca
+        return new Response('', { status: 404, statusText: 'Not Found in Cache' });
+      })
   );
 });
