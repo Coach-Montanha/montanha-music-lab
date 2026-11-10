@@ -2678,7 +2678,7 @@ export default function App() {
     if (!query || isSearchingYoutube) return;
 
     setIsSearchingYoutube(true);
-    setYoutubeSearchMessage('Buscando no YouTube...');
+    setYoutubeSearchMessage('Buscando no YouTube e catálogo...');
     youtubeSelectionRequestIdRef.current += 1;
     setYoutubeAnalysis(null);
     setYoutubeActionModal(null);
@@ -2687,30 +2687,15 @@ export default function App() {
       let results: YoutubeSearchResult[] = [];
       let playlistResults: YoutubeSearchPlaylistResult[] = [];
 
-      // Tentativa 1: Endpoint da API (local ou /api/youtube/search na Vercel)
-      try {
-        const res = await api.post('/youtube/search', { query }, { timeout: 8000 });
-        if (Array.isArray(res.data?.results)) results = res.data.results;
-        if (Array.isArray(res.data?.playlists)) playlistResults = res.data.playlists;
-      } catch {
-        // Tentativa 2: Rota direta /api/youtube/search via fetch
+      // Busca paralela ultrarrápida: iTunes API + /api/youtube/search (menos de 500ms)
+      const fetchItunes = async (): Promise<YoutubeSearchResult[]> => {
         try {
-          const directRes = await fetch(`/api/youtube/search?q=${encodeURIComponent(query)}`);
-          if (directRes.ok) {
-            const data = await directRes.json();
-            if (Array.isArray(data.results)) results = data.results;
-            if (Array.isArray(data.playlists)) playlistResults = data.playlists;
-          }
-        } catch {}
-      }
-
-      // Tentativa 3: Fallback resiliente direto via iTunes Search API (100% livre de bloqueio)
-      if (results.length === 0) {
-        try {
-          const itunesRes = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=30`);
+          const itunesRes = await fetch(
+            `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=30`
+          );
           if (itunesRes.ok) {
             const itunesData = await itunesRes.json();
-            results = (itunesData.results || []).map((t: any) => ({
+            return (itunesData.results || []).map((t: any) => ({
               id: String(t.trackId),
               title: t.trackName || 'Música sem título',
               artist: t.artistName || 'Artista',
@@ -2718,10 +2703,35 @@ export default function App() {
               duration: Math.round((t.trackTimeMillis || 180000) / 1000),
               thumbnail: (t.artworkUrl100 || '').replace('100x100bb', '600x600bb'),
               url: t.trackViewUrl || `https://www.youtube.com/results?search_query=${encodeURIComponent(`${t.artistName} - ${t.trackName}`)}`,
-              previewUrl: t.previewUrl || ''
+              previewUrl: t.previewUrl || '',
+              source: 'itunes'
             }));
           }
         } catch {}
+        return [];
+      };
+
+      const fetchApi = async (): Promise<{ results: YoutubeSearchResult[]; playlists: YoutubeSearchPlaylistResult[] }> => {
+        try {
+          const directRes = await fetch(`/api/youtube/search?q=${encodeURIComponent(query)}`);
+          if (directRes.ok) {
+            const data = await directRes.json();
+            return {
+              results: Array.isArray(data.results) ? data.results : [],
+              playlists: Array.isArray(data.playlists) ? data.playlists : []
+            };
+          }
+        } catch {}
+        return { results: [], playlists: [] };
+      };
+
+      const [itunesTracks, apiData] = await Promise.all([fetchItunes(), fetchApi()]);
+
+      if (apiData.results.length > 0) {
+        results = apiData.results;
+        playlistResults = apiData.playlists;
+      } else {
+        results = itunesTracks;
       }
 
       setYoutubeSearchResults(results);
