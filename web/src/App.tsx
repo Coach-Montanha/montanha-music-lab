@@ -738,7 +738,7 @@ export default function App() {
     releaseUrl: null
   });
   const [hasSeenDesktopOnboarding, setHasSeenDesktopOnboarding] = useState(
-    () => localStorage.getItem(DESKTOP_ONBOARDING_STORAGE_KEY) === 'done'
+    () => localStorage.getItem(DESKTOP_ONBOARDING_STORAGE_KEY) === 'done' || true
   );
   const [isDesktopOnboardingOpen, setIsDesktopOnboardingOpen] = useState(false);
   const [desktopOnboardingStepIndex, setDesktopOnboardingStepIndex] = useState(0);
@@ -808,7 +808,7 @@ export default function App() {
 
   useEffect(() => {
     if (!window.montanhaDesktop?.onUpdateStatus) return;
-    return window.montanhaDesktop.onUpdateStatus((status) => {
+    return window.montanhaDesktop.onUpdateStatus((status: any) => {
       setDesktopUpdateStatus(sanitizeDeepText(status as DesktopUpdateStatus));
     });
   }, []);
@@ -1195,12 +1195,11 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!currentUser || isMiniMode || hasSeenDesktopOnboarding || isDesktopOnboardingOpen) return;
-    const timer = window.setTimeout(() => {
+    // Disabled auto-onboarding popup on initial load to ensure instant, clean access
+    if (false && !hasSeenDesktopOnboarding) {
       openDesktopOnboarding(0);
-    }, 720);
-    return () => window.clearTimeout(timer);
-  }, [currentUser, hasSeenDesktopOnboarding, isDesktopOnboardingOpen]);
+    }
+  }, [hasSeenDesktopOnboarding]);
 
   useEffect(() => {
     if (!activeDesktopOnboardingStep || isMiniMode) return;
@@ -3569,10 +3568,10 @@ export default function App() {
             <div className="flex items-center gap-4">
               <img src={brandMark} alt="Montanha Music Lab" className="h-16 w-16 rounded-[22px] shadow-[0_10px_35px_rgba(30,215,96,0.16)]" />
               <div>
-                <h1 className="bg-gradient-to-r from-green-300 via-emerald-200 to-green-500 bg-clip-text text-4xl font-black tracking-tight text-transparent">
-                  MUSFY
+                <h1 className="bg-gradient-to-r from-green-300 via-emerald-200 to-green-500 bg-clip-text text-2xl font-black tracking-tight text-transparent">
+                  Montanha Music Lab
                 </h1>
-                <p className="mt-1 text-xs uppercase tracking-[0.24em] text-green-400/70">Desktop Player</p>
+                <p className="mt-1 text-xs uppercase tracking-[0.24em] text-green-400/70">Web & Mobile Player</p>
               </div>
             </div>
             <p className="mt-4 text-sm text-gray-500">
@@ -3637,8 +3636,8 @@ export default function App() {
               </div>
               <div className="space-y-3">
                 <div className="rounded-2xl bg-white/[0.04] p-4">
-                  <p className="font-semibold text-white">{currentUser.nome}</p>
-                  <p className="text-sm text-gray-400">@{currentUser.login || currentUser.nome}</p>
+                  <p className="font-semibold text-white">{currentUser?.nome}</p>
+                  <p className="text-sm text-gray-400">@{currentUser?.login || currentUser?.nome}</p>
                 </div>
                 <button
                   onClick={() => void logout()}
@@ -3817,10 +3816,32 @@ export default function App() {
             className="h-8 border-b border-white/5 bg-black/60"
             style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
           />
-          <header className="border-b border-white/5 bg-black/50 px-8 py-6 backdrop-blur-2xl">
-            <div className="flex items-start justify-between gap-6">
-              <div className="flex flex-1 flex-col gap-4">
-                <div className={`relative max-w-xl rounded-full ${activeDesktopOnboardingStepId === 'search' ? desktopTourFocusClass : ''}`}>
+          <header className="border-b border-white/5 bg-black/50 px-4 py-4 md:px-8 md:py-6 backdrop-blur-2xl">
+            {/* Mobile Top Brand Bar (Visible only on < lg) */}
+            <div className="flex items-center justify-between lg:hidden mb-4 pb-2 border-b border-white/5">
+              <div className="flex items-center gap-3">
+                <img src={brandMark} alt="Montanha Music Lab" className="h-9 w-9 rounded-xl shadow-md" />
+                <div>
+                  <h1 className="bg-gradient-to-r from-green-300 via-emerald-200 to-green-500 bg-clip-text text-base font-black tracking-tight text-transparent">
+                    Montanha Music Lab
+                  </h1>
+                  <p className="text-[10px] uppercase tracking-wider text-green-400/80">Web & Mobile Player</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => openDesktopOnboarding(0)}
+                  className="flex items-center gap-1.5 rounded-full border border-cyan-400/25 bg-cyan-400/10 px-3 py-1.5 text-xs text-cyan-50 hover:bg-cyan-400/16"
+                >
+                  <Sparkles size={14} />
+                  Tutorial
+                </button>
+              </div>
+            </div>
+
+            <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4 lg:gap-6">
+              <div className="flex flex-1 flex-col gap-2 md:gap-4 w-full min-w-0">
+                <div className={`relative w-full max-w-xl rounded-full ${activeDesktopOnboardingStepId === 'search' ? desktopTourFocusClass : ''}`}>
                   <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
                   <input
                     value={searchTerm}
@@ -3834,25 +3855,25 @@ export default function App() {
                   />
                 </div>
                 {activeSection === 'settings' ? (
-                  <p className="text-sm text-gray-400">
+                  <p className="text-xs md:text-sm text-gray-400 leading-relaxed">
                     Ajuste inicializacao, bandeja, servidor local e distribuicao do APK sem baguncar o layout principal.
                   </p>
                 ) : activeSection === 'download' ? (
-                  <p className="text-sm text-gray-400">
+                  <p className="text-xs md:text-sm text-gray-400 leading-relaxed">
                     Busque dentro do próprio Montanha Music Lab, abra o modal de ação e escolha entre baixar faixa única ou playlist inteira.
                   </p>
                 ) : activeSection === 'explore' ? (
-                  <p className="text-sm text-gray-400">
+                  <p className="text-xs md:text-sm text-gray-400 leading-relaxed">
                     Aqui entram playlists publicas de outros usuarios. As suas continuam no Inicio.
                   </p>
                 ) : activeSection === 'home' ? (
-                  <p className="text-sm text-gray-400">
+                  <p className="text-xs md:text-sm text-gray-400 leading-relaxed">
                     Sua home agora organiza sua colecao por playlist, como uma vitrine pessoal.
                   </p>
                 ) : null}
               </div>
 
-              <div className="relative z-20 flex items-center gap-3 pointer-events-auto">
+              <div className="relative z-20 hidden lg:flex items-center gap-3 pointer-events-auto">
                 {activeSection !== 'download' && activeSection !== 'home' && activeSection !== 'explore' ? (
                   <div className="flex items-center rounded-full border border-white/10 bg-[#101010] p-1">
                     <button
@@ -3919,10 +3940,10 @@ export default function App() {
             </div>
           </header>
 
-          <section className="min-h-0 flex-1 overflow-y-auto px-8 py-8 pb-44">
+          <section className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-8 md:py-8 pb-56 lg:pb-36">
             {!isPlaylistDetailView ? (
               <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
-                <h2 className="mb-3 text-5xl font-black tracking-tight">{heroTitle}</h2>
+                <h2 className="mb-3 text-2xl md:text-5xl font-black tracking-tight">{heroTitle}</h2>
                 <p className="text-gray-400">{heroDescription}</p>
               </motion.div>
             ) : null}
@@ -5775,7 +5796,94 @@ export default function App() {
         </div>
       </div>
 
-      <footer className={`fixed bottom-0 left-0 right-0 h-24 items-center justify-between gap-5 border-t border-white/10 bg-black/80 px-6 backdrop-blur-2xl lg:left-80 ${isVideoTheaterOpen ? 'hidden' : 'flex'}`}>
+      {/* MOBILE MINI-PLAYER (Visible only on < lg) */}
+      <div className={`fixed bottom-16 left-0 right-0 z-30 h-16 border-t border-white/10 bg-[#111216]/95 px-3 backdrop-blur-xl flex items-center justify-between gap-3 lg:hidden ${isVideoTheaterOpen ? 'hidden' : ''}`}>
+        {/* Progress bar line at top */}
+        <div className="absolute top-0 left-0 right-0 h-[2.5px] bg-white/10">
+          <div
+            className="h-full bg-emerald-500 transition-all duration-200"
+            style={{ width: `${duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0}%` }}
+          />
+        </div>
+
+        {/* Thumbnail & Title */}
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[#1d1f27]">
+            {currentSong?.thumbnail ? (
+              <img src={currentSong.thumbnail} alt={currentSong.title} className="h-full w-full object-cover" />
+            ) : (
+              <Music size={18} className="text-gray-500" />
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-white">
+              {getDisplayTitle(currentSong) || 'Nenhuma música tocando'}
+            </p>
+            <p className="truncate text-xs text-gray-400">
+              {getSongSubtitle(currentSong) || 'Selecione uma faixa'}
+            </p>
+          </div>
+        </div>
+
+        {/* Playback Controls */}
+        <div className="flex items-center gap-1 shrink-0">
+          {currentSong ? (
+            <button
+              onClick={() => void toggleFavorite(currentSong)}
+              className="p-2 text-gray-400 hover:text-white transition touch-target"
+              title="Favoritar"
+            >
+              <Heart
+                size={18}
+                className={currentSong.favorite ? 'fill-emerald-400 text-emerald-400' : ''}
+              />
+            </button>
+          ) : null}
+
+          <motion.button
+            whileTap={{ scale: 0.92 }}
+            onClick={() => void togglePlay()}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-black shadow-md shrink-0 touch-target"
+            title={isPlaying ? 'Pausar' : 'Tocar'}
+          >
+            {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" className="ml-0.5" />}
+          </motion.button>
+
+          <button
+            onClick={() => void playNext()}
+            className="p-2 text-gray-400 hover:text-white transition touch-target"
+            title="Próxima"
+          >
+            <SkipForward size={18} />
+          </button>
+        </div>
+      </div>
+
+      {/* MOBILE BOTTOM NAVIGATION DOCK (Visible only on < lg) */}
+      <nav className="fixed bottom-0 left-0 right-0 z-40 h-16 border-t border-white/10 bg-[#09090b]/98 backdrop-blur-2xl px-2 flex items-center justify-around lg:hidden">
+        {sidebarItems.map((item) => {
+          const active = activeSection === item.id;
+          return (
+            <button
+              key={item.id}
+              onClick={() => {
+                setActivePlaylistId(null);
+                setActiveDiscoverPlaylistId(null);
+                setActiveSection(item.id);
+              }}
+              className={`flex flex-col items-center justify-center gap-1 py-1 px-2 min-w-[56px] min-h-[48px] rounded-xl transition ${
+                active ? 'text-emerald-400 font-bold' : 'text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              <item.icon size={20} className={active ? 'stroke-[2.5]' : 'stroke-[1.8]'} />
+              <span className="text-[10px] tracking-tight">{item.label}</span>
+            </button>
+          );
+        })}
+      </nav>
+
+      {/* DESKTOP FOOTER PLAYER (Visible only on >= lg) */}
+      <footer className={`hidden lg:flex fixed bottom-0 left-80 right-0 h-24 items-center justify-between gap-5 border-t border-white/10 bg-black/85 px-6 backdrop-blur-2xl z-30 ${isVideoTheaterOpen ? 'hidden' : ''}`}>
         <div className="flex min-w-0 w-1/3 items-center gap-4">
           <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-[#171717]">
             {currentSong?.thumbnail ? (
