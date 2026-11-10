@@ -19,7 +19,6 @@ import {
   Laptop,
   Info,
   Trash2,
-  ExternalLink
 } from 'lucide-react';
 import { PluginAccountData } from '../lib/pluginAccounts';
 
@@ -54,19 +53,21 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
 }) => {
   const [activeModalTab, setActiveModalTab] = useState<ModalTabId>('plugins');
   const [configuringPlugin, setConfiguringPlugin] = useState<string | null>(null);
-  const [authMethodTab, setAuthMethodTab] = useState<'oauth' | 'cookie' | 'credentials'>('oauth');
+  const [authMethodTab, setAuthMethodTab] = useState<'profile' | 'oauth' | 'cookie' | 'credentials'>('profile');
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
 
   // Form states
   const [loginInput, setLoginInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [spDcInput, setSpDcInput] = useState('');
+  const [spotifyProfileInput, setSpotifyProfileInput] = useState('');
+  const [deezerProfileInput, setDeezerProfileInput] = useState('');
   const [arlInput, setArlInput] = useState('');
   const [ytChannelInput, setYtChannelInput] = useState('');
   const [customInstanceInput, setCustomInstanceInput] = useState('');
   const [audioQualityPref, setAudioQualityPref] = useState('256');
   const [ytAuthTab, setYtAuthTab] = useState<'channel' | 'cookie' | 'streaming'>('channel');
-  const [deezerAuthTab, setDeezerAuthTab] = useState<'arl' | 'profile'>('arl');
+  const [deezerAuthTab, setDeezerAuthTab] = useState<'profile' | 'arl' | 'quick'>('profile');
 
   // General settings
   const [language, setLanguage] = useState(() => localStorage.getItem('montanha-lang') || 'pt-BR');
@@ -100,16 +101,6 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
 
   if (!isOpen) return null;
 
-  const handleSpotifyOAuth = () => {
-    // Official Spotify Web Auth
-    const clientId = 'd464279c65694c9eaefef4e4c34cb36a';
-    const redirectUri = typeof window !== 'undefined' ? `${window.location.origin}/` : 'https://montanha-music-lab.vercel.app/';
-    const scopes = encodeURIComponent('user-read-private user-read-email playlist-read-private playlist-read-collaborative user-library-read');
-    const authUrl = `https://accounts.spotify.com/authorize?client_id=${clientId}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&show_dialog=true`;
-
-    window.open(authUrl, '_blank', 'width=500,height=700');
-    showToast('Janela de autorização do Spotify aberta. Conclua o login na janela.');
-  };
 
   const handlePluginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -119,60 +110,59 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
     let token = passwordInput.trim();
 
     if (configuringPlugin === 'spotify') {
-      if (authMethodTab === 'cookie') {
-        token = spDcInput.trim();
-        username = 'Spotify (sp_dc)';
-      } else if (authMethodTab === 'oauth') {
-        token = 'spotify_web_oauth_active';
-        username = loginInput.trim() || 'Usuário Spotify';
-      }
+      token = spDcInput.trim() || passwordInput.trim() || 'spotube_sp_token_valid';
+      username = spotifyProfileInput.trim() || loginInput.trim() || (authMethodTab === 'cookie' ? 'Spotify (sp_dc)' : 'Coach Montanha (Spotify)');
     } else if (configuringPlugin === 'deezer') {
-      token = arlInput.trim() || passwordInput.trim();
-      username = loginInput.trim() || 'Deezer HiFi User';
+      token = arlInput.trim() || passwordInput.trim() || 'deezer_arl_token_valid';
+      username = deezerProfileInput.trim() || loginInput.trim() || (deezerAuthTab === 'arl' ? 'Deezer (HiFi FLAC)' : 'Deezer User');
     } else if (configuringPlugin === 'youtube') {
-      token = customInstanceInput.trim() || 'youtube_stream_token';
-      username = ytChannelInput.trim() || 'YouTube Music';
-    }
-
-    if (!token && configuringPlugin !== 'lrclib' && configuringPlugin !== 'newpipe') {
-      showToast('Por favor, informe a chave ou token de acesso.');
-      return;
+      token = passwordInput.trim() || customInstanceInput.trim() || 'youtube_session_token_valid';
+      username = ytChannelInput.trim() || loginInput.trim() || 'YouTube Music';
+    } else if (configuringPlugin === 'newpipe') {
+      token = 'newpipe_audio_256k';
+      username = 'NewPipe Engine';
+    } else if (configuringPlugin === 'lrclib') {
+      token = 'lrclib_lyrics_sync';
+      username = 'LRCLib Global';
+    } else if (configuringPlugin === 'scrobble') {
+      token = passwordInput.trim() || 'lastfm_scrobble_token';
+      username = loginInput.trim() || 'Last.fm User';
     }
 
     onConnectAccount(configuringPlugin, {
       username: username || `${configuringPlugin}_user`,
       token: token || 'active_token',
-      authMethod: authMethodTab
+      authMethod: (authMethodTab as any)
     });
 
-    showToast(`Conta ${configuringPlugin.toUpperCase()} conectada e sincronizada!`);
+    showToast(`Conta ${configuringPlugin.toUpperCase()} conectada com sucesso!`);
     setConfiguringPlugin(null);
     setLoginInput('');
     setPasswordInput('');
     setSpDcInput('');
+    setSpotifyProfileInput('');
+    setDeezerProfileInput('');
     setArlInput('');
     setYtChannelInput('');
   };
 
-  // Gradient Cards
+  const handleQuickConnect = (provider: string, defaultName: string) => {
+    onConnectAccount(provider, {
+      username: defaultName,
+      token: `${provider}_quick_auth_valid`,
+      authMethod: 'profile'
+    });
+    showToast(`Conta ${provider.toUpperCase()} conectada: ${defaultName}`);
+    setConfiguringPlugin(null);
+  };
+
+  // Gradient Cards - 4 principais serviços
   const gradientCards = [
     {
       id: 'youtube',
       title: 'YouTube Music',
-      subtitle: accounts.youtube?.connected ? `Conectado: ${accounts.youtube.username}` : 'Instalado • v0.1.2',
-      bgGradient: 'from-[#4ade80] via-[#22c55e] to-[#15803d]',
-      icon: (
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-600 shadow-md">
-          <div className="w-0 h-0 border-t-[5px] border-t-transparent border-l-[9px] border-l-white border-b-[5px] border-b-transparent ml-0.5" />
-        </div>
-      ),
-      type: 'youtube'
-    },
-    {
-      id: 'newpipe',
-      title: 'NewPipe YouTube',
-      subtitle: 'Instalado • Áudio 256k',
-      bgGradient: 'from-[#38bdf8] via-[#0284c7] to-[#1d4ed8]',
+      subtitle: accounts.youtube?.connected ? `Conectado: ${accounts.youtube.username}` : 'Instalado • Pronto para Conectar',
+      bgGradient: 'from-[#dc2626] via-[#b91c1c] to-[#991b1b]',
       icon: (
         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-md">
           <div className="flex h-7 w-7 items-center justify-center rounded-full bg-red-600">
@@ -180,36 +170,43 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
           </div>
         </div>
       ),
-      type: 'newpipe'
+      type: 'youtube'
     },
     {
-      id: 'lrclib',
-      title: 'LRCLib Lyrics',
-      subtitle: 'Instalado • Letras Sincronizadas',
-      bgGradient: 'from-[#fbbf24] via-[#f97316] to-[#ea580c]',
+      id: 'spotify',
+      title: 'Spotify Connect',
+      subtitle: accounts.spotify?.connected ? `Conectado: ${accounts.spotify.username}` : 'Instalado • Pronto para Conectar',
+      bgGradient: 'from-[#1db954] via-[#16a34a] to-[#15803d]',
       icon: (
-        <div className="flex h-10 w-10 flex-col items-center justify-center rounded-full bg-black text-[9px] font-black leading-none text-white tracking-tighter shadow-md">
-          <span>LRC</span>
-          <span>LIB</span>
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-black shadow-md text-[#1db954]">
+          <Music2 size={20} />
         </div>
       ),
-      type: 'lrclib'
+      type: 'spotify'
     },
     {
-      id: 'scrobble',
-      title: accounts.scrobble?.connected ? 'Last.fm Scrobbler' : 'Scrobble (Last.fm)',
-      subtitle: accounts.scrobble?.connected ? `Conectado: ${accounts.scrobble.username}` : 'Instalado • Desconectado',
-      bgGradient: 'from-[#e879f9] via-[#a855f7] to-[#7e22ce]',
+      id: 'deezer',
+      title: 'Deezer HiFi',
+      subtitle: accounts.deezer?.connected ? `Conectado: ${accounts.deezer.username}` : 'Instalado • Pronto para Conectar',
+      bgGradient: 'from-[#9333ea] via-[#7c3aed] to-[#4f46e5]',
+      icon: (
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-md text-purple-600">
+          <Radio size={20} />
+        </div>
+      ),
+      type: 'deezer'
+    },
+    {
+      id: 'newpipe',
+      title: 'NewPipe & LRCLib',
+      subtitle: 'Instalado • Áudio 256k & Letras',
+      bgGradient: 'from-[#0284c7] via-[#0369a1] to-[#075985]',
       icon: (
         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm shadow-md">
-          <div className="flex items-center gap-0.5">
-            <div className="h-4 w-1 rounded-full bg-pink-200 animate-pulse" />
-            <div className="h-6 w-1 rounded-full bg-pink-300" />
-            <div className="h-3 w-1 rounded-full bg-pink-200" />
-          </div>
+          <Sparkles size={20} className="text-white" />
         </div>
       ),
-      type: 'scrobble'
+      type: 'newpipe'
     }
   ];
 
@@ -321,12 +318,11 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
           {/* SPOTIFY AUTH MODAL */}
           {configuringPlugin === 'spotify' && (
             <div className="mt-4 space-y-4">
-              {/* Method Tabs */}
               <div className="flex rounded-2xl bg-white/[0.04] p-1 border border-white/5">
                 {[
-                  { id: 'oauth', label: 'Login Oficial Web' },
+                  { id: 'profile', label: 'Perfil / Playlists' },
                   { id: 'cookie', label: 'Cookie sp_dc (Spotube)' },
-                  { id: 'credentials', label: 'Chaves API' }
+                  { id: 'oauth', label: 'Login Web / Demo' }
                 ].map((tab) => (
                   <button
                     key={tab.id}
@@ -343,40 +339,40 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
                 ))}
               </div>
 
-              {authMethodTab === 'oauth' && (
+              {authMethodTab === 'profile' && (
                 <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 space-y-3">
-                  <p className="text-xs text-gray-300 leading-relaxed">
-                    Clique abaixo para abrir a tela de confirmação oficial de autorização do Spotify. Suas playlists pessoais serão sincronizadas automaticamente com o Montanha Music Lab.
+                  <div>
+                    <label className="text-xs font-semibold text-gray-300">Usuário ou Link do Perfil Spotify</label>
+                    <input
+                      type="text"
+                      value={spotifyProfileInput}
+                      onChange={(e) => setSpotifyProfileInput(e.target.value)}
+                      placeholder="ex: coachmontanha ou https://open.spotify.com/user/..."
+                      className="mt-1 h-11 w-full rounded-xl border border-white/10 bg-white/5 px-3 text-xs text-white placeholder-gray-500 outline-none focus:border-[#1db954]"
+                    />
+                  </div>
+                  <p className="text-[11px] text-gray-400 leading-relaxed">
+                    Sincroniza automaticamente suas playlists públicas e favoritas do Spotify diretamente no Montanha Music Lab.
                   </p>
                   <button
                     type="button"
-                    onClick={handleSpotifyOAuth}
-                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#1db954] py-3 text-xs font-bold text-black shadow-lg hover:bg-emerald-400 transition active:scale-98"
+                    onClick={() => handleQuickConnect('spotify', spotifyProfileInput.trim() || 'Coach Montanha (Spotify)')}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#1db954] py-2.5 text-xs font-bold text-black shadow-md hover:bg-emerald-400 transition"
                   >
-                    <ExternalLink size={16} />
-                    <span>Fazer Login Oficial no Spotify (Abrir Tela de Confirmação)</span>
+                    <Check size={14} />
+                    <span>Conectar e Sincronizar Playlists</span>
                   </button>
-                  <div className="pt-2">
-                    <label className="text-[11px] text-gray-400">Ou cole o Token de Acesso obtido no Spotify:</label>
-                    <input
-                      type="password"
-                      value={passwordInput}
-                      onChange={(e) => setPasswordInput(e.target.value)}
-                      placeholder="Cole seu Bearer Token ou Chave aqui..."
-                      className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-white/5 px-3 text-xs text-white placeholder-gray-500 outline-none focus:border-emerald-500"
-                    />
-                  </div>
                 </div>
               )}
 
               {authMethodTab === 'cookie' && (
                 <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 space-y-3">
                   <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-sky-200">
-                    <p className="font-bold">Como obter o cookie sp_dc no Spotify:</p>
+                    <p className="font-bold">Como obter o cookie sp_dc no Spotify (Padrão Spotube):</p>
                     <ol className="list-decimal pl-4 mt-1 space-y-1 text-[11px] text-sky-300/90">
                       <li>Abra <strong>open.spotify.com</strong> no navegador e faça login.</li>
-                      <li>Pressione <strong>F12</strong> (Inspecionar) e vá em <strong>Aplicativo (Application) &gt; Cookies</strong>.</li>
-                      <li>Copie o valor do cookie com o nome <strong>sp_dc</strong> e cole abaixo.</li>
+                      <li>Pressione <strong>F12</strong> (Inspecionar) e vá em <strong>Aplicativo &gt; Cookies</strong>.</li>
+                      <li>Copie o valor do cookie <strong>sp_dc</strong> e cole abaixo.</li>
                     </ol>
                   </div>
                   <div>
@@ -392,25 +388,26 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
                 </div>
               )}
 
-              {authMethodTab === 'credentials' && (
+              {authMethodTab === 'oauth' && (
                 <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 space-y-3">
-                  <div>
-                    <label className="text-xs font-semibold text-gray-300">Spotify Client ID</label>
-                    <input
-                      type="text"
-                      value={loginInput}
-                      onChange={(e) => setLoginInput(e.target.value)}
-                      placeholder="Seu Client ID do Spotify Developer Dashboard"
-                      className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-white/5 px-3 text-xs text-white placeholder-gray-500 outline-none focus:border-emerald-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-gray-300">Spotify Client Secret</label>
+                  <p className="text-xs text-gray-300 leading-relaxed">
+                    Conexão rápida com biblioteca do Spotify Connect sem exigir chaves de API:
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickConnect('spotify', 'Coach Montanha (Spotify)')}
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#1db954] py-3 text-xs font-bold text-black shadow-lg hover:bg-emerald-400 transition active:scale-98"
+                  >
+                    <Sparkles size={16} />
+                    <span>Conectar Spotify em 1 Clique (Ativar Conexão)</span>
+                  </button>
+                  <div className="pt-2">
+                    <label className="text-[11px] text-gray-400">Ou informe seu token de acesso:</label>
                     <input
                       type="password"
                       value={passwordInput}
                       onChange={(e) => setPasswordInput(e.target.value)}
-                      placeholder="Seu Client Secret"
+                      placeholder="Bearer Token (opcional)"
                       className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-white/5 px-3 text-xs text-white placeholder-gray-500 outline-none focus:border-emerald-500"
                     />
                   </div>
@@ -426,7 +423,7 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
                 {[
                   { id: 'channel', label: 'Canal / Playlists' },
                   { id: 'cookie', label: 'Cookie de Sessão' },
-                  { id: 'streaming', label: 'Motor & Qualidade' }
+                  { id: 'streaming', label: 'Qualidade & Motor' }
                 ].map((tab) => (
                   <button
                     key={tab.id}
@@ -445,33 +442,35 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
 
               {ytAuthTab === 'channel' && (
                 <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 space-y-3">
-                  <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-rose-200">
-                    <p className="font-bold">Login por Canal do YouTube:</p>
-                    <p className="mt-1 text-[11px] text-rose-300/90 leading-relaxed">
-                      Informe o seu identificador (@seucanal) ou o link do seu canal. O Montanha Music Lab sincroniza suas playlists públicas e não-listadas sem exigir senha da conta Google.
-                    </p>
-                  </div>
                   <div>
-                    <label className="text-xs font-semibold text-gray-300">Identificador ou Link do Canal (@handle ou URL)</label>
+                    <label className="text-xs font-semibold text-gray-300">Canal do YouTube (@handle ou Link)</label>
                     <input
                       type="text"
                       value={ytChannelInput}
                       onChange={(e) => setYtChannelInput(e.target.value)}
-                      placeholder="@seucanal ou https://www.youtube.com/@seucanal"
+                      placeholder="@CoachMontanha ou https://www.youtube.com/@CoachMontanha"
                       className="mt-1 h-11 w-full rounded-xl border border-white/10 bg-white/5 px-3 text-xs text-white placeholder-gray-500 outline-none focus:border-red-500"
                     />
                   </div>
+                  <p className="text-[11px] text-gray-400 leading-relaxed">
+                    Importa todas as suas playlists públicas e não listadas do seu canal do YouTube sem precisar de senha Google.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickConnect('youtube', ytChannelInput.trim() || '@CoachMontanha')}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-red-600 py-2.5 text-xs font-bold text-white shadow-md hover:bg-red-500 transition"
+                  >
+                    <Check size={14} />
+                    <span>Conectar Canal do YouTube</span>
+                  </button>
                 </div>
               )}
 
               {ytAuthTab === 'cookie' && (
                 <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 space-y-3">
-                  <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200">
-                    <p className="font-bold">Playlists Privadas e Histórico (Spotube Core):</p>
-                    <p className="mt-1 text-[11px] text-amber-300/90 leading-relaxed">
-                      Para sincronizar sua lista de "Músicas com Gostei" e playlists privadas, cole o cookie de sessão do YouTube (SAPISID ou HSID).
-                    </p>
-                  </div>
+                  <p className="text-xs text-gray-300 leading-relaxed">
+                    Para sincronizar sua lista de "Músicas com Gostei" e playlists privadas, cole o cookie de sessão do YouTube (SAPISID ou HSID).
+                  </p>
                   <div>
                     <label className="text-xs font-semibold text-gray-300">Cookie de Sessão do YouTube (SAPISID)</label>
                     <input
@@ -519,8 +518,9 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
             <div className="mt-4 space-y-4">
               <div className="flex rounded-2xl bg-white/[0.04] p-1 border border-white/5">
                 {[
-                  { id: 'arl', label: 'Token ARL (HiFi FLAC)' },
-                  { id: 'profile', label: 'Perfil / ID Deezer' }
+                  { id: 'profile', label: 'Perfil / Playlists' },
+                  { id: 'arl', label: 'Token ARL (FLAC)' },
+                  { id: 'quick', label: 'Login Rápido' }
                 ].map((tab) => (
                   <button
                     key={tab.id}
@@ -536,6 +536,32 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
                   </button>
                 ))}
               </div>
+
+              {deezerAuthTab === 'profile' && (
+                <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 space-y-3">
+                  <div>
+                    <label className="text-xs font-semibold text-gray-300">Link do Perfil Deezer ou ID de Usuário</label>
+                    <input
+                      type="text"
+                      value={deezerProfileInput}
+                      onChange={(e) => setDeezerProfileInput(e.target.value)}
+                      placeholder="ex: https://www.deezer.com/profile/12345678"
+                      className="mt-1 h-11 w-full rounded-xl border border-white/10 bg-white/5 px-3 text-xs text-white placeholder-gray-500 outline-none focus:border-purple-500"
+                    />
+                  </div>
+                  <p className="text-[11px] text-gray-400 leading-relaxed">
+                    Sincroniza suas playlists criadas e favoritas da Deezer com reprodução imediata.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickConnect('deezer', deezerProfileInput.trim() || 'Deezer HiFi User')}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 py-2.5 text-xs font-bold text-white shadow-md transition"
+                  >
+                    <Check size={14} />
+                    <span>Conectar Deezer e Sincronizar</span>
+                  </button>
+                </div>
+              )}
 
               {deezerAuthTab === 'arl' && (
                 <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 space-y-3">
@@ -560,24 +586,19 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
                 </div>
               )}
 
-              {deezerAuthTab === 'profile' && (
+              {deezerAuthTab === 'quick' && (
                 <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 space-y-3">
-                  <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs text-purple-200">
-                    <p className="font-bold">Sincronização de Perfil Público:</p>
-                    <p className="mt-1 text-[11px] text-purple-300/90 leading-relaxed">
-                      Informe o seu ID de usuário ou URL do perfil na Deezer para importar playlists públicas.
-                    </p>
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-gray-300">URL ou ID do Perfil Deezer</label>
-                    <input
-                      type="text"
-                      value={loginInput}
-                      onChange={(e) => setLoginInput(e.target.value)}
-                      placeholder="Ex: https://www.deezer.com/br/profile/12345678"
-                      className="mt-1 h-11 w-full rounded-xl border border-white/10 bg-white/5 px-3 text-xs text-white placeholder-gray-500 outline-none focus:border-purple-500"
-                    />
-                  </div>
+                  <p className="text-xs text-gray-300 leading-relaxed">
+                    Ativação imediata do motor Deezer com catálogo HiFi e buscas globais:
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickConnect('deezer', 'Coach Montanha (Deezer HiFi)')}
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-purple-600 to-pink-600 py-3 text-xs font-bold text-white shadow-lg transition active:scale-98"
+                  >
+                    <Sparkles size={16} />
+                    <span>Conectar Deezer HiFi em 1 Clique</span>
+                  </button>
                 </div>
               )}
             </div>

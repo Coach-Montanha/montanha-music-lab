@@ -646,10 +646,7 @@ function formatReleaseDateLabel(value?: string | null) {
 
 export default function App() {
   const storedDeviceId = localStorage.getItem(DEVICE_ID_STORAGE_KEY) || createDeviceId();
-  let rawDeviceName = repairTextEncoding(localStorage.getItem(DEVICE_NAME_STORAGE_KEY)) || '';
-  if (!rawDeviceName || /musfy/i.test(rawDeviceName)) {
-    rawDeviceName = `${navigator.platform.includes('Win') ? 'Notebook' : 'Dispositivo'} Montanha Music Lab`;
-  }
+  let rawDeviceName = 'Notebook Montanha Music Lab';
   const storedDeviceName = rawDeviceName;
   localStorage.setItem(DEVICE_ID_STORAGE_KEY, storedDeviceId);
   localStorage.setItem(DEVICE_NAME_STORAGE_KEY, storedDeviceName);
@@ -2696,7 +2693,7 @@ export default function App() {
     if (!query || isSearchingYoutube) return;
 
     setIsSearchingYoutube(true);
-    setYoutubeSearchMessage('Buscando no YouTube e catálogo...');
+    setYoutubeSearchMessage('Buscando faixas no YouTube, Deezer e catálogos...');
     youtubeSelectionRequestIdRef.current += 1;
     setYoutubeAnalysis(null);
     setYoutubeActionModal(null);
@@ -2705,11 +2702,11 @@ export default function App() {
       let results: YoutubeSearchResult[] = [];
       let playlistResults: YoutubeSearchPlaylistResult[] = [];
 
-      // Busca paralela ultrarrápida: iTunes API + /api/youtube/search (menos de 500ms)
+      // 1. iTunes / Apple Music (AAC 256k preview direto)
       const fetchItunes = async (): Promise<YoutubeSearchResult[]> => {
         try {
           const itunesRes = await fetch(
-            `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=30`
+            `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=25`
           );
           if (itunesRes.ok) {
             const itunesData = await itunesRes.json();
@@ -2729,6 +2726,29 @@ export default function App() {
         return [];
       };
 
+      // 2. Deezer API Oficial (HiFi streaming preview 30s direto)
+      const fetchDeezer = async (): Promise<YoutubeSearchResult[]> => {
+        try {
+          const dzRes = await fetch(`https://api.deezer.com/search?q=${encodeURIComponent(query)}&limit=25`);
+          if (dzRes.ok) {
+            const dzData = await dzRes.json();
+            return (dzData.data || []).map((t: any) => ({
+              id: `dz-${t.id}`,
+              title: t.title || 'Música Deezer',
+              artist: t.artist?.name || 'Artista',
+              album: t.album?.title || 'Álbum',
+              duration: t.duration || 180,
+              thumbnail: t.album?.cover_big || t.album?.cover_medium || '',
+              url: t.link || `https://www.deezer.com/track/${t.id}`,
+              previewUrl: t.preview || '',
+              source: 'deezer'
+            }));
+          }
+        } catch {}
+        return [];
+      };
+
+      // 3. YouTube Serverless backend
       const fetchApi = async (): Promise<{ results: YoutubeSearchResult[]; playlists: YoutubeSearchPlaylistResult[] }> => {
         try {
           const directRes = await fetch(`/api/youtube/search?q=${encodeURIComponent(query)}`);
@@ -2743,15 +2763,23 @@ export default function App() {
         return { results: [], playlists: [] };
       };
 
-      const [itunesTracks, apiData] = await Promise.all([fetchItunes(), fetchApi()]);
-      console.log('[SearchDebug] query:', query, 'itunesTracks:', itunesTracks.length, 'apiResults:', apiData.results.length);
+      const [itunesTracks, dzTracks, apiData] = await Promise.all([fetchItunes(), fetchDeezer(), fetchApi()]);
 
-      if (apiData.results.length > 0) {
-        results = apiData.results;
-        playlistResults = apiData.playlists;
-      } else {
-        results = itunesTracks;
-      }
+      const combined = [
+        ...apiData.results,
+        ...dzTracks,
+        ...itunesTracks
+      ];
+
+      // Deduplicate by title + artist
+      const seen = new Set<string>();
+      results = combined.filter((item) => {
+        const key = `${(item.title || '').toLowerCase()}|${(item.artist || '').toLowerCase()}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      playlistResults = apiData.playlists;
 
       setYoutubeSearchResults(results);
       setYoutubePlaylistSearchResults(playlistResults);
@@ -4351,6 +4379,86 @@ export default function App() {
                     </div>
                   )}
                 </div>
+
+                {/* Desktop Search Results Grid Prominent at the Top */}
+                {youtubeSearchResults.length > 0 && (
+                  <div className="hidden lg:block mb-8">
+                    <div className="mb-4 flex items-center justify-between gap-4">
+                      <div>
+                        <h3 className="text-2xl font-black tracking-tight text-white">
+                          Resultados da Busca: "{searchTerm || youtubeSearchQuery}"
+                        </h3>
+                        <p className="mt-1 text-xs text-gray-400">
+                          {youtubeSearchResults.length} faixas encontradas • Clique no Play para ouvir imediatamente ou Baixar para fila offline
+                        </p>
+                      </div>
+                      <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-3.5 py-1 text-xs font-bold text-blue-300">
+                        {youtubeSearchResults.length} faixas
+                      </span>
+                    </div>
+
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                      {youtubeSearchResults.map((result) => (
+                        <div
+                          key={`desk-top-${result.id}-${result.url}`}
+                          className="group relative flex items-center gap-3.5 rounded-2xl border border-white/10 bg-white/[0.03] p-3 transition hover:border-blue-500/30 hover:bg-white/[0.06] text-left"
+                        >
+                          <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-black/40 border border-white/5">
+                            {result.thumbnail ? (
+                              <img src={result.thumbnail} alt={result.title} className="h-full w-full object-cover transition group-hover:scale-105" />
+                            ) : (
+                              <Music size={22} className="text-gray-500 m-auto mt-4" />
+                            )}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void playYoutubeTrack(result);
+                              }}
+                              className="absolute inset-0 m-auto flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg opacity-0 group-hover:opacity-100 transition active:scale-90"
+                              title="Tocar Agora"
+                            >
+                              <Play size={16} fill="currentColor" className="ml-0.5" />
+                            </button>
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-bold text-white group-hover:text-blue-400 transition">{result.title}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${
+                                result.source === 'deezer' ? 'bg-purple-500/20 text-purple-300' :
+                                result.source === 'itunes' ? 'bg-blue-500/20 text-blue-300' :
+                                'bg-red-500/20 text-red-300'
+                              }`}>
+                                {result.source === 'deezer' ? 'Deezer HiFi' : result.source === 'itunes' ? 'Apple Music' : 'YouTube'}
+                              </span>
+                              <p className="truncate text-xs text-gray-400">{result.artist || 'Artista'}</p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => void playYoutubeTrack(result)}
+                              className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition shadow-sm"
+                              title="Tocar Imediatamente"
+                            >
+                              <Play size={15} fill="currentColor" className="ml-0.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void selectYoutubeSearchResult(result)}
+                              className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-gray-400 hover:text-white transition"
+                              title="Opções de Download"
+                            >
+                              <Download size={15} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Desktop Downloader View */}
                 <div className="hidden lg:grid items-start gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,380px)]">

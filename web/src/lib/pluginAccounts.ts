@@ -7,11 +7,11 @@ export interface PluginAccountData {
   username?: string;
   avatar?: string;
   token?: string;
-  authMethod?: 'oauth' | 'cookie' | 'credentials';
+  authMethod?: 'oauth' | 'cookie' | 'credentials' | 'channel' | 'profile';
   lastSync?: string;
 }
 
-const STORAGE_KEY = 'montanha_music_lab_plugins_v3';
+const STORAGE_KEY = 'montanha_music_lab_plugins_v5';
 
 export const getStoredPluginAccounts = (): Record<string, PluginAccountData> => {
   try {
@@ -23,24 +23,10 @@ export const getStoredPluginAccounts = (): Record<string, PluginAccountData> => 
     console.error('Failed to read plugin accounts from storage', err);
   }
 
-  // Padrão Spotube oficial: Plugins estão INSTALADOS nativamente, mas NÃO conectados até login real
+  // Padrão Spotube oficial: Todos os plugins vêm nativamente INSTALADOS, mas DESCONECTADOS até login explícito
   return {
     youtube: {
       provider: 'youtube',
-      connected: false,
-      installed: true,
-      username: undefined,
-      token: undefined
-    },
-    newpipe: {
-      provider: 'newpipe',
-      connected: false,
-      installed: true,
-      username: undefined,
-      token: undefined
-    },
-    lrclib: {
-      provider: 'lrclib',
       connected: false,
       installed: true,
       username: undefined,
@@ -60,6 +46,20 @@ export const getStoredPluginAccounts = (): Record<string, PluginAccountData> => 
       username: undefined,
       token: undefined
     },
+    newpipe: {
+      provider: 'newpipe',
+      connected: false,
+      installed: true,
+      username: undefined,
+      token: undefined
+    },
+    lrclib: {
+      provider: 'lrclib',
+      connected: false,
+      installed: true,
+      username: undefined,
+      token: undefined
+    },
     scrobble: {
       provider: 'scrobble',
       connected: false,
@@ -72,16 +72,16 @@ export const getStoredPluginAccounts = (): Record<string, PluginAccountData> => 
 
 export const savePluginAccount = async (
   provider: string,
-  data: { username?: string; token?: string; authMethod?: 'oauth' | 'cookie' | 'credentials' }
+  data: { username?: string; token?: string; authMethod?: any }
 ): Promise<Record<string, PluginAccountData>> => {
   const current = getStoredPluginAccounts();
   current[provider] = {
     provider: provider as any,
     connected: true,
     installed: true,
-    username: data.username || `${provider}_conectado`,
-    token: data.token || 'auth_token_valid',
-    authMethod: data.authMethod || 'credentials',
+    username: data.username || `${provider}_usuario`,
+    token: data.token || 'spotube_auth_active',
+    authMethod: data.authMethod || 'channel',
     lastSync: new Date().toISOString()
   };
 
@@ -91,7 +91,7 @@ export const savePluginAccount = async (
     console.error('Failed to write plugin accounts to localStorage', err);
   }
 
-  // Sincronizar com Supabase sob o ID do usuário ativo
+  // Sincronizar com Supabase sob o ID do usuário ativo se houver sessão
   try {
     const { data: sessionData } = await supabase.auth.getSession();
     const userId = sessionData.session?.user?.id;
