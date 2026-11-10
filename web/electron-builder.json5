@@ -1,0 +1,80 @@
+// @see - https://www.electron.build/configuration/configuration
+{
+  "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
+  "appId": "com.montanha.musiclab.desktop",
+  "asar": true,
+  "productName": "Montanha Music Lab",
+  "directories": {
+    "output": "release/${version}"
+  },
+  "files": [
+    "dist",
+    "dist-electron"
+  ],
+  "extraFiles": [
+    {
+      "from": "build/windows/MusFyServiceHost.exe",
+      "to": "."
+    },
+    {
+      "from": "build/windows/Register-MusFyService.ps1",
+      "to": "."
+    }
+  ],
+  "extraResources": [
+    {
+      "from": "build/runtime",
+      "to": "runtime"
+    },
+    {
+      "from": "src/assets",
+      "to": "assets"
+    },
+    {
+      "from": "dist",
+      "to": "frontend-dist"
+    },
+    {
+      "from": "build/backend-musfy",
+      "to": "backend-musfy",
+      "filter": [
+        "**/*"
+      ]
+    }
+  ],
+  "mac": {
+    "target": [
+      "dmg"
+    ],
+    "artifactName": "${productName}-Mac-${version}-Installer.${ext}"
+  },
+  "win": {
+    "icon": "src/assets/tray.ico",
+    "target": [
+      {
+        "target": "nsis",
+        "arch": [
+          "x64"
+        ]
+      }
+    ],
+    "artifactName": "Montanha-Music-Lab-Setup.${ext}"
+  },
+  "nsis": {
+    "artifactName": "Montanha-Music-Lab-Setup.${ext}",
+    "oneClick": false,
+    "perMachine": true,
+    "deleteAppDataOnUninstall": false,
+    "allowToChangeInstallationDirectory": true,
+    "allowElevation": true,
+    "installerIcon": "src/assets/tray.ico",
+    "uninstallerIcon": "src/assets/tray.ico",
+    "installerHeaderIcon": "src/assets/tray.ico"
+  },
+  "linux": {
+    "target": [
+      "AppImage"
+    ],
+    "artifactName": "${productName}-Linux-${version}.${ext}"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "name": "Montanha Music Lab",
+  "short_name": "Montanha Music",
+  "description": "Universal Multiplatform Audio & Streaming Player",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#060709",
+  "theme_color": "#060709",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/app.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/app.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["music", "entertainment", "utilities"]
+}
