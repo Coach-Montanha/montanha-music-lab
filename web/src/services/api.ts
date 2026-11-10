@@ -12,7 +12,7 @@ function buildCandidateBaseUrls() {
   const envBaseUrl = import.meta.env.VITE_API_BASE_URL
     ? String(import.meta.env.VITE_API_BASE_URL)
     : '';
-  const desktopConfig = typeof window !== 'undefined' ? window.musfyDesktop?.getServiceConfig?.() || null : null;
+  const desktopConfig = typeof window !== 'undefined' ? (window as any).musfyDesktop?.getServiceConfig?.() || null : null;
   const desktopBaseUrl = desktopConfig?.baseUrl || '';
   const desktopPort = Number(desktopConfig?.port || 0) || 0;
 
@@ -21,6 +21,18 @@ function buildCandidateBaseUrls() {
   }
 
   const { protocol, hostname, port, origin } = window.location;
+  const isHttps = protocol === 'https:';
+  const isLocalHost = hostname === 'localhost' || hostname === '127.0.0.1';
+
+  // When loaded over HTTPS in web/PWA (like Vercel), do not attempt insecure HTTP localhost or non-SSL URLs (blocks Mixed Content)
+  if (isHttps && !isLocalHost) {
+    return unique([
+      envBaseUrl,
+      desktopBaseUrl,
+      '/api'
+    ]);
+  }
+
   const sameOriginBackend =
     (protocol === 'http:' || protocol === 'https:') &&
     desktopPort > 0 &&
@@ -41,11 +53,11 @@ function buildCandidateBaseUrls() {
   ]);
 }
 
-let activeBaseUrl = buildCandidateBaseUrls()[0] || 'http://localhost:3001';
+let activeBaseUrl = buildCandidateBaseUrls()[0] || (typeof window !== 'undefined' && window.location.protocol === 'https:' ? '/api' : 'http://localhost:3001');
 
 const api = axios.create({
   baseURL: activeBaseUrl,
-  timeout: 20000
+  timeout: 10000
 });
 
 api.interceptors.request.use((config) => {

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-br" class="dark">
+<html lang="pt-br" class="dark" style="background-color: #060709; color: #f8fafc;">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
@@ -14,15 +14,63 @@
     <link rel="icon" type="image/png" href="/app.png" />
     <link rel="apple-touch-icon" href="/app.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
+
+    <style>
+      html, body {
+        background-color: #060709 !important;
+        color: #f8fafc;
+        margin: 0;
+        padding: 0;
+        min-height: 100vh;
+        overflow-x: hidden;
+      }
+      #root {
+        min-height: 100vh;
+        background-color: #060709;
+      }
+    </style>
+
+    <script>
+      // Self-healing service worker cache buster
+      window.addEventListener('error', function(e) {
+        var msg = (e && e.message) ? e.message.toLowerCase() : '';
+        if (msg.indexOf('dynamically imported') !== -1 || msg.indexOf('unexpected token') !== -1 || msg.indexOf('failed to fetch') !== -1) {
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(regs) {
+              regs.forEach(function(r) { r.unregister(); });
+            });
+          }
+          if ('caches' in window) {
+            caches.keys().then(function(keys) {
+              keys.forEach(function(k) { caches.delete(k); });
+            });
+          }
+          setTimeout(function() {
+            window.location.reload();
+          }, 300);
+        }
+      });
+    </script>
   </head>
   <body class="bg-[#060709] text-slate-100 antialiased selection:bg-emerald-500/20 selection:text-emerald-300 overflow-x-hidden">
-    <div id="root"></div>
+    <div id="root">
+      <!-- Fallback splash screen before hydration to eliminate any white flash -->
+      <div style="display:flex;height:100vh;align-items:center;justify-content:center;background-color:#060709;color:#fff;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;">
+        <div style="text-align:center;padding:24px;">
+          <div style="width:48px;height:48px;margin:0 auto 16px auto;background:#10b981;border-radius:14px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:24px;color:#000;">M</div>
+          <div style="font-size:12px;text-transform:uppercase;letter-spacing:0.25em;color:#34d399;font-weight:700;">Montanha Music Lab</div>
+          <div style="margin-top:8px;font-size:14px;color:#9ca3af;">Iniciando player...</div>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
     <script>
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch((err) => {
-            console.log('SW registration failed:', err);
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('/sw.js').then(function(registration) {
+            registration.update();
+          }).catch(function(err) {
+            console.log('SW registration error:', err);
           });
         });
       }

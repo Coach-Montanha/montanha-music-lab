@@ -1092,6 +1092,9 @@ export default function App() {
   };
 
   const probeBackendAvailability = async () => {
+    if (typeof window !== 'undefined' && window.location.protocol === 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      return false;
+    }
     try {
       await api.get('/health');
       setBackendAvailable(true);
@@ -1165,6 +1168,9 @@ export default function App() {
 
   useEffect(() => {
     if (isMiniMode) return;
+    if (typeof window !== 'undefined' && window.location.protocol === 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      return;
+    }
 
     void probeBackendAvailability();
     const interval = window.setInterval(() => {

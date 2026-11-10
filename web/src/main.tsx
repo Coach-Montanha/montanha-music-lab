@@ -1,22 +1,80 @@
-import React, { Suspense, lazy } from 'react'
-import ReactDOM from 'react-dom/client'
-import './index.css'
+import React, { Component, ErrorInfo, ReactNode } from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App.tsx';
+import './index.css';
 
-const App = lazy(() => import('./App.tsx'))
+interface ErrorBoundaryProps {
+  children: ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class RootErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('App runtime error caught by boundary:', error, errorInfo);
+  }
+
+  handleHardReset = () => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then((regs) => {
+        regs.forEach((r) => void r.unregister());
+      });
+    }
+    if ('caches' in window) {
+      caches.keys().then((keys) => {
+        keys.forEach((k) => void caches.delete(k));
+      });
+    }
+    localStorage.clear();
+    sessionStorage.clear();
+    window.location.reload();
+  };
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex min-h-screen flex-col items-center justify-center bg-[#060709] px-6 text-center text-white">
+          <div className="w-full max-w-md rounded-3xl border border-white/10 bg-[#111216] p-8 shadow-2xl">
+            <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-400">
+              <span className="text-xl font-bold">M</span>
+            </div>
+            <h1 className="text-xl font-bold text-white">Montanha Music Lab</h1>
+            <p className="mt-2 text-sm text-gray-400">
+              Detectamos uma atualização nos arquivos da aplicação.
+            </p>
+            <p className="mt-1 text-xs text-gray-500 font-mono break-words">
+              {this.state.error?.message || 'Atualização de cache pendente'}
+            </p>
+            <button
+              onClick={this.handleHardReset}
+              className="mt-6 w-full rounded-2xl bg-emerald-500 py-3 text-sm font-semibold text-black transition hover:bg-emerald-400 active:scale-95"
+            >
+              Atualizar e Recarregar
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <Suspense
-      fallback={
-        <div className="flex h-screen items-center justify-center bg-[#050505] text-white">
-          <div className="rounded-[28px] border border-white/10 bg-white/[0.03] px-8 py-6 text-center shadow-[0_20px_60px_rgba(0,0,0,0.24)]">
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-green-300">Montanha Music Lab</p>
-            <p className="mt-3 text-lg font-semibold">Carregando interface...</p>
-          </div>
-        </div>
-      }
-    >
+    <RootErrorBoundary>
       <App />
-    </Suspense>
-  </React.StrictMode>,
-)
+    </RootErrorBoundary>
+  </React.StrictMode>
+);
