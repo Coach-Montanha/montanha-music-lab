@@ -38,7 +38,7 @@ import {
   X
 } from 'lucide-react';
 import api from './services/api';
-import brandMark from './assets/musfy-mark.svg';
+import brandMark from './assets/app.png';
 import type { DesktopOnboardingStep } from './components/DesktopOnboardingOverlay';
 import { createOfflineAudioStore, type LocalForageImportShape, type OfflineAudioStore } from './lib/offlineAudioStore';
 import { buildLocalVideoPlaybackUrl, resolveAudioPlaybackUrl } from './lib/playbackUrl';
@@ -268,9 +268,9 @@ interface DownloadJob {
   items?: DownloadJobItem[];
 }
 
-const GITHUB_RELEASES_LATEST_URL = 'https://github.com/hasbuen/MusFy/releases/latest';
-const GITHUB_ANDROID_APK_URL = `${GITHUB_RELEASES_LATEST_URL}/download/MusFy-Android.apk`;
-const GITHUB_ANDROID_APK_ASSET_NAME = 'MusFy-Android.apk';
+const GITHUB_RELEASES_LATEST_URL = 'https://github.com/hasbuen/Montanha Music Lab/releases/latest';
+const GITHUB_ANDROID_APK_URL = `${GITHUB_RELEASES_LATEST_URL}/download/Montanha Music Lab-Android.apk`;
+const GITHUB_ANDROID_APK_ASSET_NAME = 'Montanha Music Lab-Android.apk';
 
 type ViewMode = 'grid' | 'list';
 type Section = 'home' | 'explore' | 'library' | 'favorites' | 'download' | 'settings';
@@ -330,7 +330,7 @@ const DESKTOP_ONBOARDING_STEPS: DesktopOnboardingStep[] = [
   {
     id: 'nav-download',
     title: 'Entrada de captura',
-    description: 'O MusFy já pode abrir direto em downloads. Esse atalho concentra busca no YouTube, fila e publicação no catálogo.',
+    description: 'O Montanha Music Lab já pode abrir direto em downloads. Esse atalho concentra busca no YouTube, fila e publicação no catálogo.',
     accent: 'Use a seção "Baixar do YouTube" como ponto de entrada para novas faixas.'
   },
   {
@@ -343,7 +343,7 @@ const DESKTOP_ONBOARDING_STEPS: DesktopOnboardingStep[] = [
     id: 'youtube-search',
     title: 'Busca integrada no YouTube',
     description: 'A seção de downloads resolve pesquisa e seleção dentro do app, reduzindo ida e volta entre navegador e player.',
-    accent: 'Busque, analise e publique faixas sem sair do MusFy.'
+    accent: 'Busque, analise e publique faixas sem sair do Montanha Music Lab.'
   },
   {
     id: 'mini-player',
@@ -625,7 +625,7 @@ export default function App() {
   const storedDeviceId = localStorage.getItem(DEVICE_ID_STORAGE_KEY) || createDeviceId();
   const storedDeviceName =
     repairTextEncoding(localStorage.getItem(DEVICE_NAME_STORAGE_KEY)) ||
-    `${navigator.platform.includes('Win') ? 'Notebook' : 'Dispositivo'} MusFy`;
+    `${navigator.platform.includes('Win') ? 'Notebook' : 'Dispositivo'} Montanha Music Lab`;
   localStorage.setItem(DEVICE_ID_STORAGE_KEY, storedDeviceId);
   localStorage.setItem(DEVICE_NAME_STORAGE_KEY, storedDeviceName);
 
@@ -674,9 +674,16 @@ export default function App() {
   const [authLogin, setAuthLogin] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [authMessage, setAuthMessage] = useState('');
+  const DEFAULT_LOCAL_USER: User = {
+  id: 'montanha_user',
+  nome: 'Coach Montanha',
+  login: 'montanha',
+  email: 'contato@coachmontanha.com'
+};
+
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     const stored = localStorage.getItem(AUTH_STORAGE_KEY);
-    return stored ? sanitizeDeepText(JSON.parse(stored) as User) : null;
+    return stored ? sanitizeDeepText(JSON.parse(stored) as User) : DEFAULT_LOCAL_USER;
   });
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [discoverPlaylists, setDiscoverPlaylists] = useState<Playlist[]>([]);
@@ -754,54 +761,54 @@ export default function App() {
 
   const desktopApi = {
     minimizeToTray: async () => {
-      if (!window.musfyDesktop) return false;
-      await window.musfyDesktop.minimizeToTray();
+      if (!window.montanhaDesktop) return false;
+      await window.montanhaDesktop.minimizeToTray();
       return true;
     },
     showMiniPlayer: async () => {
-      if (!window.musfyDesktop?.showMiniPlayer) return false;
-      return window.musfyDesktop.showMiniPlayer();
+      if (!window.montanhaDesktop?.showMiniPlayer) return false;
+      return window.montanhaDesktop.showMiniPlayer();
     },
     toggleMiniPlayer: async () => {
-      if (!window.musfyDesktop) return false;
-      return window.musfyDesktop.toggleMiniPlayer();
+      if (!window.montanhaDesktop) return false;
+      return window.montanhaDesktop.toggleMiniPlayer();
     },
     showMain: async () => {
-      if (!window.musfyDesktop) return false;
-      await window.musfyDesktop.showMain();
+      if (!window.montanhaDesktop) return false;
+      await window.montanhaDesktop.showMain();
       return true;
     },
     closeMiniPlayer: async () => {
-      if (!window.musfyDesktop) return false;
-      await window.musfyDesktop.closeMiniPlayer();
+      if (!window.montanhaDesktop) return false;
+      await window.montanhaDesktop.closeMiniPlayer();
       return true;
     },
     setMiniPlayerMode: async (mode: 'compact' | 'video') => {
-      if (!window.musfyDesktop?.setMiniPlayerMode) return false;
-      return window.musfyDesktop.setMiniPlayerMode(mode);
+      if (!window.montanhaDesktop?.setMiniPlayerMode) return false;
+      return window.montanhaDesktop.setMiniPlayerMode(mode);
     },
     quitApp: async () => {
-      if (!window.musfyDesktop) return false;
-      await window.musfyDesktop.quitApp();
+      if (!window.montanhaDesktop) return false;
+      await window.montanhaDesktop.quitApp();
       return true;
     },
     openExternal: async (targetUrl: string) => {
-      if (!window.musfyDesktop?.openExternal) return false;
-      return window.musfyDesktop.openExternal(targetUrl);
+      if (!window.montanhaDesktop?.openExternal) return false;
+      return window.montanhaDesktop.openExternal(targetUrl);
     },
     selectBackupDirectory: async () => {
-      if (!window.musfyDesktop?.selectBackupDirectory) return null;
-      return window.musfyDesktop.selectBackupDirectory();
+      if (!window.montanhaDesktop?.selectBackupDirectory) return null;
+      return window.montanhaDesktop.selectBackupDirectory();
     }
   };
 
   useEffect(() => {
-    window.musfyDesktop?.notifyRendererReady?.();
+    window.montanhaDesktop?.notifyRendererReady?.();
   }, []);
 
   useEffect(() => {
-    if (!window.musfyDesktop?.onUpdateStatus) return;
-    return window.musfyDesktop.onUpdateStatus((status) => {
+    if (!window.montanhaDesktop?.onUpdateStatus) return;
+    return window.montanhaDesktop.onUpdateStatus((status) => {
       setDesktopUpdateStatus(sanitizeDeepText(status as DesktopUpdateStatus));
     });
   }, []);
@@ -843,13 +850,17 @@ export default function App() {
   };
 
   const loadSongs = async (section = activeSection, user = currentUser) => {
-    const res = await api.get('/enviar-musica', {
-      params: {
-        section,
-        ...(user?.id ? { userId: user.id } : {})
-      }
-    });
-    setSongs(sanitizeDeepText(Array.isArray(res.data) ? res.data : []));
+    try {
+      const res = await api.get('/enviar-musica', {
+        params: {
+          section,
+          ...(user?.id ? { userId: user.id } : {})
+        }
+      });
+      setSongs(sanitizeDeepText(Array.isArray(res.data) ? res.data : []));
+    } catch (_err) {
+      // Offline / Vercel direct mode fallback
+    }
   };
 
   const loadPlaylists = async (user = currentUser) => {
@@ -857,23 +868,28 @@ export default function App() {
       setPlaylists([]);
       return;
     }
-
-    const res = await api.get('/playlists', {
-      params: { userId: user.id }
-    });
-
-    setPlaylists(sanitizeDeepText(Array.isArray(res.data) ? res.data : []));
+    try {
+      const res = await api.get('/playlists', {
+        params: { userId: user.id }
+      });
+      setPlaylists(sanitizeDeepText(Array.isArray(res.data) ? res.data : []));
+    } catch (_err) {
+      // Offline / Vercel direct mode fallback
+    }
   };
 
   const loadDiscoverPlaylists = async (user = currentUser) => {
-    const res = await api.get('/playlists', {
-      params: {
-        scope: 'discover',
-        ...(user?.id ? { userId: user.id, excludeUserId: user.id } : {})
-      }
-    });
-
-    setDiscoverPlaylists(sanitizeDeepText(Array.isArray(res.data) ? res.data : []));
+    try {
+      const res = await api.get('/playlists', {
+        params: {
+          scope: 'discover',
+          ...(user?.id ? { userId: user.id, excludeUserId: user.id } : {})
+        }
+      });
+      setDiscoverPlaylists(sanitizeDeepText(Array.isArray(res.data) ? res.data : []));
+    } catch (_err) {
+      // Offline / Vercel direct mode fallback
+    }
   };
 
   const openBrowserClient = async () => {
@@ -973,7 +989,7 @@ export default function App() {
       if (error instanceof Error && error.message === unavailableMessage) {
         throw error;
       }
-      throw new Error('Servidor local indisponivel. Verifique se o MusFy esta aberto e tente novamente.');
+      throw new Error('Servidor local indisponivel. Verifique se o Montanha Music Lab esta aberto e tente novamente.');
     }
   };
 
@@ -1027,26 +1043,26 @@ export default function App() {
   };
 
   const loadDesktopPreferences = async () => {
-    if (!window.musfyDesktop?.getPreferences) return;
-    const preferences = await window.musfyDesktop.getPreferences();
+    if (!window.montanhaDesktop?.getPreferences) return;
+    const preferences = await window.montanhaDesktop.getPreferences();
     setDesktopPreferences(sanitizeDeepText(preferences));
   };
 
   const loadDesktopUpdateStatus = async () => {
-    if (!window.musfyDesktop?.getUpdateStatus) return;
-    const status = await window.musfyDesktop.getUpdateStatus();
+    if (!window.montanhaDesktop?.getUpdateStatus) return;
+    const status = await window.montanhaDesktop.getUpdateStatus();
     setDesktopUpdateStatus(sanitizeDeepText(status));
   };
 
   const triggerDesktopUpdateCheck = async () => {
-    if (!window.musfyDesktop?.checkForUpdates) return;
-    const status = await window.musfyDesktop.checkForUpdates();
+    if (!window.montanhaDesktop?.checkForUpdates) return;
+    const status = await window.montanhaDesktop.checkForUpdates();
     setDesktopUpdateStatus(sanitizeDeepText(status));
   };
 
   const installDesktopUpdate = async () => {
-    if (!window.musfyDesktop?.installUpdate) return;
-    await window.musfyDesktop.installUpdate();
+    if (!window.montanhaDesktop?.installUpdate) return;
+    await window.montanhaDesktop.installUpdate();
   };
 
   const focusDesktopUpdateSection = (target: 'panel' | 'notes') => {
@@ -1588,7 +1604,7 @@ export default function App() {
   );
   const updateHeadline =
     desktopUpdateStatus.releaseName ||
-    (desktopUpdateStatus.availableVersion ? `MusFy ${desktopUpdateStatus.availableVersion}` : 'Atualizacao do MusFy');
+    (desktopUpdateStatus.availableVersion ? `Montanha Music Lab ${desktopUpdateStatus.availableVersion}` : 'Atualizacao do Montanha Music Lab');
   const desktopTourFocusClass = 'border-cyan-300/45 bg-cyan-300/[0.08] shadow-[0_0_0_1px_rgba(103,232,249,0.18),0_20px_60px_rgba(8,145,178,0.12)]';
 
   const settingsContent = (
@@ -1695,7 +1711,7 @@ export default function App() {
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-white">Atualização automática</p>
                   <p className="mt-2 text-sm leading-6 text-gray-400">
-                    Verifica novas versões do MusFy em segundo plano e baixa o instalador sozinho quando houver update.
+                    Verifica novas versões do Montanha Music Lab em segundo plano e baixa o instalador sozinho quando houver update.
                   </p>
                 </div>
                 <span className={`shrink-0 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] ${desktopPreferences.autoUpdateEnabled ? 'bg-green-500/15 text-green-300' : 'bg-white/10 text-gray-400'}`}>
@@ -1729,7 +1745,7 @@ export default function App() {
                         }))
                       }
                       onBlur={() => void updateDesktopPreference({ backupDirectory: desktopPreferences.backupDirectory })}
-                      placeholder="Ex.: C:\\Users\\SeuUsuario\\Music\\MusFy Backup"
+                      placeholder="Ex.: C:\\Users\\SeuUsuario\\Music\\Montanha Music Lab Backup"
                       className="mt-2 h-9 w-full truncate bg-transparent text-sm font-semibold text-white outline-none placeholder:text-gray-600"
                     />
                   </div>
@@ -1815,7 +1831,7 @@ export default function App() {
                     <p className="text-xs uppercase tracking-[0.22em] text-gray-500">Atualizações do GitHub</p>
                     <p className="mt-3 text-base font-semibold text-white">Versão atual {desktopUpdateStatus.currentVersion}</p>
                     <p className="mt-2 text-sm leading-6 text-gray-400">
-                      O MusFy verifica as releases publicadas em segundo plano e avisa quando entra uma atualização nova.
+                      O Montanha Music Lab verifica as releases publicadas em segundo plano e avisa quando entra uma atualização nova.
                     </p>
                   </div>
                   <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] uppercase tracking-[0.22em] text-gray-300">
@@ -2016,8 +2032,8 @@ export default function App() {
                   <p className="mt-4 text-sm font-semibold text-white">QR do ultimo APK publicado</p>
                   <p className="mt-2 text-xs leading-5 text-gray-500">
                     {androidApkInfo?.fileExists
-                      ? 'O APK local ja foi gerado, mas este QR baixa direto o MusFy-Android.apk do latest release no GitHub.'
-                      : 'Ao ler com o celular, o download abre direto no asset MusFy-Android.apk do latest release no GitHub.'}
+                      ? 'O APK local ja foi gerado, mas este QR baixa direto o Montanha Music Lab-Android.apk do latest release no GitHub.'
+                      : 'Ao ler com o celular, o download abre direto no asset Montanha Music Lab-Android.apk do latest release no GitHub.'}
                   </p>
                 </div>
               </div>
@@ -2432,9 +2448,9 @@ export default function App() {
   };
 
   const updateDesktopPreference = async (patch: Partial<DesktopPreferences>) => {
-    if (!window.musfyDesktop?.updatePreferences) return;
+    if (!window.montanhaDesktop?.updatePreferences) return;
 
-    const nextPreferences = await window.musfyDesktop.updatePreferences(patch);
+    const nextPreferences = await window.montanhaDesktop.updatePreferences(patch);
     setDesktopPreferences(nextPreferences);
     setSettingsMessage('Preferencia salva. Reinicie o app para aplicar no proximo inicio.');
   };
@@ -2529,7 +2545,7 @@ export default function App() {
       const backendMessage = error?.response?.data?.error;
       const networkMessage =
         error?.message === 'Network Error'
-          ? 'Falha ao falar com o backend local. Confirme se o servico MusFy esta rodando.'
+          ? 'Falha ao falar com o backend local. Confirme se o servico Montanha Music Lab esta rodando.'
           : null;
       setYoutubeSearchMessage(backendMessage || networkMessage || 'Falha ao buscar no YouTube.');
     } finally {
@@ -2792,7 +2808,7 @@ export default function App() {
       const backendMessage = error?.response?.data?.error;
       const networkMessage =
         error?.message === 'Network Error'
-          ? 'Falha ao falar com o backend local. Confirme se o servidor MusFy esta rodando.'
+          ? 'Falha ao falar com o backend local. Confirme se o servidor Montanha Music Lab esta rodando.'
           : error?.code === 'ECONNABORTED'
             ? 'A análise do link demorou demais. O backend ainda pode estar consultando o YouTube.'
             : null;
@@ -2843,7 +2859,7 @@ export default function App() {
       task.mode === 'playlist'
         ? `Baixando playlist "${task.label}" e convertendo faixas para OPUS...`
         : task.mode === 'video'
-          ? `Baixando video "${task.label}" e preparando o playback no MusFy...`
+          ? `Baixando video "${task.label}" e preparando o playback no Montanha Music Lab...`
         : `Baixando faixa "${task.label}" e convertendo para OPUS...`
     );
     await loadActivityLogs().catch(console.error);
@@ -2899,7 +2915,7 @@ export default function App() {
       const backendMessage = error?.response?.data?.error;
       const networkMessage =
         error?.message === 'Network Error'
-          ? 'Falha ao falar com o backend local. Confirme se o servidor MusFy esta rodando.'
+          ? 'Falha ao falar com o backend local. Confirme se o servidor Montanha Music Lab esta rodando.'
           : error?.response?.data?.paused
             ? 'Download pausado. Você pode retomar pela fila de downloads.'
           : error?.code === 'ECONNABORTED'
@@ -3399,16 +3415,17 @@ export default function App() {
 
   if (isMiniMode) return miniLayout;
 
-  if (!currentUser) {
+  // Login screen bypassed for direct access
+  if (false && !currentUser) {
     return (
       <div className="flex h-screen items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_top,#103322_0%,#050505_45%,#020202_100%)] px-6 text-white">
         <div className="grid w-full max-w-5xl grid-cols-[1.1fr_0.9fr] overflow-hidden rounded-[36px] border border-white/10 bg-black/60 shadow-[0_30px_120px_rgba(0,0,0,0.55)] backdrop-blur-2xl">
           <div className="flex flex-col justify-between border-r border-white/10 bg-[linear-gradient(180deg,rgba(9,30,20,0.92)_0%,rgba(5,5,5,0.92)_100%)] p-10">
             <div>
               <div className="inline-flex items-center gap-4 rounded-full border border-white/10 bg-white/[0.04] px-4 py-3">
-                <img src={brandMark} alt="MusFy" className="h-12 w-12 rounded-2xl" />
+                <img src={brandMark} alt="Montanha Music Lab" className="h-12 w-12 rounded-2xl" />
                 <div>
-                  <p className="text-xs uppercase tracking-[0.32em] text-green-400/80">MusFy Desktop</p>
+                  <p className="text-xs uppercase tracking-[0.32em] text-green-400/80">Montanha Music Lab Desktop</p>
                   <p className="mt-1 text-sm text-gray-400">Player local com cara de produto</p>
                 </div>
               </div>
@@ -3481,7 +3498,7 @@ export default function App() {
                   onClick={() => void openBrowserClient()}
                   className="w-full rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-gray-300 transition hover:border-cyan-400/40 hover:text-white"
                 >
-                  Abrir MusFy no navegador
+                  Abrir Montanha Music Lab no navegador
                 </button>
 
                 {authMessage ? <p className="text-sm text-gray-400">{authMessage}</p> : null}
@@ -3550,7 +3567,7 @@ export default function App() {
         <aside className="hidden h-full w-80 flex-col overflow-y-auto border-r border-white/5 bg-[linear-gradient(180deg,#070707_0%,#0d0d0d_100%)] lg:flex">
           <div className="px-7 pb-6 pt-7">
             <div className="flex items-center gap-4">
-              <img src={brandMark} alt="MusFy" className="h-16 w-16 rounded-[22px] shadow-[0_10px_35px_rgba(30,215,96,0.16)]" />
+              <img src={brandMark} alt="Montanha Music Lab" className="h-16 w-16 rounded-[22px] shadow-[0_10px_35px_rgba(30,215,96,0.16)]" />
               <div>
                 <h1 className="bg-gradient-to-r from-green-300 via-emerald-200 to-green-500 bg-clip-text text-4xl font-black tracking-tight text-transparent">
                   MUSFY
@@ -3822,7 +3839,7 @@ export default function App() {
                   </p>
                 ) : activeSection === 'download' ? (
                   <p className="text-sm text-gray-400">
-                    Busque dentro do próprio MusFy, abra o modal de ação e escolha entre baixar faixa única ou playlist inteira.
+                    Busque dentro do próprio Montanha Music Lab, abra o modal de ação e escolha entre baixar faixa única ou playlist inteira.
                   </p>
                 ) : activeSection === 'explore' ? (
                   <p className="text-sm text-gray-400">
@@ -3921,7 +3938,7 @@ export default function App() {
                     </div>
                     <h3 className="text-3xl font-black tracking-tight">Encontre no YouTube e publique no catálogo</h3>
                     <p className="mt-3 text-sm leading-6 text-gray-400">
-                      O MusFy consulta o YouTube dentro do app, agrupa faixas e playlists e deixa tudo pronto para baixar sem sair da tela.
+                      O Montanha Music Lab consulta o YouTube dentro do app, agrupa faixas e playlists e deixa tudo pronto para baixar sem sair da tela.
                     </p>
                   </div>
 
@@ -3933,9 +3950,9 @@ export default function App() {
                     <div className="flex flex-wrap items-start justify-between gap-4">
                       <div>
                         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">Busca integrada</p>
-                        <h4 className="mt-2 text-2xl font-black tracking-tight text-white">Encontre sem sair do MusFy</h4>
+                        <h4 className="mt-2 text-2xl font-black tracking-tight text-white">Encontre sem sair do Montanha Music Lab</h4>
                         <p className="mt-2 max-w-xl text-sm leading-6 text-gray-300">
-                          Digite artista, música, live, acoustic ou remix. O MusFy consulta o YouTube, mostra faixas e playlists e você escolhe exatamente o que vai baixar.
+                          Digite artista, música, live, acoustic ou remix. O Montanha Music Lab consulta o YouTube, mostra faixas e playlists e você escolhe exatamente o que vai baixar.
                         </p>
                       </div>
                       <div className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-200">
@@ -4394,7 +4411,7 @@ export default function App() {
                       <p className="mt-2 text-2xl font-bold text-white">{currentUser?.nome || 'Nenhum usuario conectado'}</p>
                       <p className="mt-2 text-sm text-gray-400">
                         {currentUser
-                          ? 'A faixa entra no Explorar e fica favoritada para este usuario. Se for playlist, o MusFy tambem cria uma playlist local automaticamente.'
+                          ? 'A faixa entra no Explorar e fica favoritada para este usuario. Se for playlist, o Montanha Music Lab tambem cria uma playlist local automaticamente.'
                           : 'Entre com um usuario antes de enviar downloads.'}
                       </p>
                     </div>
@@ -5122,7 +5139,7 @@ export default function App() {
                       </div>
                       <div className="mt-6 flex items-center justify-center gap-3 text-sm text-cyan-100">
                         <LoaderCircle size={18} className="animate-spin" />
-                        <span>Preparando reprodução segura dentro do MusFy...</span>
+                        <span>Preparando reprodução segura dentro do Montanha Music Lab...</span>
                       </div>
                       <div className="mx-auto mt-4 h-2 max-w-md overflow-hidden rounded-full bg-white/10">
                         <div className="h-full w-2/3 animate-pulse rounded-full bg-cyan-300/70" />
@@ -5153,7 +5170,7 @@ export default function App() {
             </div>
             <div className="border-t border-white/10 px-5 py-4">
               <p className="text-xs leading-5 text-gray-400">
-                {youtubePreviewMessage || 'Prévia carregada diretamente do YouTube em um player nativo do MusFy.'}
+                {youtubePreviewMessage || 'Prévia carregada diretamente do YouTube em um player nativo do Montanha Music Lab.'}
               </p>
             </div>
           </div>
@@ -5172,7 +5189,7 @@ export default function App() {
                   {youtubeActionModal.analysis.playlist?.title || youtubeActionModal.analysis.selectedEntry?.title || youtubeActionModal.selection.title}
                 </h3>
                 <p className="mt-3 text-sm leading-6 text-gray-300">
-                  {youtubeActionModal.selection.subtitle || 'Escolha como o MusFy deve tratar esse resultado do YouTube.'}
+                  {youtubeActionModal.selection.subtitle || 'Escolha como o Montanha Music Lab deve tratar esse resultado do YouTube.'}
                 </p>
                 {isInspectingYoutube ? (
                   <p className="mt-3 text-xs font-medium uppercase tracking-[0.18em] text-cyan-300/80">
@@ -5181,7 +5198,7 @@ export default function App() {
                 ) : null}
                 {youtubeActionModal.analysis.kind === 'playlist' && youtubeActionModal.analysis.playlist ? (
                   <p className="mt-3 rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3 text-sm font-medium text-cyan-50">
-                    Você pode baixar só a faixa destacada, salvar apenas o vídeo dela ou importar a playlist inteira. Se escolher a playlist completa, o MusFy cria tudo com o nome correto.
+                    Você pode baixar só a faixa destacada, salvar apenas o vídeo dela ou importar a playlist inteira. Se escolher a playlist completa, o Montanha Music Lab cria tudo com o nome correto.
                   </p>
                 ) : null}
                 {youtubeActionModal.analysis.selectedEntry?.title ? (
@@ -5321,7 +5338,7 @@ export default function App() {
                   disabled={!youtubeActionModal.analysis.selectedEntry}
                   className="rounded-[24px] border border-cyan-400/30 bg-cyan-400/10 p-5 text-left transition hover:bg-cyan-400/15 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <p className="text-sm font-semibold text-white">Assistir agora no MusFy</p>
+                  <p className="text-sm font-semibold text-white">Assistir agora no Montanha Music Lab</p>
                   <p className="mt-2 text-xs leading-5 text-cyan-100/80">
                     Abre uma prévia incorporada do YouTube dentro do aplicativo, sem baixar nada.
                   </p>
@@ -5353,7 +5370,7 @@ export default function App() {
                 >
                   <p className="text-sm font-semibold text-white">Salvar só o vídeo agora</p>
                   <p className="mt-2 text-xs leading-5 text-cyan-100/80">
-                    Baixa o vídeo da faixa destacada para assistir no MusFy sem puxar um download de áudio separado do YouTube.
+                    Baixa o vídeo da faixa destacada para assistir no Montanha Music Lab sem puxar um download de áudio separado do YouTube.
                   </p>
                 </button>
 
@@ -5385,7 +5402,7 @@ export default function App() {
                     >
                       <p className="text-sm font-semibold text-white">Salvar a playlist inteira agora</p>
                       <p className="mt-2 text-xs leading-5 text-cyan-100/80">
-                        Importa todas as faixas e já cria uma playlist nova no MusFy com o mesmo nome da playlist do YouTube.
+                        Importa todas as faixas e já cria uma playlist nova no Montanha Music Lab com o mesmo nome da playlist do YouTube.
                       </p>
                     </button>
 
@@ -5416,7 +5433,7 @@ export default function App() {
                     onChange={(e) => setYoutubeIncludeVideo(e.target.checked)}
                     className="h-4 w-4 accent-green-500"
                   />
-                  Salvar vídeo também quando eu quiser assistir dentro do MusFy
+                  Salvar vídeo também quando eu quiser assistir dentro do Montanha Music Lab
                 </label>
 
                 <div className="mt-4">
@@ -5434,7 +5451,7 @@ export default function App() {
                     ))}
                   </select>
                   <p className="mt-2 text-xs leading-5 text-gray-500">
-                    Em faixa única, o download entra nesta playlist. Em playlist inteira, o MusFy pode anexar nela ou criar automaticamente uma nova playlist com o nome original.
+                    Em faixa única, o download entra nesta playlist. Em playlist inteira, o Montanha Music Lab pode anexar nela ou criar automaticamente uma nova playlist com o nome original.
                   </p>
                 </div>
 
@@ -5467,7 +5484,7 @@ export default function App() {
                         ))
                       ) : (
                         <div className="rounded-2xl border border-white/5 bg-black/20 px-3 py-4 text-sm leading-5 text-gray-400">
-                          O MusFy ainda está buscando as faixas desta playlist. Você já pode escolher uma ação ou tentar abrir a playlist novamente em instantes.
+                          O Montanha Music Lab ainda está buscando as faixas desta playlist. Você já pode escolher uma ação ou tentar abrir a playlist novamente em instantes.
                         </div>
                       )}
                     </div>

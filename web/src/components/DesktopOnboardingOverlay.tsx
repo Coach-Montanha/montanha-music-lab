@@ -38,7 +38,7 @@ export default function DesktopOnboardingOverlay({
             <div>
               <div className="flex items-center gap-2">
                 <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.3em] text-cyan-200">
-                  Tutorial do MusFy
+                  Tutorial do Montanha Music Lab
                 </span>
                 <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-gray-400">
                   Etapa {stepIndex + 1}
