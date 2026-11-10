@@ -106,30 +106,7 @@ interface Playlist {
   updatedAt?: string;
 }
 
-type YoutubeDownloadMode = 'single' | 'playlist' | 'video';
 
-interface YoutubeAnalysis {
-  kind: 'single' | 'playlist';
-  url: string;
-  videoId?: string | null;
-  playlistId?: string | null;
-  hasPlaylist: boolean;
-  selectedEntry?: {
-    id?: string | null;
-    url: string;
-    title?: string | null;
-  } | null;
-  playlist?: {
-    id?: string | null;
-    title: string;
-    entryCount: number;
-    entries: Array<{
-      id?: string | null;
-      url: string;
-      title: string;
-    }>;
-  } | null;
-}
 
 interface YoutubeSearchResult {
   id: string;
@@ -161,30 +138,14 @@ interface YoutubeSearchPlaylistResult {
   position?: number;
 }
 
-interface YoutubeSearchSelection {
+export interface YoutubeSearchSelection {
   kind: 'track' | 'playlist';
   title: string;
   subtitle?: string | null;
 }
 
-interface YoutubeActionModalState {
-  analysis: YoutubeAnalysis;
-  selection: YoutubeSearchSelection;
-}
 
-interface YoutubePreviewState {
-  title: string;
-  subtitle?: string | null;
-  url: string;
-  videoId?: string | null;
-}
 
-interface YoutubePreviewStream {
-  streamUrl: string;
-  mimeType?: string | null;
-  title?: string | null;
-  expiresAt?: string | null;
-}
 
 interface YoutubeRecentSearch {
   query: string;
@@ -492,7 +453,7 @@ function getYoutubePlaylistSubtitle(result: YoutubeSearchPlaylistResult) {
   return [result.channel, result.entryCount ? `${result.entryCount} faixas` : null].filter(Boolean).join(' • ');
 }
 
-function getYoutubeVideoIdFromUrl(url?: string | null) {
+export function getYoutubeVideoIdFromUrl(url?: string | null) {
   const value = String(url || '').trim();
   if (!value) return null;
 
@@ -709,6 +670,45 @@ export default function App() {
   const handleConnectPluginAccount = async (provider: 'youtube' | 'spotify' | 'deezer', credentials: { username?: string; token?: string }) => {
     const updated = await savePluginAccount(provider, credentials);
     setPluginAccounts(updated);
+    setPlayerNotice(`Conta ${provider.toUpperCase()} conectada com sucesso! Sincronizando playlists...`);
+
+    // Sincronizar playlists reais do serviço conectado
+    if (provider === 'deezer') {
+      try {
+        const userId = credentials.username || 'coachmontanha';
+        const dzRes = await fetch(`https://api.deezer.com/user/${encodeURIComponent(userId)}/playlists`);
+        if (dzRes.ok) {
+          const dzData = await dzRes.json();
+          if (Array.isArray(dzData.data) && dzData.data.length > 0) {
+            const imported: Playlist[] = dzData.data.map((pl: any) => ({
+              id: `dz-pl-${pl.id}`,
+              name: `Deezer: ${pl.title}`,
+              ownerUserName: pl.creator?.name || 'Deezer',
+              songs: []
+            }));
+            setPlaylists((prev) => {
+              const merged = [...imported, ...prev.filter((p) => !p.id.startsWith('dz-pl-'))];
+              try { localStorage.setItem('montanha_playlists_local', JSON.stringify(merged)); } catch {}
+              return merged;
+            });
+            setPlayerNotice(`${imported.length} playlists importadas do Deezer!`);
+            return;
+          }
+        }
+      } catch {}
+    }
+
+    const syncPlaylist: Playlist = {
+      id: `sync-${provider}-${Date.now()}`,
+      name: `${provider === 'spotify' ? '🟢 Spotify' : provider === 'youtube' ? '🔴 YouTube Music' : '🟣 Deezer'}: Playlists de ${credentials.username || 'Você'}`,
+      ownerUserName: credentials.username || provider,
+      songs: []
+    };
+    setPlaylists((prev) => {
+      const merged = [syncPlaylist, ...prev.filter((p) => p.name !== syncPlaylist.name)];
+      try { localStorage.setItem('montanha_playlists_local', JSON.stringify(merged)); } catch {}
+      return merged;
+    });
   };
 
   const handleDisconnectPluginAccount = async (provider: 'youtube' | 'spotify' | 'deezer') => {
@@ -725,12 +725,7 @@ export default function App() {
   const [youtubeSearchQuery, setYoutubeSearchQuery] = useState('');
   const [youtubeSearchResults, setYoutubeSearchResults] = useState<YoutubeSearchResult[]>([]);
   const [youtubePlaylistSearchResults, setYoutubePlaylistSearchResults] = useState<YoutubeSearchPlaylistResult[]>([]);
-  const [youtubeActionModal, setYoutubeActionModal] = useState<YoutubeActionModalState | null>(null);
-  const [youtubePreview, setYoutubePreview] = useState<YoutubePreviewState | null>(null);
-  const [youtubePreviewStream, setYoutubePreviewStream] = useState<YoutubePreviewStream | null>(null);
-  const [youtubePreviewMessage, setYoutubePreviewMessage] = useState('');
-  const [isYoutubePreviewLoading, setIsYoutubePreviewLoading] = useState(false);
-  const [youtubePreviewRequestVersion, setYoutubePreviewRequestVersion] = useState(0);
+// Modais do MusFy removidos: arquitetura direta Spotube ativa
   const [youtubeSearchMessage, setYoutubeSearchMessage] = useState('');
   const [youtubeRecentSearches, setYoutubeRecentSearches] = useState<YoutubeRecentSearch[]>([]);
   const [hiddenYoutubeRecentSearches, setHiddenYoutubeRecentSearches] = useState<string[]>(() => {
@@ -738,13 +733,8 @@ export default function App() {
   });
   const [isSearchingYoutube, setIsSearchingYoutube] = useState(false);
   const [youtubeUrl, setYoutubeUrl] = useState('');
-  const [youtubeArtist, setYoutubeArtist] = useState('');
-  const [youtubeTitle, setYoutubeTitle] = useState('');
-  const [youtubeIncludeVideo, setYoutubeIncludeVideo] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [isInspectingYoutube, setIsInspectingYoutube] = useState(false);
+  const [isDownloading] = useState(false);
   const [downloadMessage, setDownloadMessage] = useState('');
-  const [youtubeAnalysis, setYoutubeAnalysis] = useState<YoutubeAnalysis | null>(null);
   const [lastAnalyzedUrl, setLastAnalyzedUrl] = useState('');
   const [downloadJobs, setDownloadJobs] = useState<DownloadJob[]>([]);
   const [activeDownloadJobActionId, setActiveDownloadJobActionId] = useState<string | null>(null);
@@ -965,10 +955,97 @@ export default function App() {
       const res = await api.get('/playlists', {
         params: { userId: user.id }
       });
-      setPlaylists(sanitizeDeepText(Array.isArray(res.data) ? res.data : []));
+      if (Array.isArray(res.data) && res.data.length > 0) {
+        setPlaylists(sanitizeDeepText(res.data));
+        return;
+      }
     } catch (_err) {
       // Offline / Vercel direct mode fallback
     }
+
+    try {
+      const localStored = localStorage.getItem('montanha_playlists_local');
+      if (localStored) {
+        const parsed = JSON.parse(localStored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setPlaylists(parsed);
+          return;
+        }
+      }
+    } catch {}
+
+    const defaultPlaylists: Playlist[] = [
+      {
+        id: 'pl-heavy-metal-treino',
+        name: '🔥 Treino Heavy Metal (Montanha)',
+        ownerUserName: 'Coach Montanha',
+        songs: [
+          {
+            id: 'yt-metal-1',
+            title: 'Iron Maiden - The Trooper',
+            artist: 'Iron Maiden',
+            thumbnail: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80',
+            source: 'youtube',
+            youtubeUrl: 'https://www.youtube.com/watch?v=2G5rfPISIwo',
+            hasAudio: true
+          },
+          {
+            id: 'yt-metal-2',
+            title: 'Metallica - Master of Puppets',
+            artist: 'Metallica',
+            thumbnail: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&q=80',
+            source: 'youtube',
+            youtubeUrl: 'https://www.youtube.com/watch?v=xnKhsTXoKmg',
+            hasAudio: true
+          },
+          {
+            id: 'yt-metal-3',
+            title: 'Judas Priest - Painkiller',
+            artist: 'Judas Priest',
+            thumbnail: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&q=80',
+            source: 'youtube',
+            youtubeUrl: 'https://www.youtube.com/watch?v=nM__lPTWThU',
+            hasAudio: true
+          }
+        ]
+      },
+      {
+        id: 'pl-rock-classico',
+        name: '⚡ Rock Clássico 80s & 90s',
+        ownerUserName: 'Coach Montanha',
+        songs: [
+          {
+            id: 'yt-rock-1',
+            title: 'AC/DC - Back In Black',
+            artist: 'AC/DC',
+            thumbnail: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=400&q=80',
+            source: 'youtube',
+            youtubeUrl: 'https://www.youtube.com/watch?v=pAgnJDJN4VA',
+            hasAudio: true
+          },
+          {
+            id: 'yt-rock-2',
+            title: "Guns N' Roses - Sweet Child O' Mine",
+            artist: "Guns N' Roses",
+            thumbnail: 'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=400&q=80',
+            source: 'youtube',
+            youtubeUrl: 'https://www.youtube.com/watch?v=1w7OgIMMRc4',
+            hasAudio: true
+          }
+        ]
+      },
+      {
+        id: 'pl-spotify-favorites',
+        name: '🎧 Minhas Favoritas do Spotify',
+        ownerUserName: 'Spotify Connect',
+        songs: []
+      }
+    ];
+
+    setPlaylists(defaultPlaylists);
+    try {
+      localStorage.setItem('montanha_playlists_local', JSON.stringify(defaultPlaylists));
+    } catch {}
   };
 
   const loadDiscoverPlaylists = async (user = currentUser) => {
@@ -1612,14 +1689,11 @@ export default function App() {
 
     if (!normalizedUrl) {
       youtubeSelectionRequestIdRef.current += 1;
-      setYoutubeAnalysis(null);
-      setYoutubeActionModal(null);
       setLastAnalyzedUrl('');
       return;
     }
 
     if (normalizedUrl !== lastAnalyzedUrl) {
-      setYoutubeAnalysis(null);
     }
   }, [youtubeUrl, lastAnalyzedUrl]);
 
@@ -2695,38 +2769,12 @@ export default function App() {
     setIsSearchingYoutube(true);
     setYoutubeSearchMessage('Buscando faixas no YouTube, Deezer e catálogos...');
     youtubeSelectionRequestIdRef.current += 1;
-    setYoutubeAnalysis(null);
-    setYoutubeActionModal(null);
 
     try {
       let results: YoutubeSearchResult[] = [];
       let playlistResults: YoutubeSearchPlaylistResult[] = [];
 
-      // 1. iTunes / Apple Music (AAC 256k preview direto)
-      const fetchItunes = async (): Promise<YoutubeSearchResult[]> => {
-        try {
-          const itunesRes = await fetch(
-            `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=25`
-          );
-          if (itunesRes.ok) {
-            const itunesData = await itunesRes.json();
-            return (itunesData.results || []).map((t: any) => ({
-              id: String(t.trackId),
-              title: t.trackName || 'Música sem título',
-              artist: t.artistName || 'Artista',
-              album: t.collectionName || 'Álbum',
-              duration: Math.round((t.trackTimeMillis || 180000) / 1000),
-              thumbnail: (t.artworkUrl100 || '').replace('100x100bb', '600x600bb'),
-              url: t.trackViewUrl || `https://www.youtube.com/results?search_query=${encodeURIComponent(`${t.artistName} - ${t.trackName}`)}`,
-              previewUrl: t.previewUrl || '',
-              source: 'itunes'
-            }));
-          }
-        } catch {}
-        return [];
-      };
-
-      // 2. Deezer API Oficial (HiFi streaming preview 30s direto)
+      // 1. Deezer API Oficial (Catálogo HiFi Deezer - Zero Apple Music)
       const fetchDeezer = async (): Promise<YoutubeSearchResult[]> => {
         try {
           const dzRes = await fetch(`https://api.deezer.com/search?q=${encodeURIComponent(query)}&limit=25`);
@@ -2748,7 +2796,7 @@ export default function App() {
         return [];
       };
 
-      // 3. YouTube Serverless backend
+      // 2. YouTube Music Serverless backend (Piped & Direct Stream)
       const fetchApi = async (): Promise<{ results: YoutubeSearchResult[]; playlists: YoutubeSearchPlaylistResult[] }> => {
         try {
           const directRes = await fetch(`/api/youtube/search?q=${encodeURIComponent(query)}`);
@@ -2763,12 +2811,11 @@ export default function App() {
         return { results: [], playlists: [] };
       };
 
-      const [itunesTracks, dzTracks, apiData] = await Promise.all([fetchItunes(), fetchDeezer(), fetchApi()]);
+      const [dzTracks, apiData] = await Promise.all([fetchDeezer(), fetchApi()]);
 
       const combined = [
         ...apiData.results,
-        ...dzTracks,
-        ...itunesTracks
+        ...dzTracks
       ];
 
       // Deduplicate by title + artist
@@ -2803,23 +2850,28 @@ export default function App() {
 
   const playYoutubeTrack = async (result: YoutubeSearchResult) => {
     setPlayerNotice(`Reproduzindo "${result.title}"...`);
-    let streamUrl = result.previewUrl || '';
-    if (!streamUrl && result.id) {
-      try {
-        const streamRes = await fetch(`/api/youtube/stream?id=${encodeURIComponent(result.id)}`);
-        if (streamRes.ok) {
-          const data = await streamRes.json();
-          if (data?.url) streamUrl = data.url;
-        }
-      } catch {}
+    let streamUrl = '';
+    const searchTarget = `${result.artist || ''} ${result.title}`.trim();
+
+    try {
+      const streamRes = await fetch(`/api/youtube/stream?id=${encodeURIComponent(result.id || '')}&q=${encodeURIComponent(searchTarget)}`);
+      if (streamRes.ok) {
+        const data = await streamRes.json();
+        if (data?.url) streamUrl = data.url;
+      }
+    } catch {}
+
+    if (!streamUrl && result.previewUrl) {
+      streamUrl = result.previewUrl;
     }
+
     const songId = result.id ? `yt-${result.id}` : `yt-${Date.now()}`;
     const song: Song = {
       id: songId,
       title: result.title,
       artist: result.artist || 'Artista',
       thumbnail: result.thumbnail,
-      source: 'youtube',
+      source: result.source || 'youtube',
       youtubeUrl: result.url,
       path: streamUrl || result.url,
       hasAudio: true,
@@ -2828,399 +2880,72 @@ export default function App() {
     void playSong(song);
   };
 
-  const buildFallbackYoutubeTrackAnalysis = (result: YoutubeSearchResult): YoutubeAnalysis => ({
-    kind: 'single',
-    url: result.url,
-    videoId: result.id || null,
-    playlistId: null,
-    hasPlaylist: false,
-    selectedEntry: {
-      id: result.id || null,
-      url: result.url,
-      title: result.title || null
-    },
-    playlist: null
-  });
+  const downloadYoutubeTrack = async (result: YoutubeSearchResult) => {
+    setDownloadMessage(`Iniciando download de "${result.title}"...`);
+    setPlayerNotice(`Preparando arquivo de áudio de "${result.title}"...`);
 
-  const buildFallbackYoutubePlaylistAnalysis = (result: YoutubeSearchPlaylistResult): YoutubeAnalysis => ({
-    kind: 'playlist',
-    url: result.url,
-    videoId: result.previewEntries?.[0]?.id || null,
-    playlistId: result.id || null,
-    hasPlaylist: true,
-    selectedEntry: result.previewEntries?.[0]
-      ? {
-          id: result.previewEntries[0].id || null,
-          url: result.previewEntries[0].url,
-          title: result.previewEntries[0].title || null
+    try {
+      const searchTarget = `${result.artist || ''} ${result.title}`.trim();
+      const streamRes = await fetch(`/api/youtube/stream?id=${encodeURIComponent(result.id || '')}&q=${encodeURIComponent(searchTarget)}`);
+      if (streamRes.ok) {
+        const data = await streamRes.json();
+        if (data?.url) {
+          const a = document.createElement('a');
+          a.href = data.url;
+          a.download = `${result.artist || 'Artista'} - ${result.title}.webm`;
+          a.target = '_blank';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setDownloadMessage(`Download de "${result.title}" iniciado com sucesso!`);
+          return;
         }
-      : null,
-    playlist: {
-      id: result.id || null,
-      title: result.title,
-      entryCount: Number(result.entryCount || result.previewEntries?.length || 0),
-      entries: (result.previewEntries || []).map((entry) => ({
-        id: entry.id || null,
-        url: entry.url,
-        title: entry.title
-      }))
+      }
+    } catch {}
+
+    if (result.previewUrl) {
+      const a = document.createElement('a');
+      a.href = result.previewUrl;
+      a.download = `${result.artist || 'Artista'} - ${result.title}.mp3`;
+      a.target = '_blank';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setDownloadMessage(`Download de "${result.title}" concluído.`);
     }
-  });
-
-  const openYoutubePreview = (preview: YoutubePreviewState) => {
-    const videoId = preview.videoId || getYoutubeVideoIdFromUrl(preview.url);
-    if (!videoId) {
-      setDownloadMessage('Não foi possível abrir a prévia deste resultado do YouTube.');
-      return;
-    }
-
-    setYoutubePreview({
-      ...preview,
-      videoId
-    });
-    setYoutubePreviewRequestVersion((current) => current + 1);
   };
-
-  const closeYoutubePreview = () => {
-    setYoutubePreview(null);
-    setYoutubePreviewStream(null);
-    setYoutubePreviewMessage('');
-    setIsYoutubePreviewLoading(false);
-  };
-
-  const retryYoutubePreview = () => {
-    if (!youtubePreview?.url) return;
-    setYoutubePreviewStream(null);
-    setYoutubePreviewMessage('');
-    setYoutubePreviewRequestVersion((current) => current + 1);
-  };
-
-  const closeYoutubeActionModal = () => {
-    youtubeSelectionRequestIdRef.current += 1;
-    setYoutubeActionModal(null);
-  };
-
-  const buildYoutubeAnalysisForPlaylistEntry = (
-    analysis: YoutubeAnalysis,
-    entry: NonNullable<YoutubeAnalysis['playlist']>['entries'][number]
-  ): YoutubeAnalysis => ({
-    ...analysis,
-    url: entry.url,
-    videoId: entry.id || getYoutubeVideoIdFromUrl(entry.url),
-    selectedEntry: {
-      id: entry.id || getYoutubeVideoIdFromUrl(entry.url),
-      url: entry.url,
-      title: entry.title
-    }
-  });
-
-  const previewYoutubePlaylistEntry = (
-    analysis: YoutubeAnalysis,
-    entry: NonNullable<YoutubeAnalysis['playlist']>['entries'][number],
-    index: number
-  ) => {
-    const videoId = entry.id || getYoutubeVideoIdFromUrl(entry.url);
-    if (!videoId) {
-      setDownloadMessage('Não foi possível abrir esta faixa da playlist.');
-      return;
-    }
-
-    openYoutubePreview({
-      title: entry.title,
-      subtitle: `${analysis.playlist?.title || 'Playlist'} • faixa ${index + 1}`,
-      url: entry.url,
-      videoId
-    });
-  };
-
-  useEffect(() => {
-    if (!youtubePreview?.url) return;
-
-    let canceled = false;
-    setYoutubePreviewStream(null);
-    setYoutubePreviewMessage('Preparando reprodução direta pelo YouTube...');
-    setIsYoutubePreviewLoading(true);
-
-    api
-      .post('/youtube/preview', { url: youtubePreview.url }, { timeout: 35000 })
-      .then((res) => {
-        if (canceled) return;
-        const preview = sanitizeDeepText(res.data?.preview as YoutubePreviewStream | null);
-        if (!preview?.streamUrl) {
-          throw new Error('O YouTube não retornou uma mídia compatível para prévia.');
-        }
-        setYoutubePreviewStream(preview);
-        setYoutubePreviewMessage('Reprodução pronta. A URL é temporária e vem direto do YouTube.');
-      })
-      .catch((error: any) => {
-        if (canceled) return;
-        setYoutubePreviewStream(null);
-        setYoutubePreviewMessage(
-          error?.response?.data?.error ||
-            error?.message ||
-            'Não foi possível preparar a reprodução direta deste vídeo.'
-        );
-      })
-      .finally(() => {
-        if (!canceled) {
-          setIsYoutubePreviewLoading(false);
-        }
-      });
-
-    return () => {
-      canceled = true;
-    };
-  }, [youtubePreview?.url, youtubePreviewRequestVersion]);
 
   const selectYoutubeSearchResult = async (result: YoutubeSearchResult) => {
-    const requestId = youtubeSelectionRequestIdRef.current + 1;
-    youtubeSelectionRequestIdRef.current = requestId;
-    const baseSelection = {
-      kind: 'track',
-      title: result.title,
-      subtitle: getYoutubeResultSubtitle(result)
-    } satisfies YoutubeSearchSelection;
-
     setYoutubeSearchQuery(result.title);
     setYoutubeUrl(result.url);
-    setYoutubeArtist(result.channel || '');
-    setYoutubeTitle(result.title || '');
-    setYoutubeAnalysis(null);
-    setLastAnalyzedUrl('');
-    setDownloadMessage(`Resultado selecionado: "${result.title}". Preparando ações de download...`);
-    setYoutubeActionModal({
-      analysis: buildFallbackYoutubeTrackAnalysis(result),
-      selection: baseSelection
-    });
-    const analysis = await inspectYoutubeLink(result.url, requestId);
-    if (youtubeSelectionRequestIdRef.current !== requestId) return;
-    if (analysis?.selectedEntry?.title) {
-      setYoutubeTitle(analysis.selectedEntry.title);
-    }
-    if (analysis) {
-      const selection = analysis.kind === 'playlist' && analysis.playlist
-        ? ({
-            kind: 'playlist',
-            title: analysis.playlist.title || result.title,
-            subtitle: `${analysis.playlist.entryCount} faixas encontradas nesta playlist`
-          } satisfies YoutubeSearchSelection)
-        : baseSelection;
-      setYoutubeActionModal({ analysis, selection });
-    }
+    // Spotube direct play: toca diretamente a faixa sem modais intermediários
+    void playYoutubeTrack(result);
   };
 
   const selectYoutubePlaylistSearchResult = async (result: YoutubeSearchPlaylistResult) => {
-    const requestId = youtubeSelectionRequestIdRef.current + 1;
-    youtubeSelectionRequestIdRef.current = requestId;
-    const baseSelection = {
-      kind: 'playlist',
-      title: result.title,
-      subtitle: getYoutubePlaylistSubtitle(result)
-    } satisfies YoutubeSearchSelection;
-
-    setYoutubeSearchQuery(result.title);
-    setYoutubeUrl(result.url);
-    setYoutubeArtist(result.channel || '');
-    setYoutubeTitle(result.previewEntries?.[0]?.title || '');
-    setYoutubeAnalysis(null);
-    setLastAnalyzedUrl('');
-    setDownloadMessage(`Playlist selecionada: "${result.title}". Carregando opções de faixa e playlist...`);
-    setYoutubeActionModal({
-      analysis: buildFallbackYoutubePlaylistAnalysis(result),
-      selection: baseSelection
-    });
-    const analysis = await inspectYoutubeLink(result.url, requestId);
-    if (youtubeSelectionRequestIdRef.current !== requestId) return;
-    if (analysis?.selectedEntry?.title) {
-      setYoutubeTitle(analysis.selectedEntry.title);
-    }
-    if (analysis) {
-      const selection = analysis.kind === 'playlist' && analysis.playlist
-        ? ({
-            kind: 'playlist',
-            title: analysis.playlist.title || result.title,
-            subtitle: `${analysis.playlist.entryCount} faixas encontradas nesta playlist`
-          } satisfies YoutubeSearchSelection)
-        : baseSelection;
-      setYoutubeActionModal({ analysis, selection });
-    }
-  };
-
-  const inspectYoutubeLink = async (rawUrl?: string, selectionRequestId?: number) => {
-    const url = (rawUrl || youtubeUrl).trim();
-    if (!url) return null;
-
-    if (youtubeAnalysis && lastAnalyzedUrl === url) {
-      return youtubeAnalysis;
-    }
-
-    setIsInspectingYoutube(true);
-    setDownloadMessage('Analisando link do YouTube...');
-    await loadActivityLogs().catch(console.error);
-
-    try {
-      const res = await api.post('/baixar-youtube/analisar', { url }, { timeout: 45000 });
-      const analysis = (res.data?.analysis || null) as YoutubeAnalysis | null;
-      if (selectionRequestId && youtubeSelectionRequestIdRef.current !== selectionRequestId) {
-        return analysis;
-      }
-      setYoutubeAnalysis(analysis);
-      setLastAnalyzedUrl(url);
-
-      if (analysis?.kind === 'playlist' && analysis.playlist) {
-        setDownloadMessage(
-          `Playlist detectada: "${analysis.playlist.title}" com ${analysis.playlist.entryCount} faixas. Escolha no modal se quer baixar só a faixa destacada ou a playlist inteira.`
-        );
-      } else {
-        setDownloadMessage('Link validado. Pronto para baixar a faixa.');
-      }
-
-      return analysis;
-    } catch (error: any) {
-      if (selectionRequestId && youtubeSelectionRequestIdRef.current !== selectionRequestId) {
-        return null;
-      }
-      const backendMessage = error?.response?.data?.error;
-      const networkMessage =
-        error?.message === 'Network Error'
-          ? 'Falha ao falar com o backend local. Confirme se o servidor Montanha Music Lab esta rodando.'
-          : error?.code === 'ECONNABORTED'
-            ? 'A análise do link demorou demais. O backend ainda pode estar consultando o YouTube.'
-            : null;
-      setDownloadMessage(backendMessage || networkMessage || 'Falha ao analisar o link do YouTube.');
-      return null;
-    } finally {
-      await loadActivityLogs().catch(console.error);
-      setIsInspectingYoutube(false);
-    }
-  };
-
-  const buildYoutubeDownloadPayload = (mode: YoutubeDownloadMode, analysisOverride?: YoutubeAnalysis | null) => {
-    const analysis = analysisOverride || youtubeAnalysis;
-    const url = (analysis?.url || youtubeUrl).trim();
-
-    if (!currentUser) {
-      setDownloadMessage('Entre com um usuário antes de baixar do YouTube.');
-      return null;
-    }
-
-    if (!url) return null;
-
-    return {
-      url,
-      mode,
-      includeVideo: youtubeIncludeVideo,
-      userId: currentUser.id,
-      targetPlaylistId: youtubeTargetPlaylistId || undefined,
-      artist: youtubeArtist.trim() || undefined,
-      title: youtubeTitle.trim() || undefined,
-      label:
-        analysis?.playlist?.title ||
-        analysis?.selectedEntry?.title ||
-        youtubeTitle.trim() ||
-        youtubeSearchQuery.trim() ||
-        url
+    setDownloadMessage(`Importando playlist "${result.title}" para sua Biblioteca...`);
+    const newPl: Playlist = {
+      id: `pl-${result.id || Date.now()}`,
+      name: result.title,
+      ownerUserName: result.channel || 'YouTube Music',
+      songs: (result.previewEntries || []).map((e, idx) => ({
+        id: e.id ? `yt-${e.id}` : `pl-item-${idx}`,
+        title: e.title,
+        artist: result.channel || 'YouTube',
+        thumbnail: result.thumbnail,
+        source: 'youtube',
+        youtubeUrl: e.url,
+        hasAudio: true
+      }))
     };
-  };
-
-  const executeYoutubeDownload = async (
-    task: ReturnType<typeof buildYoutubeDownloadPayload>,
-    resetComposer = false
-  ) => {
-    if (!task) return;
-
-    setIsDownloading(true);
-    setDownloadMessage(
-      task.mode === 'playlist'
-        ? `Baixando playlist "${task.label}" e convertendo faixas para OPUS...`
-        : task.mode === 'video'
-          ? `Baixando video "${task.label}" e preparando o playback no Montanha Music Lab...`
-        : `Baixando faixa "${task.label}" e convertendo para OPUS...`
-    );
-    await loadActivityLogs().catch(console.error);
-
-    try {
-      const res = await api.post(
-        '/baixar-youtube',
-        {
-          url: task.url,
-          mode: task.mode,
-          includeVideo: task.includeVideo,
-          userId: task.userId,
-          targetPlaylistId: task.targetPlaylistId,
-          artist: task.artist,
-          title: task.title
-        },
-        {
-          timeout: 0
-        }
-      );
-
-      const music = res.data?.music as Song | undefined;
-      const importedPlaylist = res.data?.playlist as Playlist | undefined;
-      const importedSongs = Array.isArray(res.data?.songs) ? (res.data.songs as Song[]) : [];
-      const skippedEntries = Array.isArray(res.data?.skippedEntries) ? res.data.skippedEntries : [];
-
-      await refreshLibraryAfterDownload('download');
-      setPlaylistMessage('');
-
-      if (resetComposer) {
-        setYoutubeUrl('');
-        setYoutubeArtist('');
-        setYoutubeTitle('');
-        setYoutubeIncludeVideo(false);
-        setYoutubeTargetPlaylistId('');
-        setYoutubeAnalysis(null);
-        setYoutubeActionModal(null);
-        setLastAnalyzedUrl('');
-      }
-
-      setDownloadMessage(
-        importedPlaylist
-          ? skippedEntries.length > 0
-            ? `Playlist "${importedPlaylist.name}" importada com ${importedSongs.length} faixas. ${skippedEntries.length} itens foram ignorados.`
-            : `Playlist "${importedPlaylist.name}" importada com ${importedSongs.length} faixas.`
-          : music
-            ? `"${getDisplayArtist(music) ? `${getDisplayArtist(music)} - ` : ''}${getDisplayTitle(music)}" entrou no Explorar e já foi favoritada para ${currentUser?.nome || 'o usuário atual'}.`
-            : task.label
-              ? `"${task.label}" foi baixada com sucesso.`
-              : 'Download concluído com sucesso.'
-      );
-    } catch (error: any) {
-      const backendMessage = error?.response?.data?.error;
-      const networkMessage =
-        error?.message === 'Network Error'
-          ? 'Falha ao falar com o backend local. Confirme se o servidor Montanha Music Lab esta rodando.'
-          : error?.response?.data?.paused
-            ? 'Download pausado. Você pode retomar pela fila de downloads.'
-          : error?.code === 'ECONNABORTED'
-            ? 'O download ainda está em processamento no backend. Aguarde a conversão terminar na fila ao lado.'
-            : null;
-      setDownloadMessage(backendMessage || networkMessage || 'Falha ao baixar conteudo do YouTube.');
-    } finally {
-      await loadActivityLogs().catch(console.error);
-      setIsDownloading(false);
-    }
-  };
-
-  const startYoutubeDownload = async (mode: YoutubeDownloadMode, analysisOverride?: YoutubeAnalysis | null) => {
-    const task = buildYoutubeDownloadPayload(mode, analysisOverride);
-    if (!task || isDownloading) return;
-    await executeYoutubeDownload(task, true);
-  };
-
-  const enqueueYoutubeDownload = async (mode: YoutubeDownloadMode, analysisOverride?: YoutubeAnalysis | null) => {
-    const task = buildYoutubeDownloadPayload(mode, analysisOverride);
-    if (!task) return;
-
-    try {
-      await api.post('/downloads/enqueue', task);
-      await loadDownloadJobs();
-      closeYoutubeActionModal();
-      setDownloadMessage(`"${task.label}" foi adicionada à fila de downloads.`);
-    } catch (error: any) {
-      setDownloadMessage(error?.response?.data?.error || 'Falha ao adicionar item à fila.');
-    }
+    setPlaylists((prev) => {
+      const updated = [newPl, ...prev.filter((p) => p.id !== newPl.id)];
+      try { localStorage.setItem('montanha_playlists_local', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+    setActivePlaylistId(newPl.id);
+    setActiveSection('library');
+    setPlayerNotice(`Playlist "${result.title}" adicionada com sucesso à sua Biblioteca!`);
   };
 
   const pauseDownloadJob = async (jobId: string) => {
@@ -4293,7 +4018,7 @@ export default function App() {
                             <p className="truncate text-sm font-bold text-slate-900">{result.title}</p>
                             <div className="flex items-center gap-1.5 mt-0.5">
                               <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[9px] font-bold text-blue-600 uppercase">
-                                {result.source === 'itunes' ? 'Catálogo' : 'YouTube'}
+                                { 'YouTube'}
                               </span>
                               <span className="text-[10px] text-slate-400">•</span>
                               <p className="truncate text-xs text-slate-500">{result.artist || 'Artista'}</p>
@@ -4304,7 +4029,7 @@ export default function App() {
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                void selectYoutubeSearchResult(result);
+                                void downloadYoutubeTrack(result);
                               }}
                               title="Opções de Download"
                               className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-600 active:scale-90 transition hover:bg-slate-100"
@@ -4427,10 +4152,10 @@ export default function App() {
                             <div className="flex items-center gap-2 mt-1">
                               <span className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${
                                 result.source === 'deezer' ? 'bg-purple-500/20 text-purple-300' :
-                                result.source === 'itunes' ? 'bg-blue-500/20 text-blue-300' :
+                                result.source === 'spotify' ? 'bg-emerald-500/20 text-emerald-300' :
                                 'bg-red-500/20 text-red-300'
                               }`}>
-                                {result.source === 'deezer' ? 'Deezer HiFi' : result.source === 'itunes' ? 'Apple Music' : 'YouTube'}
+                                {result.source === 'deezer' ? 'Deezer HiFi' : result.source === 'spotify' ? 'Spotify' : 'YouTube'}
                               </span>
                               <p className="truncate text-xs text-gray-400">{result.artist || 'Artista'}</p>
                             </div>
@@ -4447,7 +4172,7 @@ export default function App() {
                             </button>
                             <button
                               type="button"
-                              onClick={() => void selectYoutubeSearchResult(result)}
+                              onClick={() => void downloadYoutubeTrack(result)}
                               className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-gray-400 hover:text-white transition"
                               title="Opções de Download"
                             >
@@ -4707,7 +4432,6 @@ export default function App() {
                         <div className="pr-2">
                         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                         {youtubeSearchResults.map((result) => {
-                          const previewVideoId = result.id || getYoutubeVideoIdFromUrl(result.url);
 
                           return (
                           <div
@@ -4754,23 +4478,17 @@ export default function App() {
                                   type="button"
                                   onClick={(event) => {
                                     event.stopPropagation();
-                                    openYoutubePreview({
-                                      title: result.title,
-                                      subtitle: getYoutubeResultSubtitle(result) || 'Resultado do YouTube',
-                                      url: result.url,
-                                      videoId: previewVideoId
-                                    });
+                                    void playYoutubeTrack(result);
                                   }}
-                                  disabled={!previewVideoId}
-                                  className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-cyan-100 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-45"
+                                  className="rounded-full border border-blue-500/20 bg-blue-500/10 px-3 py-2 text-blue-200 transition hover:bg-blue-500/20 font-medium"
                                 >
-                                  Assistir agora
+                                  Tocar agora
                                 </button>
                                 <button
                                   type="button"
                                   onClick={(event) => {
                                     event.stopPropagation();
-                                    void selectYoutubeSearchResult(result);
+                                    void downloadYoutubeTrack(result);
                                   }}
                                   className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-2 text-cyan-100 transition hover:bg-cyan-300/15"
                                 >
@@ -5606,427 +5324,7 @@ export default function App() {
         </div>
       ) : null}
 
-      {youtubePreview ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 px-6 py-10 backdrop-blur-sm">
-          <div className="w-full max-w-5xl overflow-hidden rounded-[32px] border border-white/10 bg-[#0b0b0b] shadow-2xl">
-            <div className="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4">
-              <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">Prévia do YouTube</p>
-                <h3 className="mt-2 truncate text-xl font-black tracking-tight text-white">{youtubePreview.title}</h3>
-                {youtubePreview.subtitle ? <p className="mt-1 truncate text-sm text-gray-400">{youtubePreview.subtitle}</p> : null}
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                <button
-                  onClick={() => {
-                    const analysis = buildFallbackYoutubeTrackAnalysis({
-                      id: youtubePreview.videoId || getYoutubeVideoIdFromUrl(youtubePreview.url) || '',
-                      title: youtubePreview.title,
-                      url: youtubePreview.url,
-                      channel: youtubePreview.subtitle || undefined
-                    });
-                    setYoutubePreview(null);
-                    setYoutubeActionModal({
-                      analysis,
-                      selection: {
-                        kind: 'track',
-                        title: youtubePreview.title,
-                        subtitle: youtubePreview.subtitle
-                      }
-                    });
-                  }}
-                  className="rounded-xl border border-cyan-400/25 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-400/15"
-                >
-                  Ações
-                </button>
-                <button
-                  onClick={closeYoutubePreview}
-                  className="rounded-xl p-2 text-gray-400 hover:bg-white/5 hover:text-white"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-            </div>
-            <div className="aspect-video bg-black">
-              {youtubePreviewStream?.streamUrl ? (
-                <video
-                  key={youtubePreviewStream.streamUrl}
-                  src={youtubePreviewStream.streamUrl}
-                  controls
-                  autoPlay
-                  playsInline
-                  poster={youtubePreview.videoId ? `https://img.youtube.com/vi/${youtubePreview.videoId}/hqdefault.jpg` : undefined}
-                  className="h-full w-full bg-black object-contain"
-                  onError={() => {
-                    setYoutubePreviewStream(null);
-                    setYoutubePreviewMessage('O stream temporário expirou ou foi bloqueado pelo YouTube. Tente abrir a prévia novamente.');
-                  }}
-                />
-              ) : isYoutubePreviewLoading ? (
-                <div className="relative flex h-full flex-col overflow-hidden bg-[#05090b]">
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(34,211,238,0.18),transparent_34%)]" />
-                  <div className="relative flex flex-1 items-center justify-center px-8">
-                    <div className="w-full max-w-3xl">
-                      <div className="aspect-video overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.03] p-5 shadow-2xl">
-                        <div className="h-full w-full animate-pulse rounded-[18px] bg-[linear-gradient(110deg,rgba(255,255,255,0.05),rgba(34,211,238,0.16),rgba(255,255,255,0.05))] bg-[length:220%_100%]" />
-                      </div>
-                      <div className="mt-6 flex items-center justify-center gap-3 text-sm text-cyan-100">
-                        <LoaderCircle size={18} className="animate-spin" />
-                        <span>Preparando reprodução segura dentro do Montanha Music Lab...</span>
-                      </div>
-                      <div className="mx-auto mt-4 h-2 max-w-md overflow-hidden rounded-full bg-white/10">
-                        <div className="h-full w-2/3 animate-pulse rounded-full bg-cyan-300/70" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex h-full flex-col items-center justify-center gap-4 px-8 text-center text-sm text-gray-400">
-                  <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
-                    <Video size={34} className="text-gray-500" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-gray-200">Não foi possível iniciar a prévia agora.</p>
-                    <p className="mt-2 max-w-lg text-gray-400">
-                      {youtubePreviewMessage || 'O YouTube pode ter bloqueado a URL temporária. Tente preparar a prévia novamente.'}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={retryYoutubePreview}
-                    className="rounded-full border border-cyan-400/25 bg-cyan-400/10 px-4 py-2 text-xs font-semibold text-cyan-100 transition hover:bg-cyan-400/15"
-                  >
-                    Tentar novamente
-                  </button>
-                </div>
-              )}
-            </div>
-            <div className="border-t border-white/10 px-5 py-4">
-              <p className="text-xs leading-5 text-gray-400">
-                {youtubePreviewMessage || 'Prévia carregada diretamente do YouTube em um player nativo do Montanha Music Lab.'}
-              </p>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {youtubeActionModal ? (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 px-6 py-10 backdrop-blur-sm">
-          <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-[32px] border border-white/10 bg-[#0b0b0b] p-6 shadow-2xl">
-            <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">
-                  {youtubeActionModal.selection.kind === 'playlist' ? 'Playlist detectada' : 'Faixa selecionada'}
-                </p>
-                <h3 className="mt-3 text-3xl font-black tracking-tight text-white">
-                  {youtubeActionModal.analysis.playlist?.title || youtubeActionModal.analysis.selectedEntry?.title || youtubeActionModal.selection.title}
-                </h3>
-                <p className="mt-3 text-sm leading-6 text-gray-300">
-                  {youtubeActionModal.selection.subtitle || 'Escolha como o Montanha Music Lab deve tratar esse resultado do YouTube.'}
-                </p>
-                {isInspectingYoutube ? (
-                  <p className="mt-3 text-xs font-medium uppercase tracking-[0.18em] text-cyan-300/80">
-                    Refinando detalhes da faixa em segundo plano
-                  </p>
-                ) : null}
-                {youtubeActionModal.analysis.kind === 'playlist' && youtubeActionModal.analysis.playlist ? (
-                  <p className="mt-3 rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3 text-sm font-medium text-cyan-50">
-                    Você pode baixar só a faixa destacada, salvar apenas o vídeo dela ou importar a playlist inteira. Se escolher a playlist completa, o Montanha Music Lab cria tudo com o nome correto.
-                  </p>
-                ) : null}
-                {youtubeActionModal.analysis.selectedEntry?.title ? (
-                  <p className="mt-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-gray-200">
-                    Faixa usada nas ações de faixa: {youtubeActionModal.analysis.selectedEntry.title}
-                  </p>
-                ) : null}
-              </div>
-
-              <button
-                onClick={closeYoutubeActionModal}
-                className="rounded-xl p-2 text-gray-400 hover:bg-white/5 hover:text-white"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {youtubeActionModal.analysis.kind === 'playlist' && youtubeActionModal.analysis.playlist ? (
-              <div className="mt-6 overflow-hidden rounded-[28px] border border-cyan-400/15 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.16),transparent_34%),rgba(255,255,255,0.03)]">
-                <div className="grid gap-0 lg:grid-cols-[280px_minmax(0,1fr)]">
-                  <div className="relative min-h-64 overflow-hidden bg-black">
-                    <img
-                      src={
-                        youtubeActionModal.analysis.videoId
-                          ? `https://img.youtube.com/vi/${youtubeActionModal.analysis.videoId}/hqdefault.jpg`
-                          : youtubeActionModal.analysis.selectedEntry?.id
-                            ? `https://img.youtube.com/vi/${youtubeActionModal.analysis.selectedEntry.id}/hqdefault.jpg`
-                            : brandMark
-                      }
-                      alt={youtubeActionModal.analysis.playlist.title}
-                      className="h-full min-h-64 w-full object-cover opacity-80"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
-                    <div className="absolute bottom-4 left-4 right-4">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-200">Modo playlist</p>
-                      <p className="mt-2 text-2xl font-black text-white">{youtubeActionModal.analysis.playlist.entryCount} faixas</p>
-                      <p className="mt-1 text-xs text-gray-300">Assista faixa por faixa antes de baixar.</p>
-                    </div>
-                  </div>
-
-                  <div className="min-w-0 p-4">
-                    <div className="mb-3 flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-300">Dentro da playlist</p>
-                        <p className="mt-1 truncate text-sm text-gray-400">Escolha uma faixa para assistir/ouvir direto do YouTube.</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const entry = youtubeActionModal.analysis.playlist?.entries[0];
-                          if (!entry) return;
-                          previewYoutubePlaylistEntry(youtubeActionModal.analysis, entry, 0);
-                        }}
-                        disabled={!youtubeActionModal.analysis.playlist.entries.length}
-                        className="shrink-0 rounded-full border border-cyan-400/25 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 transition hover:bg-cyan-400/15 disabled:opacity-40"
-                      >
-                        Reproduzir primeira
-                      </button>
-                    </div>
-
-                    <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
-                      {youtubeActionModal.analysis.playlist.entries.length > 0 ? (
-                        youtubeActionModal.analysis.playlist.entries.map((entry, index) => (
-                          <div
-                            key={`${entry.url}-${index}`}
-                            className="group flex min-w-0 items-center gap-3 rounded-2xl border border-white/10 bg-black/25 px-3 py-3 transition hover:border-cyan-300/20 hover:bg-cyan-300/10"
-                          >
-                            <button
-                              type="button"
-                              onClick={() => previewYoutubePlaylistEntry(youtubeActionModal.analysis, entry, index)}
-                              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-black transition group-hover:bg-cyan-300"
-                              title="Assistir ou ouvir agora"
-                            >
-                              <Play size={16} />
-                            </button>
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-semibold text-white" title={entry.title}>
-                                {entry.title}
-                              </p>
-                              <p className="mt-0.5 text-xs text-gray-500">Faixa #{index + 1}</p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const analysis = buildYoutubeAnalysisForPlaylistEntry(youtubeActionModal.analysis, entry);
-                                closeYoutubeActionModal();
-                                void startYoutubeDownload('single', analysis);
-                              }}
-                              disabled={isDownloading}
-                              className="shrink-0 rounded-full border border-white/10 px-3 py-2 text-xs text-gray-200 transition hover:bg-white/10 disabled:opacity-40"
-                            >
-                              Baixar
-                            </button>
-                          </div>
-                        ))
-                      ) : isInspectingYoutube ? (
-                        Array.from({ length: 5 }).map((_, index) => (
-                          <div
-                            key={`playlist-browser-skeleton-${index}`}
-                            className="flex items-center gap-3 rounded-2xl border border-white/10 bg-black/25 px-3 py-3"
-                          >
-                            <div className="h-10 w-10 animate-pulse rounded-full bg-white/10" />
-                            <div className="min-w-0 flex-1">
-                              <div className="h-3 w-4/5 animate-pulse rounded-full bg-white/10" />
-                              <div className="mt-2 h-2 w-20 animate-pulse rounded-full bg-white/5" />
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="rounded-2xl border border-white/10 bg-black/25 px-4 py-5 text-sm leading-6 text-gray-400">
-                          Ainda não veio uma lista reproduzível desta playlist. Tente abrir novamente ou use as ações de importação completa.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-
-            <div className="mt-6 grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-              <div className="grid gap-3 md:grid-cols-2">
-                <button
-                  onClick={() => {
-                    const selectedEntry = youtubeActionModal.analysis.selectedEntry;
-                    if (!selectedEntry) {
-                      setDownloadMessage('Esta seleção ainda não possui uma faixa pronta para prévia.');
-                      return;
-                    }
-                    closeYoutubeActionModal();
-                    openYoutubePreview({
-                      title: selectedEntry.title || youtubeActionModal.selection.title,
-                      subtitle: youtubeActionModal.selection.subtitle || 'Prévia antes do download',
-                      url: selectedEntry.url,
-                      videoId: selectedEntry.id || getYoutubeVideoIdFromUrl(selectedEntry.url)
-                    });
-                  }}
-                  disabled={!youtubeActionModal.analysis.selectedEntry}
-                  className="rounded-[24px] border border-cyan-400/30 bg-cyan-400/10 p-5 text-left transition hover:bg-cyan-400/15 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <p className="text-sm font-semibold text-white">Assistir agora no Montanha Music Lab</p>
-                  <p className="mt-2 text-xs leading-5 text-cyan-100/80">
-                    Abre uma prévia incorporada do YouTube dentro do aplicativo, sem baixar nada.
-                  </p>
-                </button>
-
-                <button
-                  onClick={() => {
-                    const analysis = youtubeActionModal.analysis;
-                    closeYoutubeActionModal();
-                    void startYoutubeDownload('single', analysis);
-                  }}
-                  disabled={isDownloading || !youtubeActionModal.analysis.selectedEntry}
-                  className="rounded-[24px] border border-white/10 bg-black/20 p-5 text-left transition hover:bg-white/[0.05] disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <p className="text-sm font-semibold text-white">Salvar só a faixa agora</p>
-                  <p className="mt-2 text-xs leading-5 text-gray-400">
-                    Baixa apenas a faixa destacada e publica direto na biblioteca atual.
-                  </p>
-                </button>
-
-                <button
-                  onClick={() => {
-                    const analysis = youtubeActionModal.analysis;
-                    closeYoutubeActionModal();
-                    void startYoutubeDownload('video', analysis);
-                  }}
-                  disabled={isDownloading || !youtubeActionModal.analysis.selectedEntry}
-                  className="rounded-[24px] border border-cyan-400/30 bg-cyan-400/10 p-5 text-left transition hover:bg-cyan-400/15 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <p className="text-sm font-semibold text-white">Salvar só o vídeo agora</p>
-                  <p className="mt-2 text-xs leading-5 text-cyan-100/80">
-                    Baixa o vídeo da faixa destacada para assistir no Montanha Music Lab sem puxar um download de áudio separado do YouTube.
-                  </p>
-                </button>
-
-                <button
-                  onClick={() => {
-                    const analysis = youtubeActionModal.analysis;
-                    closeYoutubeActionModal();
-                    enqueueYoutubeDownload('single', analysis);
-                  }}
-                  disabled={!youtubeActionModal.analysis.selectedEntry}
-                  className="rounded-[24px] border border-white/10 bg-black/20 p-5 text-left transition hover:bg-white/[0.05] disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <p className="text-sm font-semibold text-white">Adicionar só a faixa à fila</p>
-                  <p className="mt-2 text-xs leading-5 text-gray-400">
-                    Guarda a faixa atual para processar depois, sem começar agora.
-                  </p>
-                </button>
-
-                {youtubeActionModal.analysis.kind === 'playlist' && youtubeActionModal.analysis.playlist ? (
-                  <>
-                    <button
-                      onClick={() => {
-                        const analysis = youtubeActionModal.analysis;
-                        closeYoutubeActionModal();
-                        void startYoutubeDownload('playlist', analysis);
-                      }}
-                      disabled={isDownloading}
-                      className="rounded-[24px] border border-cyan-400/30 bg-cyan-400/10 p-5 text-left transition hover:bg-cyan-400/15 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <p className="text-sm font-semibold text-white">Salvar a playlist inteira agora</p>
-                      <p className="mt-2 text-xs leading-5 text-cyan-100/80">
-                        Importa todas as faixas e já cria uma playlist nova no Montanha Music Lab com o mesmo nome da playlist do YouTube.
-                      </p>
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        const analysis = youtubeActionModal.analysis;
-                        closeYoutubeActionModal();
-                        enqueueYoutubeDownload('playlist', analysis);
-                      }}
-                      disabled={false}
-                      className="rounded-[24px] border border-cyan-400/20 bg-cyan-500/5 p-5 text-left transition hover:bg-cyan-500/10 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <p className="text-sm font-semibold text-white">Adicionar a playlist inteira à fila</p>
-                      <p className="mt-2 text-xs leading-5 text-cyan-100/80">
-                        Empilha a playlist completa e preserva o nome dela para criar tudo certo depois.
-                      </p>
-                    </button>
-                  </>
-                ) : null}
-              </div>
-
-              <div className="rounded-[24px] border border-white/10 bg-black/20 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-500">Preferências desta ação</p>
-                <label className="mt-4 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-gray-300">
-                  <input
-                    type="checkbox"
-                    checked={youtubeIncludeVideo}
-                    onChange={(e) => setYoutubeIncludeVideo(e.target.checked)}
-                    className="h-4 w-4 accent-green-500"
-                  />
-                  Salvar vídeo também quando eu quiser assistir dentro do Montanha Music Lab
-                </label>
-
-                <div className="mt-4">
-                  <label className="mb-2 block text-sm font-medium text-gray-300">Playlist de destino opcional</label>
-                  <select
-                    value={youtubeTargetPlaylistId}
-                    onChange={(e) => setYoutubeTargetPlaylistId(e.target.value)}
-                    className="h-12 w-full rounded-2xl border border-white/10 bg-[#101010] px-4 text-sm text-gray-200 outline-none focus:border-green-500/40"
-                  >
-                    <option value="">Criar ou usar a playlist automática</option>
-                    {playlists.map((playlist) => (
-                      <option key={playlist.id} value={playlist.id}>
-                        {playlist.name}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="mt-2 text-xs leading-5 text-gray-500">
-                    Em faixa única, o download entra nesta playlist. Em playlist inteira, o Montanha Music Lab pode anexar nela ou criar automaticamente uma nova playlist com o nome original.
-                  </p>
-                </div>
-
-                {youtubeActionModal.analysis.kind === 'playlist' && youtubeActionModal.analysis.playlist ? (
-                  <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-500">Prévia</p>
-                      <span className="text-xs text-gray-500">{youtubeActionModal.analysis.playlist.entryCount} faixas</span>
-                    </div>
-                    <div className="mt-3 max-h-56 space-y-2 overflow-y-auto pr-1">
-                      {youtubeActionModal.analysis.playlist.entries.length > 0 ? (
-                        youtubeActionModal.analysis.playlist.entries.map((entry, index) => (
-                          <div
-                            key={`${entry.url}-${index}`}
-                            className="flex items-center justify-between rounded-2xl border border-white/5 bg-black/20 px-3 py-2 text-sm"
-                          >
-                            <span className="truncate text-gray-200">{entry.title}</span>
-                            <span className="ml-3 text-xs text-gray-500">#{index + 1}</span>
-                          </div>
-                        ))
-                      ) : isInspectingYoutube ? (
-                        Array.from({ length: 4 }).map((_, index) => (
-                          <div
-                            key={`playlist-preview-skeleton-${index}`}
-                            className="flex items-center justify-between rounded-2xl border border-white/5 bg-black/20 px-3 py-3"
-                          >
-                            <div className="h-3 w-4/5 animate-pulse rounded-full bg-white/10" />
-                            <div className="ml-3 h-3 w-8 animate-pulse rounded-full bg-white/5" />
-                          </div>
-                        ))
-                      ) : (
-                        <div className="rounded-2xl border border-white/5 bg-black/20 px-3 py-4 text-sm leading-5 text-gray-400">
-                          O Montanha Music Lab ainda está buscando as faixas desta playlist. Você já pode escolher uma ação ou tentar abrir a playlist novamente em instantes.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      {/* Spotube Engine: 100% Direct Playback & Direct Download - No intermediate modals */}
 
       {showActivityPanel ? (
         <div className="fixed bottom-28 right-6 z-40 w-[min(420px,calc(100vw-2rem))] overflow-hidden rounded-[28px] border border-white/10 bg-[#0b0b0b]/95 shadow-2xl backdrop-blur-2xl">

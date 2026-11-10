@@ -8,17 +8,43 @@ export default async function handler(req, res) {
   }
 
   const id = (req.query?.id || req.body?.id || '').trim();
-  if (!id) {
-    return res.status(400).json({ error: 'ID do vídeo obrigatório' });
+  const query = (req.query?.q || req.query?.query || req.body?.query || '').trim();
+
+  if (!id && !query) {
+    return res.status(400).json({ error: 'ID ou query do vídeo obrigatório' });
   }
 
-  const cleanId = id.replace(/^yt-/, '').replace(/https?:\/\/(www\.)?youtube\.com\/watch\?v=/, '');
+  let cleanId = id.replace(/^yt-/, '').replace(/https?:\/\/(www\.)?youtube\.com\/watch\?v=/, '');
 
   const pipedInstances = [
     'https://api.piped.private.coffee',
     'https://pipedapi.adminforge.de',
     'https://piped.video/api/v1'
   ];
+
+  // Se o ID for de outro serviço (ex: Deezer 'dz-...') ou query foi fornecida, buscar o vídeo equivalente no YouTube
+  if (cleanId.startsWith('dz-') || (!cleanId && query)) {
+    const searchTerm = query || cleanId.replace(/^dz-/, '');
+    for (const instance of pipedInstances) {
+      try {
+        const c = new AbortController();
+        const t = setTimeout(() => c.abort(), 3500);
+        const searchResp = await fetch(`${instance}/search?q=${encodeURIComponent(searchTerm)}&filter=all`, {
+          signal: c.signal,
+          headers: { 'User-Agent': 'Mozilla/5.0' }
+        });
+        clearTimeout(t);
+        if (searchResp.ok) {
+          const searchData = await searchResp.json();
+          const firstStream = (searchData.items || []).find((item) => item.type === 'stream');
+          if (firstStream?.url) {
+            cleanId = firstStream.url.replace('/watch?v=', '').split('&')[0];
+            break;
+          }
+        }
+      } catch {}
+    }
+  }
 
   for (const instance of pipedInstances) {
     try {

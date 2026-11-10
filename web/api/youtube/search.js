@@ -72,30 +72,30 @@ export default async function handler(req, res) {
     }
   }
 
-  // 2. Fallback de alta velocidade: iTunes Music Search API
+  // 2. Fallback de alta velocidade: Deezer Music Catalog API (Zero Apple Music)
   try {
-    const itunesResp = await fetch(
-      `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=25`,
+    const dzResp = await fetch(
+      `https://api.deezer.com/search?q=${encodeURIComponent(query)}&limit=25`,
       { headers: { 'User-Agent': 'Mozilla/5.0' } }
     );
-    if (itunesResp.ok) {
-      const itunesData = await itunesResp.json();
-      const results = (itunesData.results || []).map((track) => ({
-        id: String(track.trackId || Math.random().toString(36).slice(2, 8)),
-        title: track.trackName || 'Música sem título',
-        artist: track.artistName || 'Artista desconhecido',
-        album: track.collectionName || 'Álbum',
-        duration: Math.round((track.trackTimeMillis || 180000) / 1000),
-        thumbnail: (track.artworkUrl100 || '').replace('100x100bb', '600x600bb'),
-        url: track.trackViewUrl || '',
-        previewUrl: track.previewUrl || '',
-        source: 'itunes'
+    if (dzResp.ok) {
+      const dzData = await dzResp.json();
+      const results = (dzData.data || []).map((track) => ({
+        id: `dz-${track.id}`,
+        title: track.title || 'Música sem título',
+        artist: track.artist?.name || 'Artista desconhecido',
+        album: track.album?.title || 'Álbum',
+        duration: track.duration || 180,
+        thumbnail: track.album?.cover_big || track.album?.cover_medium || '',
+        url: track.link || `https://www.deezer.com/track/${track.id}`,
+        previewUrl: track.preview || '',
+        source: 'deezer'
       }));
 
       return res.status(200).json({ results, playlists: [] });
     }
   } catch (err) {
-    console.error('iTunes fallback error:', err);
+    console.error('Deezer fallback error:', err);
   }
 
   return res.status(500).json({ error: 'Nenhum provedor de busca respondeu no momento.' });
