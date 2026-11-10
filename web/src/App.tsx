@@ -661,9 +661,11 @@ export default function App() {
   useEffect(() => {
     const q = searchTerm.trim();
     if (q.length >= 2) {
+      setActiveSection('download');
+      setYoutubeSearchQuery(q);
       const timer = window.setTimeout(() => {
         void searchYoutubeInsideApp(q);
-      }, 500);
+      }, 400);
       return () => window.clearTimeout(timer);
     }
   }, [searchTerm]);
