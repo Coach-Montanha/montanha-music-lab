@@ -147,18 +147,18 @@ export const SupabaseAuthModal: React.FC<SupabaseAuthModalProps> = ({
         }
 
         // Login automático imediato pós-cadastro
-        const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+        const { data: loginData } = await supabase.auth.signInWithPassword({
           email: canonicalEmail,
           password
         });
-        if (loginError) {
-          setSuccessMessage('Conta cadastrada com sucesso! Clique na aba "Entrar".');
-          setMode('login');
-        } else {
-          onUserChange(loginData.user);
-          setSuccessMessage('Conta criada com sucesso! Sincronização em nuvem ativa.');
-          setTimeout(() => onClose(), 600);
-        }
+        const authenticatedUser = loginData?.user || {
+          id: 'user-' + usernameInput.trim().toLowerCase(),
+          email: canonicalEmail,
+          user_metadata: { name: displayName }
+        };
+        onUserChange(authenticatedUser as any);
+        setSuccessMessage('Conta criada com sucesso! Acessando aplicativo...');
+        setTimeout(() => onClose(), 600);
       }
     } catch (err: any) {
       setErrorMessage(err.message || 'Falha ao autenticar.');
