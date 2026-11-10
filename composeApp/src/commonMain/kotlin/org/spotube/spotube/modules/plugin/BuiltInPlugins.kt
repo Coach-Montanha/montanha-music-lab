@@ -54,14 +54,23 @@ val BUILT_IN_PLUGINS = listOf(
     NEWPIPE_YOUTUBE_BUILT_IN_PLUGIN,
     LRCLIB_BUILT_IN_PLUGIN)
 
+fun isBuiltInPluginEntry(plugin: PluginEntry): Boolean =
+    BUILT_IN_PLUGINS.any { it.name.equals(plugin.name, ignoreCase = true) || it.id == plugin.id }
+
+fun resolveBuiltInPlugin(pluginOrId: Any): PluginEntry? = when (pluginOrId) {
+    is PluginEntry -> BUILT_IN_PLUGINS.firstOrNull { it.name.equals(pluginOrId.name, ignoreCase = true) || it.id == pluginOrId.id }
+    is String -> BUILT_IN_PLUGINS.firstOrNull { it.id == pluginOrId || it.name.equals(pluginOrId, ignoreCase = true) || pluginOrId.startsWith(it.name + "@") }
+    else -> null
+}
+
 /**
  * The bundled placeholder logo for a built-in plugin, or `null` if it has none.
  *
  * Built-in plugins are not installed to disk, so they have no `logo.png`; these
  * resources (in `composeResources/drawable`) stand in as their logos.
  */
-fun builtInPluginLogo(plugin: PluginEntry): DrawableResource? = when (plugin.id) {
-    NEWPIPE_YOUTUBE_BUILT_IN_PLUGIN.id -> Res.drawable.plugin_logo_newpipe
-    LRCLIB_BUILT_IN_PLUGIN.id -> Res.drawable.plugin_logo_lrclib
+fun builtInPluginLogo(plugin: PluginEntry): DrawableResource? = when {
+    plugin.name.contains("NewPipe", ignoreCase = true) -> Res.drawable.plugin_logo_newpipe
+    plugin.name.contains("LRCLib", ignoreCase = true) -> Res.drawable.plugin_logo_lrclib
     else -> null
 }

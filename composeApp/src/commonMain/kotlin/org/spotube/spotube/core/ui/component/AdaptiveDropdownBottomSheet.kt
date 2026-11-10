@@ -21,6 +21,7 @@ package org.spotube.spotube.core.ui.component
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
@@ -171,7 +172,7 @@ private fun AdaptiveBottomSheetContent(
         contentPadding = PaddingValues(top = 10.dp, bottom = 8.dp),
         contentSpacing = 4.dp) {
         Column(
-            modifier = Modifier.fillMaxWidth()) {
+            modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 16.dp)) {
             header?.invoke()
 
             if (filter != null) {

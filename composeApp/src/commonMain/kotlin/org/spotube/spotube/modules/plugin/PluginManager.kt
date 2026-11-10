@@ -138,7 +138,7 @@ class PluginManager(
                 for (file in bundledFiles) {
                     try {
                         val bytes = Res.readBytes(file)
-                        addPluginFromByteArray(bytes = bytes, allowReplacingInstalled = false)
+                        addPluginFromByteArray(bytes = bytes, allowReplacingInstalled = true)
                     } catch (_: Exception) {
                     }
                 }
@@ -206,28 +206,28 @@ class PluginManager(
             } else {
                 try {
                     val res = Json.decodeFromString<PluginManagerStates.Data>(json)
-                    val plugins = res.plugins.map {
-                        // Replace plugins that match built-in plugin IDs with the built-in
-                        // plugin entries. This ensures that any updates to built-in plugins
-                        // are reflected in the UI, while still allowing user-installed plugins
-                        // to be loaded from disk.
-                        if (it in BUILT_IN_PLUGINS) {
-                            BUILT_IN_PLUGINS.first { builtIn -> builtIn.id == it.id }
-                        } else it
+                    val plugins = res.plugins.map { plugin ->
+                        resolveBuiltInPlugin(plugin) ?: plugin
                     }.toSet()
 
                     val resolvedPlugins = (plugins union BUILT_IN_PLUGINS).toList()
                     val resolvedPluginsById = resolvedPlugins.associateBy { it.id }
-                    // Drop selections for plugins that don't actually declare the ability
-                    // (e.g. a scrobble selection left over from a removed built-in plugin)
-                    // and always point selections at the resolved plugin entry.
                     val mergedSelected = defaultSelectedPlugins + res.selectedPlugins
                     val selectedPlugins = mergedSelected
                         .mapNotNull { (ability, selected) ->
-                            val plugin = resolvedPluginsById[selected.id] ?: return@mapNotNull null
+                            val plugin = resolvedPluginsById[selected.id]
+                                ?: resolveBuiltInPlugin(selected)
+                                ?: return@mapNotNull null
                             if (ability in plugin.abilities) ability to plugin else null
                         }
-                        .toMap()
+                        .toMutableMap()
+
+                    if (PluginAbility.AUDIO !in selectedPlugins) {
+                        selectedPlugins[PluginAbility.AUDIO] = NEWPIPE_YOUTUBE_BUILT_IN_PLUGIN
+                    }
+                    if (PluginAbility.LYRICS !in selectedPlugins) {
+                        selectedPlugins[PluginAbility.LYRICS] = LRCLIB_BUILT_IN_PLUGIN
+                    }
 
                     res.copy(
                         plugins = resolvedPlugins,
@@ -264,10 +264,11 @@ class PluginManager(
                     for (ability in PluginAbility.entries) {
                         val plugin = plugins[ability] ?: continue
 
+                        val builtIn = resolveBuiltInPlugin(plugin)
                         if (ziplineServicesByPluginID.containsKey(plugin.id)) {
                             ziplineServices[ability] = ziplineServicesByPluginID[plugin.id]
-                        } else if (plugin in BUILT_IN_PLUGINS) {
-                            val service = BuiltInPluginService(plugin)
+                        } else if (builtIn != null) {
+                            val service = BuiltInPluginService(builtIn)
                             ziplineServices[ability] = service
                             ziplineServicesByPluginID[plugin.id] = service
                             service.start()
@@ -324,13 +325,18 @@ class PluginManager(
 
     private fun filterSelectedPluginByType(ability: PluginAbility): StateFlow<PluginService?> {
         return ziplineServices
-            .mapNotNull { state ->
-                state?.get(ability)
+            .map { state ->
+                val service = state?.get(ability)
+                if (service == null && ability == PluginAbility.AUDIO) {
+                    BuiltInPluginService(NEWPIPE_YOUTUBE_BUILT_IN_PLUGIN).apply { start() }
+                } else {
+                    service
+                }
             }
             .stateIn(
                 scope = scope,
                 started = SharingStarted.Eagerly,
-                initialValue = null
+                initialValue = if (ability == PluginAbility.AUDIO) BuiltInPluginService(NEWPIPE_YOUTUBE_BUILT_IN_PLUGIN) else null
             )
     }
 

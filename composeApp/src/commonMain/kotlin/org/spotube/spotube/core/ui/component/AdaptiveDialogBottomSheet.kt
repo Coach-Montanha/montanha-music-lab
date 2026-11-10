@@ -35,6 +35,8 @@ import org.spotube.millennium.composables.MillenniumModalBottomSheet
 import org.spotube.millennium.composables.MillenniumSeparator
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -93,7 +95,7 @@ fun AdaptiveDialogBottomSheet(
         }
         MillenniumModalBottomSheet(state = sheetState) {
             Column(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 16.dp),
                 horizontalAlignment = Alignment.Start) {
                 title?.let {
                     Row(
