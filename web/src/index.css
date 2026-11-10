@@ -3,11 +3,12 @@
 :root {
   --ease-entrance: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-exit: cubic-bezier(0.7, 0, 0.84, 0);
-  --accent-volt: #00f59b;
-  --accent-emerald: #10b981;
+  --accent-blue: #38bdf8;
+  --accent-royal: #2563eb;
+  --accent-glow: rgba(37, 99, 235, 0.45);
   --surface-base: #060709;
-  --surface-panel: #0c0e14;
-  --surface-card: #12151e;
+  --surface-panel: #0b0d14;
+  --surface-card: #101420;
 }
 
 html {
@@ -53,16 +54,12 @@ input, select, textarea {
   justify-content: center;
 }
 
-/* Equalizer Bars Animation */
-@keyframes eq-bounce-1 { 0%, 100% { height: 4px; } 50% { height: 16px; } }
-@keyframes eq-bounce-2 { 0%, 100% { height: 14px; } 50% { height: 6px; } }
-@keyframes eq-bounce-3 { 0%, 100% { height: 8px; } 50% { height: 20px; } }
-@keyframes eq-bounce-4 { 0%, 100% { height: 18px; } 50% { height: 10px; } }
-
-.eq-bar-1 { animation: eq-bounce-1 0.75s ease-in-out infinite; }
-.eq-bar-2 { animation: eq-bounce-2 0.85s ease-in-out infinite; }
-.eq-bar-3 { animation: eq-bounce-3 0.65s ease-in-out infinite; }
-.eq-bar-4 { animation: eq-bounce-4 0.95s ease-in-out infinite; }
+/* Blue Glow Player Button (Spotube Signature) */
+.btn-player-glow {
+  background: linear-gradient(180deg, #1d4ed8 0%, #2563eb 100%);
+  box-shadow: 0 0 24px rgba(37, 99, 235, 0.55), 0 4px 12px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(96, 165, 250, 0.4);
+}
 
 * {
   scrollbar-width: thin;

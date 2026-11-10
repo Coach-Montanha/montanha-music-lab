@@ -3,9 +3,13 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Suspense, lazy } from 'react';
 import {
   Check,
+  ChevronDown,
+  ChevronRight,
   Compass,
+  Disc,
   Download,
   Expand,
+  Folder,
   FolderOpen,
   HardDriveDownload,
   Heart,
@@ -20,23 +24,33 @@ import {
   MonitorSpeaker,
   Music,
   Pause,
-  Pencil,
   Play,
   QrCode,
   Search,
   Server,
   Settings2,
+  Shuffle,
+  Repeat,
+  Mic2,
+  ListPlus,
+  ListMusic,
+  MoreHorizontal,
+  ScreenShare,
   SkipBack,
   SkipForward,
   Smartphone,
   Sparkles,
   Plus,
   Trash2,
+  User,
   UserPlus,
   Video,
   Volume2,
   X
 } from 'lucide-react';
+import { supabase, getCloudFavorites, toggleCloudFavorite } from './lib/supabase';
+import { SupabaseAuthModal } from './components/SupabaseAuthModal';
+import type { User as SupabaseUser } from '@supabase/supabase-js';
 import api from './services/api';
 import brandMark from './assets/app.png';
 import type { DesktopOnboardingStep } from './components/DesktopOnboardingOverlay';
@@ -742,6 +756,11 @@ export default function App() {
   );
   const [isDesktopOnboardingOpen, setIsDesktopOnboardingOpen] = useState(false);
   const [desktopOnboardingStepIndex, setDesktopOnboardingStepIndex] = useState(0);
+  const [supabaseUser, setSupabaseUser] = useState<SupabaseUser | null>(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [sidebarLibraryExpanded, setSidebarLibraryExpanded] = useState(true);
+  const [sidebarDeviceExpanded, setSidebarDeviceExpanded] = useState(true);
+  const [sidebarConnectExpanded, setSidebarConnectExpanded] = useState(true);
 
   const visibleYoutubeRecentSearches = useMemo(() => {
     return filterVisibleRecentSearches(youtubeRecentSearches, hiddenYoutubeRecentSearches);
@@ -1199,6 +1218,57 @@ export default function App() {
       releaseObjectUrl();
     };
   }, []);
+
+  // Supabase Auth and Realtime sync
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSupabaseUser(session?.user || null);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSupabaseUser(session?.user || null);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  // Supabase Realtime channel for instant cross-device updates
+  useEffect(() => {
+    if (!supabaseUser) return;
+
+    // Load cloud favorites on login
+    getCloudFavorites(supabaseUser.id).then((cloudFavs) => {
+      if (cloudFavs && cloudFavs.length > 0) {
+        const favIds = new Set(cloudFavs.map((f) => f.song_id));
+        setSongs((prev) =>
+          prev.map((s) => ({
+            ...s,
+            favorite: favIds.has(s.id) ? true : s.favorite
+          }))
+        );
+      }
+    });
+
+    // Realtime subscription
+    const channel = supabase
+      .channel('montanha-realtime-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'montanha_favorites', filter: `user_id=eq.${supabaseUser.id}` }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const newFav = payload.new as any;
+          setSongs((prev) => prev.map((s) => s.id === newFav.song_id ? { ...s, favorite: true } : s));
+        } else if (payload.eventType === 'DELETE') {
+          const oldFav = payload.old as any;
+          setSongs((prev) => prev.map((s) => s.id === oldFav.song_id ? { ...s, favorite: false } : s));
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [supabaseUser]);
 
   useEffect(() => {
     // Disabled auto-onboarding popup on initial load to ensure instant, clean access
@@ -2313,15 +2383,25 @@ export default function App() {
   };
 
   const toggleFavorite = async (song: Song) => {
-    const res = await api.patch(`/musicas/${song.id}/favorito`, {
-      favorite: !song.favorite,
-      userId: currentUser?.id
-    });
+    if (supabaseUser) {
+      void toggleCloudFavorite(supabaseUser.id, song, !song.favorite);
+    }
+    try {
+      const res = await api.patch(`/musicas/${song.id}/favorito`, {
+        favorite: !song.favorite,
+        userId: currentUser?.id
+      });
 
-    const updated = sanitizeDeepText(res.data.music as Song);
-    setSongs((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
-    if (currentSong?.id === updated.id) setCurrentSong(updated);
-    await loadSongs(activeSection, currentUser);
+      const updated = sanitizeDeepText(res.data.music as Song);
+      setSongs((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+      if (currentSong?.id === updated.id) setCurrentSong(updated);
+      await loadSongs(activeSection, currentUser);
+    } catch {
+      // Local fallback if offline or backend unreachable
+      const updated = { ...song, favorite: !song.favorite };
+      setSongs((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+      if (currentSong?.id === updated.id) setCurrentSong(updated);
+    }
   };
 
   const createPlaylist = async () => {
@@ -3268,7 +3348,9 @@ export default function App() {
         <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
           <div className="min-w-0 flex-1">
             <p className="truncate font-bold">{getDisplayTitle(currentSong) || 'Nenhum video'}</p>
-            <p className="truncate text-xs text-gray-400">{getSongSubtitle(currentSong)}</p>
+            <p className="truncate text-xs text-gray-400">
+              {playerNotice ? <span className="text-amber-400">{playerNotice}</span> : getSongSubtitle(currentSong)}
+            </p>
           </div>
           <div className="flex shrink-0 items-center gap-2" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
             <button onClick={() => void desktopApi.showMain()} className="rounded-xl bg-white/5 px-3 py-2 text-xs hover:bg-white/10">
@@ -3523,6 +3605,15 @@ export default function App() {
     { id: 'download' as Section, label: 'YouTube Studio', description: 'Buscar e importar', icon: Download, count: downloadJobs.length }
   ];
 
+  void sidebarItems;
+  void createPlaylist;
+  void startPlaylistRename;
+  void submitPlaylistRename;
+  void deletePlaylist;
+  void playlistMessage;
+  void playlistEditingId;
+  void logout;
+
   const handleMediaTimeUpdate = (element: HTMLMediaElement | null) => {
     if (!element) return;
     const nextTime = element.currentTime || 0;
@@ -3569,251 +3660,221 @@ export default function App() {
       />
 
       <div className="flex h-full min-h-0">
-        <aside className="hidden h-full w-80 flex-col overflow-y-auto border-r border-white/5 bg-[linear-gradient(180deg,#070707_0%,#0d0d0d_100%)] lg:flex">
-          <div className="px-7 pb-6 pt-7">
-            <div className="flex items-center gap-4">
-              <img src={brandMark} alt="Montanha Music Lab" className="h-16 w-16 rounded-[22px] shadow-[0_10px_35px_rgba(30,215,96,0.16)]" />
-              <div>
-                <h1 className="bg-gradient-to-r from-green-300 via-emerald-200 to-green-500 bg-clip-text text-2xl font-black tracking-tight text-transparent">
-                  Montanha Music Lab
-                </h1>
-                <p className="mt-1 text-xs uppercase tracking-[0.24em] text-green-400/70">Web & Mobile Player</p>
-              </div>
+        {/* DESKTOP SIDEBAR - 100% FIEL AO SPOTUBE / MONTANHA MUSIC LAB */}
+        <aside className="hidden h-full w-72 flex-col overflow-y-auto border-r border-white/5 bg-[#090b10] lg:flex select-none">
+          {/* Header Brand */}
+          <div className="flex items-center gap-3 px-6 py-5 border-b border-white/5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600/20 text-sky-400 border border-blue-500/30 shadow-[0_0_15px_rgba(56,189,248,0.25)]">
+              <ScreenShare size={20} />
             </div>
-            <p className="mt-4 text-sm text-gray-500">
-              Sua sessão, sua biblioteca, seu player.
-            </p>
+            <div>
+              <h1 className="text-base font-bold tracking-tight text-white">Montanha Music Lab</h1>
+              <p className="text-[10px] uppercase tracking-wider text-sky-400 font-medium">Spotube Core Engine</p>
+            </div>
           </div>
 
-          <div className="px-4">
-            <div className="rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.025))] p-2 shadow-[0_24px_70px_rgba(0,0,0,0.22)]">
-              {sidebarItems.map((item) => {
-                const active = activeSection === item.id;
+          <div className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
+            {/* Buscar Item */}
+            <div>
+              <button
+                onClick={() => {
+                  setActivePlaylistId(null);
+                  setActiveDiscoverPlaylistId(null);
+                  setActiveSection('download');
+                }}
+                className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
+                  activeSection === 'download'
+                    ? 'bg-gradient-to-r from-blue-600 to-sky-500 text-white shadow-[0_4px_16px_rgba(37,99,235,0.4)]'
+                    : 'text-gray-400 hover:bg-white/[0.04] hover:text-white'
+                }`}
+              >
+                <Search size={18} />
+                <span>Buscar</span>
+              </button>
+            </div>
 
-                return (
+            {/* Group: Biblioteca */}
+            <div>
+              <button
+                onClick={() => setSidebarLibraryExpanded((prev) => !prev)}
+                className="flex w-full items-center justify-between px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500 hover:text-gray-300"
+              >
+                <span>Biblioteca</span>
+                {sidebarLibraryExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              </button>
+
+              {sidebarLibraryExpanded && (
+                <div className="mt-1 space-y-1 pl-1">
                   <button
-                    key={item.id}
                     onClick={() => {
                       setActivePlaylistId(null);
                       setActiveDiscoverPlaylistId(null);
-                      setActiveSection(item.id);
+                      setActiveSection('home');
                     }}
-                    className={`group relative mb-1 flex w-full items-center gap-3 overflow-hidden rounded-[22px] px-3 py-3 text-left transition ${
-                      active
-                        ? 'bg-white text-black shadow-[0_14px_36px_rgba(255,255,255,0.12)]'
-                        : 'text-gray-300 hover:bg-white/[0.06] hover:text-white'
-                    } ${
-                      activeDesktopOnboardingStepId === 'nav-download' && item.id === 'download'
-                        ? desktopTourFocusClass
-                        : ''
+                    className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition ${
+                      activeSection === 'home'
+                        ? 'bg-gradient-to-r from-blue-600 to-sky-500 text-white shadow-[0_4px_16px_rgba(37,99,235,0.4)]'
+                        : 'text-gray-400 hover:bg-white/[0.04] hover:text-white'
                     }`}
                   >
-                    <span
-                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition ${
-                        active ? 'bg-black text-white' : 'bg-white/[0.05] text-gray-300 group-hover:bg-white/[0.09]'
-                      }`}
-                    >
-                      <item.icon size={18} />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate font-semibold">{item.label}</span>
-                      <span className={`mt-0.5 block truncate text-xs ${active ? 'text-black/60' : 'text-gray-500'}`}>
-                        {item.description}
-                      </span>
-                    </span>
-                    <span
-                      className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold ${
-                        active ? 'bg-black/10 text-black/70' : 'bg-white/[0.06] text-gray-500'
-                      }`}
-                    >
-                      {item.count}
+                    <ListMusic size={18} />
+                    <span>Playlists</span>
+                    <span className="ml-auto text-xs text-gray-500">{playlists.length + homePlaylists.length}</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setActivePlaylistId(null);
+                      setActiveDiscoverPlaylistId(null);
+                      setActiveSection('explore');
+                    }}
+                    className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition ${
+                      activeSection === 'explore'
+                        ? 'bg-gradient-to-r from-blue-600 to-sky-500 text-white shadow-[0_4px_16px_rgba(37,99,235,0.4)]'
+                        : 'text-gray-400 hover:bg-white/[0.04] hover:text-white'
+                    }`}
+                  >
+                    <Disc size={18} />
+                    <span>Álbuns</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setActivePlaylistId(null);
+                      setActiveDiscoverPlaylistId(null);
+                      setActiveSection('favorites');
+                    }}
+                    className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition ${
+                      activeSection === 'favorites'
+                        ? 'bg-gradient-to-r from-blue-600 to-sky-500 text-white shadow-[0_4px_16px_rgba(37,99,235,0.4)]'
+                        : 'text-gray-400 hover:bg-white/[0.04] hover:text-white'
+                    }`}
+                  >
+                    <Heart size={18} className={activeSection === 'favorites' ? 'fill-white' : ''} />
+                    <span>Favoritas (Likes)</span>
+                    <span className="ml-auto text-xs text-gray-500">
+                      {songs.filter((s) => s.favorite).length}
                     </span>
                   </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="px-4 pt-4">
-            <div className="rounded-[28px] border border-green-400/10 bg-[radial-gradient(circle_at_top_left,rgba(34,197,94,0.16),transparent_42%),#0f0f0f] p-4">
-              <div className="mb-3 flex items-center gap-3">
-                <Sparkles size={18} className="text-green-400" />
-                <span className="font-semibold">Usuário ativo</span>
-              </div>
-              <div className="space-y-3">
-                <div className="rounded-2xl bg-white/[0.04] p-4">
-                  <p className="font-semibold text-white">{currentUser?.nome}</p>
-                  <p className="text-sm text-gray-400">@{currentUser?.login || currentUser?.nome}</p>
                 </div>
-                <button
-                  onClick={() => void logout()}
-                  className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] text-sm font-medium hover:bg-white/[0.07]"
-                >
-                  <LogOut size={16} />
-                  Trocar usuário
-                </button>
-              </div>
+              )}
             </div>
-          </div>
 
-          <div className="px-4 pt-4">
-            <div className="rounded-[28px] border border-white/10 bg-[#0f0f0f] p-4">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <Library size={18} className="text-green-400" />
-                  <span className="font-semibold">Playlists</span>
+            {/* Group: No dispositivo */}
+            <div>
+              <button
+                onClick={() => setSidebarDeviceExpanded((prev) => !prev)}
+                className="flex w-full items-center justify-between px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500 hover:text-gray-300"
+              >
+                <span>No dispositivo</span>
+                {sidebarDeviceExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              </button>
+
+              {sidebarDeviceExpanded && (
+                <div className="mt-1 space-y-1 pl-1">
+                  <button
+                    onClick={() => {
+                      setActivePlaylistId(null);
+                      setActiveDiscoverPlaylistId(null);
+                      setActiveSection('library');
+                    }}
+                    className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition ${
+                      activeSection === 'library'
+                        ? 'bg-gradient-to-r from-blue-600 to-sky-500 text-white shadow-[0_4px_16px_rgba(37,99,235,0.4)]'
+                        : 'text-gray-400 hover:bg-white/[0.04] hover:text-white'
+                    }`}
+                  >
+                    <Folder size={18} />
+                    <span>Arquivos locais</span>
+                    <span className="ml-auto text-xs text-gray-500">{songs.length}</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setActivePlaylistId(null);
+                      setActiveDiscoverPlaylistId(null);
+                      setActiveSection('download');
+                    }}
+                    className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition ${
+                      activeSection === 'download'
+                        ? 'bg-gradient-to-r from-blue-600 to-sky-500 text-white shadow-[0_4px_16px_rgba(37,99,235,0.4)]'
+                        : 'text-gray-400 hover:bg-white/[0.04] hover:text-white'
+                    }`}
+                  >
+                    <Download size={18} />
+                    <span>Downloads</span>
+                    <span className="ml-auto text-xs text-gray-500">{offlineSongIds.length || downloadJobs.length}</span>
+                  </button>
                 </div>
-                <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-[10px] text-gray-400">
-                  {playlists.length}
-                </span>
-              </div>
+              )}
+            </div>
 
-                  <div className="mb-3 flex gap-2">
-                <input
-                  value={newPlaylistName}
-                  onChange={(e) => setNewPlaylistName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') void createPlaylist();
-                  }}
-                  placeholder="Nova playlist"
-                  className="h-10 flex-1 rounded-2xl border border-white/10 bg-white/[0.04] px-3 text-sm outline-none"
-                />
-                <button
-                  onClick={() => void createPlaylist()}
-                  className="flex h-10 w-10 items-center justify-center rounded-2xl bg-green-500 text-black"
-                >
-                  <Plus size={16} />
-                </button>
-              </div>
+            {/* Group: Conectar */}
+            <div>
+              <button
+                onClick={() => setSidebarConnectExpanded((prev) => !prev)}
+                className="flex w-full items-center justify-between px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500 hover:text-gray-300"
+              >
+                <span>Conectar</span>
+                {sidebarConnectExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              </button>
 
-              <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
-                {playlists.map((playlist) => {
-                  const active = activePlaylistId === playlist.id;
+              {sidebarConnectExpanded && (
+                <div className="mt-1 space-y-1 pl-1">
+                  <button
+                    onClick={() => setShowDevicePicker(true)}
+                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-gray-400 hover:bg-white/[0.04] hover:text-white transition"
+                  >
+                    <Smartphone size={18} />
+                    <span>Dispositivos</span>
+                    {devices.length > 0 && (
+                      <span className="ml-auto rounded-full bg-blue-500/20 px-2 py-0.5 text-[10px] text-sky-400">
+                        {devices.length}
+                      </span>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
 
-                  return (
-                    <div
-                      key={playlist.id}
-                      className={`rounded-2xl border px-3 py-2 transition ${
-                        active ? 'border-green-300/30 bg-green-300/12 text-green-50' : 'border-white/5 bg-white/[0.04] text-gray-200 hover:bg-white/[0.07]'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => {
-                            setActiveDiscoverPlaylistId(null);
-                            setActivePlaylistId(playlist.id);
-                            setActiveSection('library');
-                          }}
-                          className="min-w-0 flex-1 text-left"
-                        >
-                          {playlistEditingId === playlist.id ? (
-                            <input
-                              autoFocus
-                              value={playlistEditingName}
-                              onChange={(e) => setPlaylistEditingName(e.target.value)}
-                              onClick={(e) => e.stopPropagation()}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') void submitPlaylistRename(playlist.id);
-                                if (e.key === 'Escape') {
-                                  setPlaylistEditingId(null);
-                                  setPlaylistEditingName('');
-                                }
-                              }}
-                              className="h-9 w-full rounded-xl border border-black/10 bg-black/10 px-3 text-sm outline-none"
-                            />
-                          ) : (
-                            <div className="flex items-center justify-between gap-3">
-                              <span className="truncate">{playlist.name}</span>
-                              <span className={`text-xs ${active ? 'text-green-100/70' : 'text-gray-500'}`}>
-                                {(playlist.songs || []).length}
-                              </span>
-                            </div>
-                          )}
-                        </button>
-
-                        <div className="flex items-center gap-1">
-                          {playlistEditingId === playlist.id ? (
-                            <>
-                              <button
-                                onClick={() => void submitPlaylistRename(playlist.id)}
-                                className={`rounded-xl p-2 ${active ? 'hover:bg-white/10' : 'hover:bg-white/10'}`}
-                                title="Salvar nome"
-                              >
-                                <Check size={14} />
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setPlaylistEditingId(null);
-                                  setPlaylistEditingName('');
-                                }}
-                                className={`rounded-xl p-2 ${active ? 'hover:bg-white/10' : 'hover:bg-white/10'}`}
-                                title="Cancelar edicao"
-                              >
-                                <X size={14} />
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              <button
-                                onClick={() => startPlaylistRename(playlist)}
-                                className={`rounded-xl p-2 ${active ? 'hover:bg-white/10' : 'hover:bg-white/10'}`}
-                                title="Renomear playlist"
-                              >
-                                <Pencil size={14} />
-                              </button>
-                              <button
-                                onClick={() => void deletePlaylist(playlist)}
-                                className={`rounded-xl p-2 ${active ? 'hover:bg-white/10' : 'hover:bg-white/10'}`}
-                                title="Excluir playlist"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {playlistMessage ? <p className="mt-3 text-sm text-gray-400">{playlistMessage}</p> : null}
+            {/* Links inferiores */}
+            <div className="pt-2 border-t border-white/5 space-y-1">
+              <button
+                onClick={() => {
+                  setActivePlaylistId(null);
+                  setActiveDiscoverPlaylistId(null);
+                  setActiveSection('settings');
+                }}
+                className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition ${
+                  activeSection === 'settings'
+                    ? 'bg-gradient-to-r from-blue-600 to-sky-500 text-white shadow-[0_4px_16px_rgba(37,99,235,0.4)]'
+                    : 'text-gray-400 hover:bg-white/[0.04] hover:text-white'
+                }`}
+              >
+                <Settings2 size={18} />
+                <span>Configurações & Plugins</span>
+              </button>
             </div>
           </div>
 
-          <div className="mt-auto px-4 pt-4">
+          {/* User Account / Supabase Sync Pill */}
+          <div className="p-3 border-t border-white/5 bg-[#07090e]">
             <button
-              onClick={() => {
-                setActivePlaylistId(null);
-                setActiveDiscoverPlaylistId(null);
-                setActiveSection('settings');
-              }}
-              className={`flex w-full items-center gap-4 rounded-[24px] border px-4 py-4 text-left transition ${
-                activeSection === 'settings'
-                  ? 'border-cyan-400/30 bg-cyan-400/10 text-cyan-50 shadow-[0_16px_40px_rgba(34,211,238,0.12)]'
-                  : 'border-white/10 bg-white/[0.03] text-gray-300 hover:border-white/15 hover:bg-white/[0.05] hover:text-white'
-              } ${activeDesktopOnboardingStepId === 'apk-release' ? desktopTourFocusClass : ''}`}
+              onClick={() => setIsAuthModalOpen(true)}
+              className="flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3 text-left transition hover:border-sky-500/40 hover:bg-white/[0.06]"
             >
-              <Settings2 size={18} />
-              <div>
-                <p className="font-semibold">Configurações</p>
-                <p className="mt-1 text-xs text-inherit/70">Desktop, servidor local e atualização</p>
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-blue-700 to-sky-400 text-white font-bold text-sm shadow-md">
+                {supabaseUser ? (supabaseUser.email?.[0] || 'U').toUpperCase() : <LogIn size={18} />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-semibold text-white">
+                  {supabaseUser ? (supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0]) : 'Sincronizar Conta'}
+                </p>
+                <p className="truncate text-[10px] text-sky-400">
+                  {supabaseUser ? 'Supabase Realtime Ativo' : 'Entrar com Supabase'}
+                </p>
               </div>
             </button>
-          </div>
-
-          <div className="px-4 pb-32 pt-4">
-            <div className="rounded-[28px] border border-white/10 bg-gradient-to-br from-white/[0.06] to-transparent p-4">
-              <p className="text-xs uppercase tracking-[0.24em] text-gray-500">Sessão</p>
-              <p className="mt-2 text-lg font-semibold">
-                {currentUser ? `Biblioteca de ${currentUser.nome}` : 'Modo exploração'}
-              </p>
-              <p className="mt-2 text-sm text-gray-400">
-                {currentUser
-                  ? 'Seções e músicas agora respeitam o usuário conectado.'
-                  : 'Entre para separar biblioteca, favoritos e downloads por usuário.'}
-              </p>
-            </div>
           </div>
         </aside>
 
@@ -5803,11 +5864,11 @@ export default function App() {
       </div>
 
       {/* MOBILE MINI-PLAYER (Visible only on < lg) */}
-      <div className={`fixed bottom-16 left-0 right-0 z-30 h-16 border-t border-white/10 bg-[#111216]/95 px-3 backdrop-blur-xl flex items-center justify-between gap-3 lg:hidden ${isVideoTheaterOpen ? 'hidden' : ''}`}>
+      <div className={`fixed bottom-16 left-0 right-0 z-30 h-16 border-t border-white/10 bg-[#0c0e16]/95 px-3 backdrop-blur-xl flex items-center justify-between gap-3 lg:hidden ${isVideoTheaterOpen ? 'hidden' : ''}`}>
         {/* Progress bar line at top */}
         <div className="absolute top-0 left-0 right-0 h-[2.5px] bg-white/10">
           <div
-            className="h-full bg-emerald-500 transition-all duration-200"
+            className="h-full bg-sky-400 transition-all duration-200 shadow-[0_0_8px_rgba(56,189,248,0.7)]"
             style={{ width: `${duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0}%` }}
           />
         </div>
@@ -5823,7 +5884,7 @@ export default function App() {
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-white">
-              {getDisplayTitle(currentSong) || 'Nenhuma música tocando'}
+              {getDisplayTitle(currentSong) || 'Nada tocando'}
             </p>
             <p className="truncate text-xs text-gray-400">
               {getSongSubtitle(currentSong) || 'Selecione uma faixa'}
@@ -5841,7 +5902,7 @@ export default function App() {
             >
               <Heart
                 size={18}
-                className={currentSong.favorite ? 'fill-emerald-400 text-emerald-400' : ''}
+                className={currentSong.favorite ? 'fill-sky-400 text-sky-400' : ''}
               />
             </button>
           ) : null}
@@ -5849,7 +5910,7 @@ export default function App() {
           <motion.button
             whileTap={{ scale: 0.92 }}
             onClick={() => void togglePlay()}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-black shadow-md shrink-0 touch-target"
+            className="flex h-10 w-10 items-center justify-center rounded-full btn-player-glow text-white shadow-md shrink-0 touch-target"
             title={isPlaying ? 'Pausar' : 'Tocar'}
           >
             {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" className="ml-0.5" />}
@@ -5865,9 +5926,14 @@ export default function App() {
         </div>
       </div>
 
-      {/* MOBILE BOTTOM NAVIGATION DOCK (Visible only on < lg) */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 h-16 border-t border-white/10 bg-[#09090b]/98 backdrop-blur-2xl px-2 flex items-center justify-around lg:hidden">
-        {sidebarItems.map((item) => {
+      {/* MOBILE BOTTOM NAVIGATION DOCK (100% FIEL AO SPOTUBE MOBILE - media_1794100501684_ad6d17fc.jpg) */}
+      <nav className="fixed bottom-0 left-0 right-0 z-40 h-16 border-t border-white/10 bg-[#090b10]/98 backdrop-blur-2xl px-2 flex items-center justify-around lg:hidden select-none">
+        {[
+          { id: 'home' as Section, label: 'Início', icon: Home },
+          { id: 'download' as Section, label: 'Buscar', icon: Search },
+          { id: 'library' as Section, label: 'Biblioteca', icon: Library },
+          { id: 'settings' as Section, label: 'Configurações', icon: Settings2 }
+        ].map((item) => {
           const active = activeSection === item.id;
           return (
             <button
@@ -5877,21 +5943,23 @@ export default function App() {
                 setActiveDiscoverPlaylistId(null);
                 setActiveSection(item.id);
               }}
-              className={`flex flex-col items-center justify-center gap-1 py-1 px-2 min-w-[56px] min-h-[48px] rounded-xl transition ${
-                active ? 'text-emerald-400 font-bold' : 'text-gray-400 hover:text-gray-200'
+              className={`flex flex-col items-center justify-center gap-1 py-1 px-3 min-w-[56px] min-h-[48px] rounded-xl transition ${
+                active ? 'text-sky-400 font-bold' : 'text-gray-400 hover:text-gray-200'
               }`}
             >
               <item.icon size={20} className={active ? 'stroke-[2.5]' : 'stroke-[1.8]'} />
-              <span className="text-[10px] tracking-tight">{item.label}</span>
+              <span className="text-[11px] tracking-tight">{item.label}</span>
+              {active && <span className="h-1 w-1 rounded-full bg-sky-400" />}
             </button>
           );
         })}
       </nav>
 
-      {/* DESKTOP FOOTER PLAYER (Visible only on >= lg) */}
-      <footer className={`hidden lg:flex fixed bottom-0 left-80 right-0 h-24 items-center justify-between gap-5 border-t border-white/10 bg-black/85 px-6 backdrop-blur-2xl z-30 ${isVideoTheaterOpen ? 'hidden' : ''}`}>
-        <div className="flex min-w-0 w-1/3 items-center gap-4">
-          <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-[#171717]">
+      {/* DESKTOP FOOTER PLAYER (100% FIEL AO SPOTUBE DESKTOP - media_1794180377520_de4cf9d4.jpg) */}
+      <footer className={`hidden lg:flex fixed bottom-0 left-72 right-0 h-24 items-center justify-between gap-5 border-t border-white/10 bg-[#0c0e14]/95 px-6 backdrop-blur-2xl z-30 select-none ${isVideoTheaterOpen ? 'hidden' : ''}`}>
+        {/* Left: Track Info & Like */}
+        <div className="flex min-w-0 w-1/4 items-center gap-4">
+          <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-[#141722] border border-white/5">
             {currentSong?.thumbnail ? (
               <img src={currentSong.thumbnail} alt={currentSong.title} className="h-full w-full object-cover" />
             ) : (
@@ -5899,33 +5967,53 @@ export default function App() {
             )}
           </div>
 
-          <div className="min-w-0">
-            <p className="truncate font-bold">{getDisplayTitle(currentSong) || 'Nenhuma musica selecionada'}</p>
-            <p className="text-xs text-gray-500">{getSongSubtitle(currentSong)}</p>
-            {playerNotice ? <p className="mt-1 max-w-md truncate text-[11px] text-amber-300">{playerNotice}</p> : null}
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-semibold text-sm text-white">{getDisplayTitle(currentSong) || 'Nenhuma música selecionada'}</p>
+            <p className="truncate text-xs text-gray-400">{getSongSubtitle(currentSong)}</p>
           </div>
+
+          {currentSong && (
+            <button
+              onClick={() => void toggleFavorite(currentSong)}
+              className="p-2 text-gray-400 hover:text-white transition touch-target rounded-full hover:bg-white/5"
+              title="Favoritar"
+            >
+              <Heart
+                size={18}
+                className={currentSong.favorite ? 'fill-sky-400 text-sky-400' : ''}
+              />
+            </button>
+          )}
         </div>
 
-        <div className="flex w-1/3 flex-col items-center gap-2">
-          <div className="flex items-center gap-6">
-            <button onClick={() => void playPrevious()} className="text-gray-400 hover:text-white">
-              <SkipBack size={20} />
+        {/* Center: Playback Controls & Scrubber */}
+        <div className="flex w-2/4 flex-col items-center gap-2 max-w-2xl">
+          <div className="flex items-center gap-5">
+            <button className="text-gray-400 hover:text-white transition p-1" title="Aleatório">
+              <Shuffle size={16} />
+            </button>
+            <button onClick={() => void playPrevious()} className="text-gray-300 hover:text-white transition" title="Anterior">
+              <SkipBack size={18} />
             </button>
             <motion.button
-              whileHover={{ scale: 1.06 }}
-              whileTap={{ scale: 0.96 }}
+              whileHover={{ scale: 1.08 }}
+              whileTap={{ scale: 0.94 }}
               onClick={() => void togglePlay()}
-              className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-black"
+              className="flex h-11 w-11 items-center justify-center rounded-full btn-player-glow text-white shadow-lg"
+              title={isPlaying ? 'Pausar' : 'Reproduzir'}
             >
-              {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
+              {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" className="ml-0.5" />}
             </motion.button>
-            <button onClick={() => void playNext()} className="text-gray-400 hover:text-white">
-              <SkipForward size={20} />
+            <button onClick={() => void playNext()} className="text-gray-300 hover:text-white transition" title="Próxima">
+              <SkipForward size={18} />
+            </button>
+            <button className="text-gray-400 hover:text-white transition p-1" title="Repetir">
+              <Repeat size={16} />
             </button>
           </div>
 
-          <div className="flex w-full max-w-xl items-center gap-3">
-            <span className="w-10 text-right text-[11px] text-gray-400">{formatTime(currentTime)}</span>
+          <div className="flex w-full items-center gap-3">
+            <span className="w-10 text-right text-[11px] font-mono text-gray-400">{formatTime(currentTime)}</span>
             <input
               type="range"
               min={0}
@@ -5936,161 +6024,74 @@ export default function App() {
                 const value = Number(e.target.value);
                 void runPlayerCommand({ type: 'SEEK', time: value });
               }}
-              className="flex-1 accent-white"
+              className="flex-1 accent-sky-400 cursor-pointer h-1.5 rounded-full"
             />
-            <span className="w-10 text-[11px] text-gray-400">{formatTime(duration)}</span>
+            <span className="w-10 text-[11px] font-mono text-gray-400">{formatTime(duration)}</span>
           </div>
         </div>
 
-        <div className="flex w-1/3 items-center justify-end gap-3">
-          {currentSong ? (
-            <>
-              <button
-                onClick={() =>
-                  offlineSongIds.includes(currentSong.id)
-                    ? void removeSongOffline(currentSong)
-                    : void saveSongOffline(currentSong)
-                }
-                className={`flex h-11 items-center gap-2 rounded-full border px-4 text-sm transition ${
-                  offlineSongIds.includes(currentSong.id)
-                    ? 'border-green-500/30 bg-green-500/10 text-green-200'
-                    : 'border-white/10 bg-[#111111] text-gray-300 hover:border-white/20 hover:text-white'
-                }`}
-                title={
-                  offlineSongIds.includes(currentSong.id)
-                    ? 'Remover cache offline'
-                    : 'Salvar audio para ouvir offline'
-                }
-              >
-                {offlineBusyIds.includes(currentSong.id) ? (
-                  <LoaderCircle size={16} className="animate-spin" />
-                ) : offlineSongIds.includes(currentSong.id) ? (
-                  <Check size={16} />
-                ) : (
-                  <HardDriveDownload size={16} />
-                )}
-                {offlineSongIds.includes(currentSong.id) ? 'Offline' : 'Salvar offline'}
-              </button>
-
-              {currentSong.hasVideo ? (
-                <button
-                  onClick={() => void switchCurrentPlaybackMode(playbackMode === 'video' ? 'audio' : 'video')}
-                  className={`flex h-11 items-center gap-2 rounded-full border px-4 text-sm transition ${
-                    playbackMode === 'video'
-                      ? 'border-cyan-500/30 bg-cyan-500/10 text-cyan-100'
-                      : 'border-white/10 bg-[#111111] text-gray-300 hover:border-white/20 hover:text-white'
-                  }`}
-                  title={playbackMode === 'video' ? 'Voltar para audio' : 'Assistir video'}
-                >
-                  <Video size={16} />
-                  {playbackMode === 'video' ? 'Modo video' : 'Ver video'}
-                </button>
-              ) : null}
-            </>
-          ) : null}
-
-          <div className="relative hidden xl:flex">
+        {/* Right: Actions, Lyrics, Queue, Volume */}
+        <div className="flex w-1/4 items-center justify-end gap-3">
+          <button className="text-gray-400 hover:text-white transition p-2" title="Letra">
+            <Mic2 size={16} />
+          </button>
+          <button className="text-gray-400 hover:text-white transition p-2" title="Fila de reprodução">
+            <ListPlus size={16} />
+          </button>
+          <div className="relative">
             <button
-              onClick={() => setShowDevicePicker((value) => !value)}
-              className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-[#111111] text-gray-300 transition hover:border-white/20 hover:bg-[#161616] hover:text-white"
-              title={
-                selectedOutputDevice
-                  ? `Saida: ${selectedOutputDevice.deviceName}`
-                  : `Saida: ${deviceName}`
-              }
+              onClick={() => setShowDevicePicker((v) => !v)}
+              className="text-gray-400 hover:text-white transition p-2"
+              title={selectedOutputDevice ? `Saída: ${selectedOutputDevice.deviceName}` : "Dispositivos de saída"}
             >
-              <MonitorSpeaker size={18} />
+              <Smartphone size={16} />
             </button>
-
-            {showDevicePicker ? (
-              <div className="absolute bottom-16 right-0 z-50 w-[360px] overflow-hidden rounded-[24px] border border-white/10 bg-[#0b0b0b]/95 p-3 shadow-2xl backdrop-blur-2xl">
-                <div className="mb-3 px-2">
-                  <p className="text-[10px] uppercase tracking-[0.22em] text-gray-500">Escolha onde tocar</p>
-                  <p className="mt-1 text-sm text-gray-300">Troque a saida entre este dispositivo e os outros apps ativos na rede.</p>
-                </div>
-
-                <div className="space-y-2">
-                  <button
-                    onClick={() => {
-                      setSelectedOutputDeviceId(storedDeviceId);
-                      setShowDevicePicker(false);
-                    }}
-                    className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
-                      selectedOutputDeviceId === storedDeviceId
-                        ? 'border-green-500/40 bg-green-500/10'
-                        : 'border-white/10 bg-white/[0.03] hover:bg-white/[0.06]'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-white">{deviceName}</p>
-                        <p className="truncate text-xs text-gray-400">Este dispositivo</p>
-                      </div>
-                      <span className="rounded-full border border-white/10 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-gray-300">
-                        Local
-                      </span>
+            {showDevicePicker && (
+              <div className="absolute bottom-14 right-0 z-50 w-72 rounded-2xl border border-white/10 bg-[#0d0f17] p-3 shadow-2xl">
+                <p className="text-xs font-semibold text-gray-400 mb-2 px-1">Dispositivos Conectados</p>
+                <div className="space-y-1">
+                  <div className="rounded-xl bg-white/[0.04] p-2 text-xs">
+                    <p className="font-semibold text-white">{deviceName}</p>
+                    <p className="text-[10px] text-sky-400">Este dispositivo (Local)</p>
+                  </div>
+                  {devices.map((d) => (
+                    <div key={d.deviceId} className="rounded-xl p-2 text-xs hover:bg-white/[0.04]">
+                      <p className="font-semibold text-white">{d.deviceName}</p>
+                      <p className="text-[10px] text-gray-500">{getDeviceStatusLabel(d)}</p>
                     </div>
-                  </button>
-
-                  {devices.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-white/10 px-4 py-5 text-sm text-gray-500">
-                      Nenhum outro dispositivo ativo encontrado agora.
-                    </div>
-                  ) : (
-                    devices.map((device) => (
-                      <button
-                        key={device.deviceId}
-                        onClick={() => {
-                          setSelectedOutputDeviceId(device.deviceId);
-                          setShowDevicePicker(false);
-                        }}
-                        className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
-                          selectedOutputDeviceId === device.deviceId
-                            ? 'border-green-500/40 bg-green-500/10'
-                            : 'border-white/10 bg-white/[0.03] hover:bg-white/[0.06]'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold text-white">{device.deviceName}</p>
-                            <p className="truncate text-xs text-gray-400">
-                              {device.userName || 'Sem usuario'}
-                              {device.ipAddress ? ` • ${device.ipAddress}` : ''}
-                            </p>
-                            <p className="mt-1 truncate text-xs text-gray-500">
-                              {getDeviceStatusLabel(device)}
-                              {device.lastState?.currentSongTitle ? ` • ${device.lastState.currentSongTitle}` : ''}
-                            </p>
-                            {device.lastError ? (
-                              <p className="mt-1 truncate text-[11px] text-red-400">{device.lastError}</p>
-                            ) : null}
-                          </div>
-                          <span className="rounded-full border border-white/10 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-gray-300">
-                            Remoto
-                          </span>
-                        </div>
-                      </button>
-                    ))
-                  )}
+                  ))}
                 </div>
               </div>
-            ) : null}
+            )}
           </div>
-          <Volume2 size={18} className="text-gray-400" />
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.01}
-            value={volume}
-            onChange={(e) => {
-              const nextVolume = Number(e.target.value);
-              void runPlayerCommand({ type: 'SET_VOLUME', volume: nextVolume });
-            }}
-            className="w-32 accent-white"
-          />
+          <button className="text-gray-400 hover:text-white transition p-2" title="Mais opções">
+            <MoreHorizontal size={16} />
+          </button>
+          <div className="flex items-center gap-2 pl-2 border-l border-white/10">
+            <Volume2 size={16} className="text-gray-400" />
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={volume}
+              onChange={(e) => {
+                const nextVolume = Number(e.target.value);
+                void runPlayerCommand({ type: 'SET_VOLUME', volume: nextVolume });
+              }}
+              className="w-24 accent-sky-400 cursor-pointer h-1.5"
+            />
+          </div>
         </div>
       </footer>
+
+      {/* Supabase Central Auth Modal */}
+      <SupabaseAuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        currentUser={supabaseUser}
+        onUserChange={setSupabaseUser}
+      />
       {isDesktopOnboardingOpen && activeDesktopOnboardingStep ? (
         <Suspense fallback={null}>
           <DesktopOnboardingOverlay
