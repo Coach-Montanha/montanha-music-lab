@@ -1,0 +1,1420 @@
+{
+  "nodes": [
+    {
+      "id": ".eslintrc.cjs",
+      "label": ".eslintrc.cjs",
+      "type": "code",
+      "size": 454,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "api/signup.js",
+      "label": "signup.js",
+      "type": "code",
+      "size": 2319,
+      "exports": [],
+      "functions": [
+        "handler"
+      ]
+    },
+    {
+      "id": "dist-electron/main.js",
+      "label": "main.js",
+      "type": "code",
+      "size": 33126,
+      "exports": [],
+      "functions": [
+        "fe",
+        "pe",
+        "me",
+        "m",
+        "h",
+        "he",
+        "ge",
+        "_e",
+        "ve",
+        "ye",
+        "be",
+        "xe",
+        "Se",
+        "we",
+        "L",
+        "ze",
+        "Be",
+        "Ve",
+        "He",
+        "Ue",
+        "We",
+        "Ge",
+        "R",
+        "z",
+        "Ke",
+        "qe",
+        "Je",
+        "Ye",
+        "B",
+        "V",
+        "Xe",
+        "Ze",
+        "Qe",
+        "et",
+        "tt",
+        "nt",
+        "rt",
+        "it",
+        "at",
+        "ot",
+        "H",
+        "st",
+        "U",
+        "ct",
+        "W",
+        "lt",
+        "ut",
+        "dt",
+        "ft",
+        "pt",
+        "G",
+        "mt",
+        "ht",
+        "gt",
+        "_t",
+        "vt",
+        "K",
+        "q",
+        "yt",
+        "J",
+        "bt",
+        "Y",
+        "xt",
+        "St",
+        "Ct",
+        "X",
+        "wt",
+        "Z",
+        "Tt",
+        "Q",
+        "Et",
+        "Dt",
+        "Ot",
+        "kt",
+        "At",
+        "jt",
+        "Mt",
+        "Nt",
+        "Pt"
+      ]
+    },
+    {
+      "id": "dist-electron/preload.cjs",
+      "label": "preload.cjs",
+      "type": "code",
+      "size": 1269,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "electron/electron-env.d.ts",
+      "label": "electron-env.d.ts",
+      "type": "code",
+      "size": 3086,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "electron/main.ts",
+      "label": "main.ts",
+      "type": "code",
+      "size": 48639,
+      "exports": [],
+      "functions": [
+        "log",
+        "isServiceMode",
+        "shouldLaunchHiddenInTray",
+        "resolvePreferencesPath",
+        "loadPreferences",
+        "savePreferences",
+        "updatePreferences",
+        "getConfiguredUpdateFeedUrl",
+        "getDefaultReleaseUrl",
+        "normalizeVersionLabel",
+        "parseVersionParts",
+        "compareVersions",
+        "delta",
+        "isNewerVersion",
+        "looksLikeMojibake",
+        "repairTextEncoding",
+        "inputSignals",
+        "repairedSignals",
+        "sanitizeUpdateStatusValue",
+        "sanitizeUpdateStatusPayload",
+        "normalizeAutoUpdateErrorMessage",
+        "notifyUpdate",
+        "notifyReleaseOnce",
+        "formatReleaseNotesForStatus",
+        "getUpdateMetadata",
+        "fetchLatestGitHubRelease",
+        "release",
+        "applyGitHubReleaseMetadata",
+        "applyGitHubReleaseProbe",
+        "scheduleAutoUpdateChecks",
+        "publishUpdateStatus",
+        "setUpdateStatus",
+        "bindAutoUpdaterListeners",
+        "configureAutoUpdater",
+        "checkForAppUpdates",
+        "recoverFromFailedInstallUpdate",
+        "getInstallCapableAutoUpdater",
+        "startDownloadedUpdateInstall",
+        "finish",
+        "handleInstallError",
+        "resolveRendererPath",
+        "resolveRendererUrl",
+        "getPreloadPath",
+        "getAssetPath",
+        "getPreferredLogoPath",
+        "getWindowIconPath",
+        "getLogoDataUrl",
+        "getSplashHtml",
+        "getTrayIconImage",
+        "loadWindow",
+        "closeSplashWindow",
+        "createSplashWindow",
+        "finalizeWindowReveal",
+        "tryFinalizeStartupReveal",
+        "markMainWindowSurfaceDirty",
+        "scheduleMainWindowSurfaceRefresh",
+        "refresh",
+        "recreateMainWindowForRecovery",
+        "ensureMainWindowRendererReady",
+        "showMainWindow",
+        "showMiniPlayer",
+        "hideMiniPlayer",
+        "hideToTray",
+        "createMainWindow",
+        "createMiniPlayerWindow",
+        "buildTrayMenu",
+        "createTray",
+        "registerIpc",
+        "runDetached",
+        "queryWindowsServiceExists",
+        "queryWindowsServiceRunning",
+        "ensureWindowsServiceRegistered",
+        "bootstrapServiceRuntime",
+        "bootstrap"
+      ]
+    },
+    {
+      "id": "electron/preload.cjs",
+      "label": "preload.cjs",
+      "type": "code",
+      "size": 1385,
+      "exports": [],
+      "functions": [
+        "handler"
+      ]
+    },
+    {
+      "id": "electron/preload.ts",
+      "label": "preload.ts",
+      "type": "code",
+      "size": 1816,
+      "exports": [],
+      "functions": [
+        "handler"
+      ]
+    },
+    {
+      "id": "electron/service-controller.ts",
+      "label": "service-controller.ts",
+      "type": "code",
+      "size": 10519,
+      "exports": [
+        "MusfyServiceController",
+        "getLocalNetworkAddresses"
+      ],
+      "functions": [
+        "delay",
+        "resolveBackendRoot",
+        "resolveBackendEntry",
+        "resolveRuntimeStatePath",
+        "buildServiceConfig",
+        "readRuntimeState",
+        "writeRuntimeState",
+        "resolveBackendLogPath",
+        "checkHealth",
+        "payload",
+        "isPortAvailable",
+        "reserveEphemeralPort",
+        "findAvailablePort",
+        "resolveHealthyConfig",
+        "MusfyServiceController",
+        "getLocalNetworkAddresses"
+      ]
+    },
+    {
+      "id": "index.html",
+      "label": "index.html",
+      "type": "view",
+      "size": 4309,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "package.json",
+      "label": "package.json",
+      "type": "code",
+      "size": 2016,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "postcss.config.js",
+      "label": "postcss.config.js",
+      "type": "code",
+      "size": 119,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "public/sw.js",
+      "label": "sw.js",
+      "type": "code",
+      "size": 2469,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "README.md",
+      "label": "README.md",
+      "type": "code",
+      "size": 1745,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "release-notes/0.1.1.md",
+      "label": "0.1.1.md",
+      "type": "code",
+      "size": 554,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "release-notes/0.1.10.md",
+      "label": "0.1.10.md",
+      "type": "code",
+      "size": 551,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "release-notes/0.1.11.md",
+      "label": "0.1.11.md",
+      "type": "code",
+      "size": 280,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "release-notes/0.1.12.md",
+      "label": "0.1.12.md",
+      "type": "code",
+      "size": 288,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "release-notes/0.1.13.md",
+      "label": "0.1.13.md",
+      "type": "code",
+      "size": 290,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "release-notes/0.1.14.md",
+      "label": "0.1.14.md",
+      "type": "code",
+      "size": 533,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "release-notes/0.1.15.md",
+      "label": "0.1.15.md",
+      "type": "code",
+      "size": 421,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "release-notes/0.1.16.md",
+      "label": "0.1.16.md",
+      "type": "code",
+      "size": 423,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "release-notes/0.1.17.md",
+      "label": "0.1.17.md",
+      "type": "code",
+      "size": 363,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "release-notes/0.1.18.md",
+      "label": "0.1.18.md",
+      "type": "code",
+      "size": 409,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "release-notes/0.1.19.md",
+      "label": "0.1.19.md",
+      "type": "code",
+      "size": 337,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "release-notes/0.1.2.md",
+      "label": "0.1.2.md",
+      "type": "code",
+      "size": 610,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "release-notes/0.1.20.md",
+      "label": "0.1.20.md",
+      "type": "code",
+      "size": 356,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "release-notes/0.1.21.md",
+      "label": "0.1.21.md",
+      "type": "code",
+      "size": 533,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "release-notes/0.1.22.md",
+      "label": "0.1.22.md",
+      "type": "code",
+      "size": 582,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "release-notes/0.1.23.md",
+      "label": "0.1.23.md",
+      "type": "code",
+      "size": 559,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "release-notes/0.1.24.md",
+      "label": "0.1.24.md",
+      "type": "code",
+      "size": 492,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "release-notes/0.1.25.md",
+      "label": "0.1.25.md",
+      "type": "code",
+      "size": 545,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "release-notes/0.1.26.md",
+      "label": "0.1.26.md",
+      "type": "code",
+      "size": 618,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "release-notes/0.1.27.md",
+      "label": "0.1.27.md",
+      "type": "code",
+      "size": 508,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "release-notes/0.1.28.md",
+      "label": "0.1.28.md",
+      "type": "code",
+      "size": 568,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "release-notes/0.1.3.md",
+      "label": "0.1.3.md",
+      "type": "code",
+      "size": 610,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "release-notes/0.1.4.md",
+      "label": "0.1.4.md",
+      "type": "code",
+      "size": 547,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "release-notes/0.1.5.md",
+      "label": "0.1.5.md",
+      "type": "code",
+      "size": 743,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "release-notes/0.1.6.md",
+      "label": "0.1.6.md",
+      "type": "code",
+      "size": 571,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "release-notes/0.1.7.md",
+      "label": "0.1.7.md",
+      "type": "code",
+      "size": 607,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "release-notes/0.1.8.md",
+      "label": "0.1.8.md",
+      "type": "code",
+      "size": 525,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "release-notes/0.1.9.md",
+      "label": "0.1.9.md",
+      "type": "code",
+      "size": 533,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "scripts/build-web.cjs",
+      "label": "build-web.cjs",
+      "type": "code",
+      "size": 356,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "scripts/publish-github-release.cjs",
+      "label": "publish-github-release.cjs",
+      "type": "code",
+      "size": 21947,
+      "exports": [],
+      "functions": [
+        "main",
+        "parseArgs",
+        "wait",
+        "asBoolean",
+        "isValidSemver",
+        "resolveRequestedVersion",
+        "resolveReleaseNotes",
+        "applyReleaseMetadata",
+        "removeYamlEntry",
+        "toYamlQuotedValue",
+        "cleanOutputDir",
+        "runBuild",
+        "getNpmCommand",
+        "runCommand",
+        "collectArtifacts",
+        "collectOptionalLinuxArtifacts",
+        "prepareAndroidApkArtifact",
+        "resolveAndroidApkSource",
+        "getContentType",
+        "createOrUpdateRelease",
+        "uploadArtifacts",
+        "uploadArtifactWithRetries",
+        "uploadArtifactRequest",
+        "uploadArtifactWithCurl",
+        "findReleaseAssetByName",
+        "githubRequest",
+        "tryParseJson",
+        "extractGithubErrorMessage",
+        "isNotFoundError",
+        "shouldRetryGithubStatus",
+        "shouldRetryGithubError",
+        "formatBytes",
+        "fail"
+      ]
+    },
+    {
+      "id": "src/App.tsx",
+      "label": "App.tsx",
+      "type": "code",
+      "size": 291957,
+      "exports": [
+        "App"
+      ],
+      "functions": [
+        "getDownloadJobStatusLabel",
+        "loadQrCodeModule",
+        "loadLocalForageModule",
+        "getOfflineAudioStore",
+        "runWhenIdle",
+        "looksLikeMojibake",
+        "repairTextEncoding",
+        "inputSignals",
+        "repairedSignals",
+        "sanitizeDeepText",
+        "getSongSubtitle",
+        "getSongSearchText",
+        "getOfflineAudioKey",
+        "getSongSourceLabel",
+        "getSongUploaderLabel",
+        "getYoutubeResultSubtitle",
+        "getYoutubePlaylistSubtitle",
+        "getYoutubeVideoIdFromUrl",
+        "getDeviceStatusLabel",
+        "createDeviceId",
+        "isGenericArtistName",
+        "isGenericSongTitle",
+        "splitSongTitle",
+        "getDisplayArtist",
+        "getDisplayTitle",
+        "getActivityMeta",
+        "splitReleaseNotesText",
+        "formatReleaseDateLabel",
+        "App",
+        "handleConnectPluginAccount",
+        "handleDisconnectPluginAccount",
+        "persistCurrentUser",
+        "closeDesktopOnboarding",
+        "openDesktopOnboarding",
+        "loadSongs",
+        "loadPlaylists",
+        "loadDiscoverPlaylists",
+        "openBrowserClient",
+        "refreshLibraryAfterDownload",
+        "loadActivityLogs",
+        "registerDevice",
+        "loadDevices",
+        "loadOfflineIndex",
+        "releaseObjectUrl",
+        "getActiveMediaElement",
+        "ensurePlaybackEndpointAvailable",
+        "getPlaybackUrl",
+        "loadDownloadJobs",
+        "loadDesktopPreferences",
+        "loadDesktopUpdateStatus",
+        "triggerDesktopUpdateCheck",
+        "installDesktopUpdate",
+        "focusDesktopUpdateSection",
+        "scrollToTarget",
+        "probeBackendAvailability",
+        "loadAndroidApkInfo",
+        "resolvedAndroidApkUrl",
+        "androidReleasePageUrl",
+        "loadYoutubeRecentSearches",
+        "hideYoutubeRecentSearch",
+        "sendDeviceState",
+        "settingsContent",
+        "formatTime",
+        "getSongIndex",
+        "broadcastSnapshot",
+        "executePlaySong",
+        "executePlayNext",
+        "executePlayPrevious",
+        "executeTogglePlay",
+        "executeSeek",
+        "executeSetVolume",
+        "sendRemoteCommand",
+        "runPlayerCommand",
+        "playSong",
+        "playSongWithMode",
+        "playNext",
+        "playPrevious",
+        "togglePlay",
+        "showDesktopMiniPlayer",
+        "toggleFavorite",
+        "createPlaylist",
+        "addSongToPlaylist",
+        "openPlaylistPicker",
+        "startPlaylistRename",
+        "submitPlaylistRename",
+        "removeSongFromActivePlaylist",
+        "canDeleteSongFromPlatform",
+        "removeSongFromPlatform",
+        "deletePlaylist",
+        "choosePlaylist",
+        "updateDesktopPreference",
+        "handlePreferDownloadOnLaunchChange",
+        "chooseBackupDirectory",
+        "updateBackupFormat",
+        "runMusicBackup",
+        "searchYoutubeInsideApp",
+        "query",
+        "buildFallbackYoutubeTrackAnalysis",
+        "buildFallbackYoutubePlaylistAnalysis",
+        "openYoutubePreview",
+        "closeYoutubePreview",
+        "retryYoutubePreview",
+        "closeYoutubeActionModal",
+        "buildYoutubeAnalysisForPlaylistEntry",
+        "previewYoutubePlaylistEntry",
+        "selectYoutubeSearchResult",
+        "selectYoutubePlaylistSearchResult",
+        "inspectYoutubeLink",
+        "url",
+        "analysis",
+        "buildYoutubeDownloadPayload",
+        "url",
+        "executeYoutubeDownload",
+        "startYoutubeDownload",
+        "enqueueYoutubeDownload",
+        "pauseDownloadJob",
+        "resumeDownloadJob",
+        "saveSongOffline",
+        "removeSongOffline",
+        "switchCurrentPlaybackMode",
+        "openVideoFullscreen",
+        "openVideoInMiniPlayer",
+        "submitAuth",
+        "logout",
+        "onMessage",
+        "syncCurrentTime",
+        "miniVideoLayout",
+        "handleMediaTimeUpdate",
+        "handleMediaLoadedMetadata"
+      ]
+    },
+    {
+      "id": "src/components/DesktopOnboardingOverlay.tsx",
+      "label": "DesktopOnboardingOverlay.tsx",
+      "type": "code",
+      "size": 5524,
+      "exports": [
+        "DesktopOnboardingOverlay"
+      ],
+      "functions": [
+        "DesktopOnboardingOverlay"
+      ]
+    },
+    {
+      "id": "src/components/SpotubePlugins.tsx",
+      "label": "SpotubePlugins.tsx",
+      "type": "code",
+      "size": 25431,
+      "exports": [
+        "SpotubePlugins"
+      ],
+      "functions": [
+        "handleLoginSubmit"
+      ]
+    },
+    {
+      "id": "src/components/SupabaseAuthModal.tsx",
+      "label": "SupabaseAuthModal.tsx",
+      "type": "code",
+      "size": 16549,
+      "exports": [
+        "SupabaseAuthModal"
+      ],
+      "functions": [
+        "formatEmailFromLogin",
+        "getCleanLoginName",
+        "handleSubmit",
+        "handleLogout"
+      ]
+    },
+    {
+      "id": "src/index.css",
+      "label": "index.css",
+      "type": "style",
+      "size": 2023,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "src/lib/browserClientEntry.test.ts",
+      "label": "browserClientEntry.test.ts",
+      "type": "code",
+      "size": 749,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "src/lib/downloadRefresh.test.ts",
+      "label": "downloadRefresh.test.ts",
+      "type": "code",
+      "size": 691,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "src/lib/installerDataSafety.test.ts",
+      "label": "installerDataSafety.test.ts",
+      "type": "code",
+      "size": 4384,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "src/lib/mediaSession.ts",
+      "label": "mediaSession.ts",
+      "type": "code",
+      "size": 3031,
+      "exports": [
+        "MediaSessionController"
+      ],
+      "functions": [
+        "MediaSessionController"
+      ]
+    },
+    {
+      "id": "src/lib/offlineAudioStore.test.ts",
+      "label": "offlineAudioStore.test.ts",
+      "type": "code",
+      "size": 1901,
+      "exports": [],
+      "functions": [
+        "createLocalForageShape",
+        "createDefaultLocalForageShape"
+      ]
+    },
+    {
+      "id": "src/lib/offlineAudioStore.ts",
+      "label": "offlineAudioStore.ts",
+      "type": "code",
+      "size": 856,
+      "exports": [
+        "resolveLocalForageModule",
+        "createOfflineAudioStore"
+      ],
+      "functions": [
+        "resolveLocalForageModule",
+        "createOfflineAudioStore"
+      ]
+    },
+    {
+      "id": "src/lib/playbackUrl.test.ts",
+      "label": "playbackUrl.test.ts",
+      "type": "code",
+      "size": 2202,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "src/lib/playbackUrl.ts",
+      "label": "playbackUrl.ts",
+      "type": "code",
+      "size": 1036,
+      "exports": [
+        "buildLocalAudioPlaybackUrl",
+        "buildLocalVideoPlaybackUrl"
+      ],
+      "functions": [
+        "buildLocalAudioPlaybackUrl",
+        "buildLocalVideoPlaybackUrl",
+        "resolveAudioPlaybackUrl"
+      ]
+    },
+    {
+      "id": "src/lib/pluginAccounts.ts",
+      "label": "pluginAccounts.ts",
+      "type": "code",
+      "size": 2731,
+      "exports": [
+        "getStoredPluginAccounts",
+        "savePluginAccount",
+        "removePluginAccount"
+      ],
+      "functions": [
+        "getStoredPluginAccounts",
+        "savePluginAccount",
+        "removePluginAccount"
+      ]
+    },
+    {
+      "id": "src/lib/supabase.ts",
+      "label": "supabase.ts",
+      "type": "code",
+      "size": 3737,
+      "exports": [
+        "SUPABASE_URL",
+        "SUPABASE_ANON_KEY",
+        "supabase"
+      ],
+      "functions": [
+        "getCloudFavorites",
+        "toggleCloudFavorite",
+        "getCloudPlaylists",
+        "createCloudPlaylist"
+      ]
+    },
+    {
+      "id": "src/lib/youtubePlaylistUx.test.ts",
+      "label": "youtubePlaylistUx.test.ts",
+      "type": "code",
+      "size": 664,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "src/lib/youtubeRecentSearches.test.ts",
+      "label": "youtubeRecentSearches.test.ts",
+      "type": "code",
+      "size": 1457,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "src/lib/youtubeRecentSearches.ts",
+      "label": "youtubeRecentSearches.ts",
+      "type": "code",
+      "size": 1094,
+      "exports": [
+        "HIDDEN_YOUTUBE_SEARCHES_STORAGE_KEY",
+        "getRecentSearchKey",
+        "parseHiddenRecentSearches",
+        "hideRecentSearch",
+        "filterVisibleRecentSearches"
+      ],
+      "functions": [
+        "getRecentSearchKey",
+        "parseHiddenRecentSearches",
+        "hideRecentSearch",
+        "filterVisibleRecentSearches"
+      ]
+    },
+    {
+      "id": "src/main.tsx",
+      "label": "main.tsx",
+      "type": "code",
+      "size": 2614,
+      "exports": [],
+      "functions": [
+        "RootErrorBoundary"
+      ]
+    },
+    {
+      "id": "src/services/api.ts",
+      "label": "api.ts",
+      "type": "code",
+      "size": 3559,
+      "exports": [],
+      "functions": [
+        "unique",
+        "buildCandidateBaseUrls",
+        "sameOriginBackend"
+      ]
+    },
+    {
+      "id": "src/vite-env.d.ts",
+      "label": "vite-env.d.ts",
+      "type": "code",
+      "size": 85,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "tailwind.config.js",
+      "label": "tailwind.config.js",
+      "type": "code",
+      "size": 217,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "tsconfig.json",
+      "label": "tsconfig.json",
+      "type": "code",
+      "size": 642,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "tsconfig.node.json",
+      "label": "tsconfig.node.json",
+      "type": "code",
+      "size": 244,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "vercel.json",
+      "label": "vercel.json",
+      "type": "code",
+      "size": 1136,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "vite.config.ts",
+      "label": "vite.config.ts",
+      "type": "code",
+      "size": 1610,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "vitest.config.ts",
+      "label": "vitest.config.ts",
+      "type": "code",
+      "size": 162,
+      "exports": [],
+      "functions": []
+    }
+  ],
+  "edges": [
+    {
+      "source": "dist-electron/main.js",
+      "target": "electron",
+      "type": "imports"
+    },
+    {
+      "source": "dist-electron/main.js",
+      "target": "child_process",
+      "type": "imports"
+    },
+    {
+      "source": "dist-electron/main.js",
+      "target": "fs",
+      "type": "imports"
+    },
+    {
+      "source": "dist-electron/main.js",
+      "target": "path",
+      "type": "imports"
+    },
+    {
+      "source": "dist-electron/main.js",
+      "target": "url",
+      "type": "imports"
+    },
+    {
+      "source": "dist-electron/main.js",
+      "target": "module",
+      "type": "imports"
+    },
+    {
+      "source": "dist-electron/main.js",
+      "target": "net",
+      "type": "imports"
+    },
+    {
+      "source": "dist-electron/main.js",
+      "target": "os",
+      "type": "imports"
+    },
+    {
+      "source": "dist-electron/preload.cjs",
+      "target": "electron",
+      "type": "imports"
+    },
+    {
+      "source": "electron/main.ts",
+      "target": "electron",
+      "type": "imports"
+    },
+    {
+      "source": "electron/main.ts",
+      "target": "child_process",
+      "type": "imports"
+    },
+    {
+      "source": "electron/main.ts",
+      "target": "electron",
+      "type": "imports"
+    },
+    {
+      "source": "electron/main.ts",
+      "target": "fs",
+      "type": "imports"
+    },
+    {
+      "source": "electron/main.ts",
+      "target": "path",
+      "type": "imports"
+    },
+    {
+      "source": "electron/main.ts",
+      "target": "url",
+      "type": "imports"
+    },
+    {
+      "source": "electron/main.ts",
+      "target": "module",
+      "type": "imports"
+    },
+    {
+      "source": "electron/main.ts",
+      "target": "electron",
+      "type": "imports"
+    },
+    {
+      "source": "electron/main.ts",
+      "target": "electron-updater",
+      "type": "imports"
+    },
+    {
+      "source": "electron/main.ts",
+      "target": "builder-util-runtime",
+      "type": "imports"
+    },
+    {
+      "source": "electron/main.ts",
+      "target": "./service-controller",
+      "type": "imports"
+    },
+    {
+      "source": "electron/main.ts",
+      "target": "electron-updater",
+      "type": "imports"
+    },
+    {
+      "source": "electron/preload.cjs",
+      "target": "electron",
+      "type": "imports"
+    },
+    {
+      "source": "electron/preload.ts",
+      "target": "electron",
+      "type": "imports"
+    },
+    {
+      "source": "electron/service-controller.ts",
+      "target": "electron",
+      "type": "imports"
+    },
+    {
+      "source": "electron/service-controller.ts",
+      "target": "module",
+      "type": "imports"
+    },
+    {
+      "source": "electron/service-controller.ts",
+      "target": "child_process",
+      "type": "imports"
+    },
+    {
+      "source": "electron/service-controller.ts",
+      "target": "fs",
+      "type": "imports"
+    },
+    {
+      "source": "electron/service-controller.ts",
+      "target": "net",
+      "type": "imports"
+    },
+    {
+      "source": "electron/service-controller.ts",
+      "target": "os",
+      "type": "imports"
+    },
+    {
+      "source": "electron/service-controller.ts",
+      "target": "path",
+      "type": "imports"
+    },
+    {
+      "source": "electron/service-controller.ts",
+      "target": "url",
+      "type": "imports"
+    },
+    {
+      "source": "scripts/build-web.cjs",
+      "target": "child_process",
+      "type": "imports"
+    },
+    {
+      "source": "scripts/publish-github-release.cjs",
+      "target": "fs",
+      "type": "imports"
+    },
+    {
+      "source": "scripts/publish-github-release.cjs",
+      "target": "path",
+      "type": "imports"
+    },
+    {
+      "source": "scripts/publish-github-release.cjs",
+      "target": "child_process",
+      "type": "imports"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "react",
+      "type": "imports"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "framer-motion",
+      "type": "imports"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "react",
+      "type": "imports"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "lucide-react",
+      "type": "imports"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "./lib/supabase",
+      "type": "imports"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "./components/SupabaseAuthModal",
+      "type": "imports"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "@supabase/supabase-js",
+      "type": "imports"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "./services/api",
+      "type": "imports"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "./assets/app.png",
+      "type": "imports"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "./components/SpotubePlugins",
+      "type": "imports"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "./lib/pluginAccounts",
+      "type": "imports"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "./components/DesktopOnboardingOverlay",
+      "type": "imports"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "./lib/offlineAudioStore",
+      "type": "imports"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "./lib/playbackUrl",
+      "type": "imports"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "./lib/youtubeRecentSearches",
+      "type": "imports"
+    },
+    {
+      "source": "src/components/SpotubePlugins.tsx",
+      "target": "react",
+      "type": "imports"
+    },
+    {
+      "source": "src/components/SpotubePlugins.tsx",
+      "target": "lucide-react",
+      "type": "imports"
+    },
+    {
+      "source": "src/components/SupabaseAuthModal.tsx",
+      "target": "react",
+      "type": "imports"
+    },
+    {
+      "source": "src/components/SupabaseAuthModal.tsx",
+      "target": "../lib/supabase",
+      "type": "imports"
+    },
+    {
+      "source": "src/components/SupabaseAuthModal.tsx",
+      "target": "lucide-react",
+      "type": "imports"
+    },
+    {
+      "source": "src/components/SupabaseAuthModal.tsx",
+      "target": "@supabase/supabase-js",
+      "type": "imports"
+    },
+    {
+      "source": "src/lib/browserClientEntry.test.ts",
+      "target": "node:fs",
+      "type": "imports"
+    },
+    {
+      "source": "src/lib/browserClientEntry.test.ts",
+      "target": "node:path",
+      "type": "imports"
+    },
+    {
+      "source": "src/lib/browserClientEntry.test.ts",
+      "target": "vitest",
+      "type": "imports"
+    },
+    {
+      "source": "src/lib/downloadRefresh.test.ts",
+      "target": "node:fs",
+      "type": "imports"
+    },
+    {
+      "source": "src/lib/downloadRefresh.test.ts",
+      "target": "node:path",
+      "type": "imports"
+    },
+    {
+      "source": "src/lib/downloadRefresh.test.ts",
+      "target": "vitest",
+      "type": "imports"
+    },
+    {
+      "source": "src/lib/installerDataSafety.test.ts",
+      "target": "node:fs",
+      "type": "imports"
+    },
+    {
+      "source": "src/lib/installerDataSafety.test.ts",
+      "target": "node:path",
+      "type": "imports"
+    },
+    {
+      "source": "src/lib/installerDataSafety.test.ts",
+      "target": "vitest",
+      "type": "imports"
+    },
+    {
+      "source": "src/lib/offlineAudioStore.test.ts",
+      "target": "vitest",
+      "type": "imports"
+    },
+    {
+      "source": "src/lib/offlineAudioStore.test.ts",
+      "target": "./offlineAudioStore",
+      "type": "imports"
+    },
+    {
+      "source": "src/lib/offlineAudioStore.ts",
+      "target": "localforage",
+      "type": "imports"
+    },
+    {
+      "source": "src/lib/playbackUrl.test.ts",
+      "target": "vitest",
+      "type": "imports"
+    },
+    {
+      "source": "src/lib/playbackUrl.test.ts",
+      "target": "./playbackUrl",
+      "type": "imports"
+    },
+    {
+      "source": "src/lib/pluginAccounts.ts",
+      "target": "./supabase",
+      "type": "imports"
+    },
+    {
+      "source": "src/lib/supabase.ts",
+      "target": "@supabase/supabase-js",
+      "type": "imports"
+    },
+    {
+      "source": "src/lib/youtubePlaylistUx.test.ts",
+      "target": "node:fs",
+      "type": "imports"
+    },
+    {
+      "source": "src/lib/youtubePlaylistUx.test.ts",
+      "target": "node:path",
+      "type": "imports"
+    },
+    {
+      "source": "src/lib/youtubePlaylistUx.test.ts",
+      "target": "vitest",
+      "type": "imports"
+    },
+    {
+      "source": "src/lib/youtubeRecentSearches.test.ts",
+      "target": "vitest",
+      "type": "imports"
+    },
+    {
+      "source": "src/lib/youtubeRecentSearches.test.ts",
+      "target": "./youtubeRecentSearches",
+      "type": "imports"
+    },
+    {
+      "source": "src/main.tsx",
+      "target": "react",
+      "type": "imports"
+    },
+    {
+      "source": "src/main.tsx",
+      "target": "react-dom/client",
+      "type": "imports"
+    },
+    {
+      "source": "src/main.tsx",
+      "target": "./App.tsx",
+      "type": "imports"
+    },
+    {
+      "source": "src/services/api.ts",
+      "target": "axios",
+      "type": "imports"
+    },
+    {
+      "source": "vite.config.ts",
+      "target": "vite",
+      "type": "imports"
+    },
+    {
+      "source": "vite.config.ts",
+      "target": "@vitejs/plugin-react",
+      "type": "imports"
+    },
+    {
+      "source": "vite.config.ts",
+      "target": "vite-plugin-electron",
+      "type": "imports"
+    },
+    {
+      "source": "vite.config.ts",
+      "target": "vite-plugin-electron-renderer",
+      "type": "imports"
+    },
+    {
+      "source": "vitest.config.ts",
+      "target": "vitest/config",
+      "type": "imports"
+    }
+  ]
+}

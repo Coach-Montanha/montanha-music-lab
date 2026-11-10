@@ -335,12 +335,12 @@ type PlayerCommand =
   | { type: 'SET_VOLUME'; volume: number };
 
 const isMiniMode = new URLSearchParams(window.location.search).get('mini') === '1';
-const channel = new BroadcastChannel('musfy-player');
+const channel = new BroadcastChannel('montanha-player');
 const DesktopOnboardingOverlay = lazy(() => import('./components/DesktopOnboardingOverlay'));
-const AUTH_STORAGE_KEY = 'musfy-current-user';
-const DEVICE_ID_STORAGE_KEY = 'musfy-device-id';
-const DEVICE_NAME_STORAGE_KEY = 'musfy-device-name';
-const DESKTOP_ONBOARDING_STORAGE_KEY = 'musfy-desktop-onboarding-v1';
+const AUTH_STORAGE_KEY = 'montanha-current-user';
+const DEVICE_ID_STORAGE_KEY = 'montanha-device-id';
+const DEVICE_NAME_STORAGE_KEY = 'montanha-device-name';
+const DESKTOP_ONBOARDING_STORAGE_KEY = 'montanha-desktop-onboarding-v1';
 let qrCodeModulePromise: Promise<typeof import('qrcode')> | null = null;
 let localForageModulePromise: Promise<LocalForageImportShape> | null = null;
 let offlineAudioStorePromise: Promise<OfflineAudioStore> | null = null;
@@ -521,7 +521,7 @@ function createDeviceId() {
     return cryptoApi.randomUUID();
   }
 
-  return `musfy-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return `montanha-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 function isGenericArtistName(value?: string | null) {
@@ -642,9 +642,11 @@ function formatReleaseDateLabel(value?: string | null) {
 
 export default function App() {
   const storedDeviceId = localStorage.getItem(DEVICE_ID_STORAGE_KEY) || createDeviceId();
-  const storedDeviceName =
-    repairTextEncoding(localStorage.getItem(DEVICE_NAME_STORAGE_KEY)) ||
-    `${navigator.platform.includes('Win') ? 'Notebook' : 'Dispositivo'} Montanha Music Lab`;
+  let rawDeviceName = repairTextEncoding(localStorage.getItem(DEVICE_NAME_STORAGE_KEY)) || '';
+  if (!rawDeviceName || /musfy/i.test(rawDeviceName)) {
+    rawDeviceName = `${navigator.platform.includes('Win') ? 'Notebook' : 'Dispositivo'} Montanha Music Lab`;
+  }
+  const storedDeviceName = rawDeviceName;
   localStorage.setItem(DEVICE_ID_STORAGE_KEY, storedDeviceId);
   localStorage.setItem(DEVICE_NAME_STORAGE_KEY, storedDeviceName);
 
@@ -746,7 +748,7 @@ export default function App() {
     backupFormat: 'mp3'
   });
   const [preferDownloadOnLaunch, setPreferDownloadOnLaunch] = useState(
-    () => localStorage.getItem('musfy-prefer-download-on-launch') !== 'false'
+    () => localStorage.getItem('montanha-prefer-download-on-launch') === 'true'
   );
   const [androidApkInfo, setAndroidApkInfo] = useState<AndroidApkInfo | null>(null);
   const [apkQrCodeDataUrl, setApkQrCodeDataUrl] = useState('');
@@ -1513,7 +1515,7 @@ export default function App() {
   }, [activeSection, isMiniMode, backendAvailable]);
 
   useEffect(() => {
-    localStorage.setItem('musfy-prefer-download-on-launch', preferDownloadOnLaunch ? 'true' : 'false');
+    localStorage.setItem('montanha-prefer-download-on-launch', preferDownloadOnLaunch ? 'true' : 'false');
   }, [preferDownloadOnLaunch]);
 
   useEffect(() => {
@@ -2629,11 +2631,45 @@ export default function App() {
     setYoutubeActionModal(null);
 
     try {
-      const res = await api.post('/youtube/search', { query }, { timeout: 30000 });
-      const results = Array.isArray(res.data?.results) ? (res.data.results as YoutubeSearchResult[]) : [];
-      const playlistResults = Array.isArray(res.data?.playlists)
-        ? (res.data.playlists as YoutubeSearchPlaylistResult[])
-        : [];
+      let results: YoutubeSearchResult[] = [];
+      let playlistResults: YoutubeSearchPlaylistResult[] = [];
+
+      // Tentativa 1: Endpoint da API (local ou /api/youtube/search na Vercel)
+      try {
+        const res = await api.post('/youtube/search', { query }, { timeout: 8000 });
+        if (Array.isArray(res.data?.results)) results = res.data.results;
+        if (Array.isArray(res.data?.playlists)) playlistResults = res.data.playlists;
+      } catch {
+        // Tentativa 2: Rota direta /api/youtube/search via fetch
+        try {
+          const directRes = await fetch(`/api/youtube/search?q=${encodeURIComponent(query)}`);
+          if (directRes.ok) {
+            const data = await directRes.json();
+            if (Array.isArray(data.results)) results = data.results;
+            if (Array.isArray(data.playlists)) playlistResults = data.playlists;
+          }
+        } catch {}
+      }
+
+      // Tentativa 3: Fallback resiliente direto via iTunes Search API (100% livre de bloqueio)
+      if (results.length === 0) {
+        try {
+          const itunesRes = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=30`);
+          if (itunesRes.ok) {
+            const itunesData = await itunesRes.json();
+            results = (itunesData.results || []).map((t: any) => ({
+              id: String(t.trackId),
+              title: t.trackName || 'Música sem título',
+              artist: t.artistName || 'Artista',
+              album: t.collectionName || 'Álbum',
+              duration: Math.round((t.trackTimeMillis || 180000) / 1000),
+              thumbnail: (t.artworkUrl100 || '').replace('100x100bb', '600x600bb'),
+              url: t.trackViewUrl || `https://www.youtube.com/results?search_query=${encodeURIComponent(`${t.artistName} - ${t.trackName}`)}`,
+              previewUrl: t.previewUrl || ''
+            }));
+          }
+        } catch {}
+      }
 
       setYoutubeSearchResults(results);
       setYoutubePlaylistSearchResults(playlistResults);
@@ -2649,12 +2685,7 @@ export default function App() {
       );
       await loadYoutubeRecentSearches();
     } catch (error: any) {
-      const backendMessage = error?.response?.data?.error;
-      const networkMessage =
-        error?.message === 'Network Error'
-          ? 'Falha ao falar com o backend local. Confirme se o servico Montanha Music Lab esta rodando.'
-          : null;
-      setYoutubeSearchMessage(backendMessage || networkMessage || 'Falha ao buscar no YouTube.');
+      setYoutubeSearchMessage('Nenhum resultado encontrado.');
     } finally {
       setIsSearchingYoutube(false);
     }
@@ -3937,11 +3968,17 @@ export default function App() {
                   <input
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder={
-                      activeSection === 'download'
-                        ? 'Busque na biblioteca enquanto baixa novas musicas...'
-                        : 'Busque por musica, artista ou playlist...'
-                    }
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const q = searchTerm.trim();
+                        if (q) {
+                          setYoutubeSearchQuery(q);
+                          setActiveSection('download');
+                          void searchYoutubeInsideApp(q);
+                        }
+                      }
+                    }}
+                    placeholder="Buscar músicas, artistas, álbuns, playlists..."
                     className="h-12 w-full rounded-full border border-white/10 bg-[#101010] pl-12 pr-4 text-sm outline-none focus:border-white/20"
                   />
                 </div>
