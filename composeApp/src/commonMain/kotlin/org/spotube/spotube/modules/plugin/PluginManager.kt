@@ -213,19 +213,20 @@ class PluginManager(
                     val resolvedPlugins = (plugins union BUILT_IN_PLUGINS).toList()
                     val resolvedPluginsById = resolvedPlugins.associateBy { it.id }
                     val mergedSelected = defaultSelectedPlugins + res.selectedPlugins
-                    val selectedPlugins = mergedSelected
+                    val selectedPlugins: MutableMap<PluginAbility, PluginEntry> = mergedSelected
                         .mapNotNull { (ability, selected) ->
                             val plugin = resolvedPluginsById[selected.id]
                                 ?: resolveBuiltInPlugin(selected)
                                 ?: return@mapNotNull null
                             if (ability in plugin.abilities) ability to plugin else null
                         }
+                        .toMap()
                         .toMutableMap()
 
-                    if (PluginAbility.AUDIO !in selectedPlugins) {
+                    if (!selectedPlugins.containsKey(PluginAbility.AUDIO)) {
                         selectedPlugins[PluginAbility.AUDIO] = NEWPIPE_YOUTUBE_BUILT_IN_PLUGIN
                     }
-                    if (PluginAbility.LYRICS !in selectedPlugins) {
+                    if (!selectedPlugins.containsKey(PluginAbility.LYRICS)) {
                         selectedPlugins[PluginAbility.LYRICS] = LRCLIB_BUILT_IN_PLUGIN
                     }
 
