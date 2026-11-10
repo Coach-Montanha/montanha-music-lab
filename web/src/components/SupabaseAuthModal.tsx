@@ -46,15 +46,19 @@ export const SupabaseAuthModal: React.FC<SupabaseAuthModalProps> = ({
   if (!isOpen) return null;
 
   // Normalização universal: se não contém '@', transforma em email canônico do Supabase
+  // Normalização universal: mapeia para identificador seguro no Supabase (@montanha.com)
   const formatEmailFromLogin = (input: string): string => {
     const cleaned = input.trim().toLowerCase();
     if (cleaned.includes('@')) return cleaned;
     const sanitized = cleaned.replace(/[^a-z0-9._-]/g, '');
-    return `${sanitized || 'usuario'}@montanhamusiclab.app`;
+    return `${sanitized || 'usuario'}@montanha.com`;
   };
 
   const getCleanLoginName = (emailString?: string | null): string => {
     if (!emailString) return 'Usuário';
+    if (emailString.endsWith('@montanha.com')) {
+      return emailString.replace('@montanha.com', '');
+    }
     if (emailString.endsWith('@montanhamusiclab.app')) {
       return emailString.replace('@montanhamusiclab.app', '');
     }
@@ -85,31 +89,64 @@ export const SupabaseAuthModal: React.FC<SupabaseAuthModalProps> = ({
           if (error.message.includes('Invalid login credentials')) {
             throw new Error('Login ou senha incorretos. Verifique suas credenciais.');
           }
+          if (error.message.includes('Email not confirmed')) {
+            throw new Error('Acesso pendente de liberação. Fale com o Coach Montanha.');
+          }
           throw error;
         }
         onUserChange(data.user);
-        setSuccessMessage('Conectado com sucesso! Sincronizando playlists...');
-        setTimeout(() => onClose(), 800);
+        setSuccessMessage('Conectado com sucesso! Sincronizando biblioteca...');
+        setTimeout(() => onClose(), 600);
       } else {
         const displayName = name.trim() || usernameInput.trim() || 'Usuário Montanha';
-        const { data, error } = await supabase.auth.signUp({
-          email: canonicalEmail,
-          password,
-          options: {
-            data: {
-              name: displayName,
-              username: usernameInput.trim().toLowerCase()
-            }
+        
+        // Chamada ao backend para criar com email auto-confirmado instantaneamente
+        try {
+          const apiRes = await fetch('/api/signup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              login: usernameInput.trim().toLowerCase(),
+              password,
+              name: displayName
+            })
+          });
+          const apiJson = await apiRes.json();
+          if (!apiRes.ok) {
+            throw new Error(apiJson.error || 'Erro ao registrar usuário.');
           }
+        } catch (apiErr: any) {
+          if (apiErr.message && apiErr.message.includes('em uso')) {
+            throw apiErr;
+          }
+          // Fallback para registro direto no Supabase
+          const { error: signUpError } = await supabase.auth.signUp({
+            email: canonicalEmail,
+            password,
+            options: {
+              data: {
+                name: displayName,
+                username: usernameInput.trim().toLowerCase()
+              }
+            }
+          });
+          if (signUpError && !signUpError.message.includes('already registered')) {
+            throw signUpError;
+          }
+        }
+
+        // Login automático imediato pós-cadastro
+        const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+          email: canonicalEmail,
+          password
         });
-        if (error) throw error;
-        if (data.user) {
-          onUserChange(data.user);
-          setSuccessMessage('Conta criada com sucesso! Sincronização em nuvem ativa.');
-          setTimeout(() => onClose(), 1000);
+        if (loginError) {
+          setSuccessMessage('Conta cadastrada com sucesso! Clique na aba "Entrar".');
+          setMode('login');
         } else {
-          setSuccessMessage('Conta cadastrada com sucesso!');
-          setTimeout(() => onClose(), 1000);
+          onUserChange(loginData.user);
+          setSuccessMessage('Conta criada com sucesso! Sincronização em nuvem ativa.');
+          setTimeout(() => onClose(), 600);
         }
       }
     } catch (err: any) {
