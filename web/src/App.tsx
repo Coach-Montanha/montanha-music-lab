@@ -825,7 +825,14 @@ export default function App() {
   );
   const [isDesktopOnboardingOpen, setIsDesktopOnboardingOpen] = useState(false);
   const [desktopOnboardingStepIndex, setDesktopOnboardingStepIndex] = useState(0);
-  const [supabaseUser, setSupabaseUser] = useState<SupabaseUser | null>(null);
+  const [supabaseUser, setSupabaseUser] = useState<SupabaseUser | null>(() => {
+    try {
+      const saved = localStorage.getItem('montanha_local_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
   const [isAuthInitialized, setIsAuthInitialized] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [sidebarLibraryExpanded, setSidebarLibraryExpanded] = useState(true);
@@ -1295,14 +1302,25 @@ export default function App() {
   // Supabase Auth and Realtime sync
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSupabaseUser(session?.user || null);
+      if (session?.user) {
+        setSupabaseUser(session.user);
+        try { localStorage.setItem('montanha_local_user', JSON.stringify(session.user)); } catch {}
+      } else {
+        const saved = localStorage.getItem('montanha_local_user');
+        if (saved) {
+          try { setSupabaseUser(JSON.parse(saved)); } catch {}
+        }
+      }
       setIsAuthInitialized(true);
     }).catch(() => {
       setIsAuthInitialized(true);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSupabaseUser(session?.user || null);
+      if (session?.user) {
+        setSupabaseUser(session.user);
+        try { localStorage.setItem('montanha_local_user', JSON.stringify(session.user)); } catch {}
+      }
       setIsAuthInitialized(true);
     });
 
@@ -2726,6 +2744,7 @@ export default function App() {
       };
 
       const [itunesTracks, apiData] = await Promise.all([fetchItunes(), fetchApi()]);
+      console.log('[SearchDebug] query:', query, 'itunesTracks:', itunesTracks.length, 'apiResults:', apiData.results.length);
 
       if (apiData.results.length > 0) {
         results = apiData.results;
@@ -6491,7 +6510,12 @@ export default function App() {
         currentUser={supabaseUser}
         onUserChange={(user) => {
           setSupabaseUser(user);
-          if (user) setIsAuthModalOpen(false);
+          if (user) {
+            try { localStorage.setItem('montanha_local_user', JSON.stringify(user)); } catch {}
+            setIsAuthModalOpen(false);
+          } else {
+            try { localStorage.removeItem('montanha_local_user'); } catch {}
+          }
         }}
       />
       {isDesktopOnboardingOpen && activeDesktopOnboardingStep ? (
