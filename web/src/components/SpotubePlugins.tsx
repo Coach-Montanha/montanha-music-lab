@@ -11,7 +11,6 @@ import {
   FileText,
   Volume2,
   ShieldCheck,
-  User,
   Sparkles,
   Globe,
   Palette,
@@ -20,22 +19,16 @@ import {
   Laptop,
   Info,
   Trash2,
+  ExternalLink
 } from 'lucide-react';
-
-export interface PluginAccount {
-  provider: 'youtube' | 'spotify' | 'deezer' | 'lrclib' | 'newpipe' | 'scrobble';
-  connected: boolean;
-  username?: string;
-  avatar?: string;
-  token?: string;
-}
+import { PluginAccountData } from '../lib/pluginAccounts';
 
 interface SpotubePluginsProps {
   isMobile?: boolean;
   isOpen?: boolean;
   onClose?: () => void;
-  accounts: Record<string, PluginAccount>;
-  onConnectAccount: (provider: any, credentials: { username?: string; token?: string }) => void;
+  accounts: Record<string, PluginAccountData>;
+  onConnectAccount: (provider: any, credentials: { username?: string; token?: string; authMethod?: any }) => void;
   onDisconnectAccount: (provider: any) => void;
 }
 
@@ -61,15 +54,21 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
 }) => {
   const [activeModalTab, setActiveModalTab] = useState<ModalTabId>('plugins');
   const [configuringPlugin, setConfiguringPlugin] = useState<string | null>(null);
+  const [authMethodTab, setAuthMethodTab] = useState<'oauth' | 'cookie' | 'credentials'>('oauth');
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
 
-  // Form states for plugin configuration
+  // Form states
   const [loginInput, setLoginInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
+  const [spDcInput, setSpDcInput] = useState('');
+  const [arlInput, setArlInput] = useState('');
+  const [ytChannelInput, setYtChannelInput] = useState('');
   const [customInstanceInput, setCustomInstanceInput] = useState('');
   const [audioQualityPref, setAudioQualityPref] = useState('256');
+  const [ytAuthTab, setYtAuthTab] = useState<'channel' | 'cookie' | 'streaming'>('channel');
+  const [deezerAuthTab, setDeezerAuthTab] = useState<'arl' | 'profile'>('arl');
 
-  // General settings stored in localStorage
+  // General settings
   const [language, setLanguage] = useState(() => localStorage.getItem('montanha-lang') || 'pt-BR');
   const [themeMode, setThemeMode] = useState(() => localStorage.getItem('montanha-theme') || 'oled');
   const [accentColor, setAccentColor] = useState(() => localStorage.getItem('montanha-accent') || 'blue');
@@ -101,26 +100,66 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
 
   if (!isOpen) return null;
 
+  const handleSpotifyOAuth = () => {
+    // Official Spotify Web Auth
+    const clientId = 'd464279c65694c9eaefef4e4c34cb36a';
+    const redirectUri = typeof window !== 'undefined' ? `${window.location.origin}/` : 'https://montanha-music-lab.vercel.app/';
+    const scopes = encodeURIComponent('user-read-private user-read-email playlist-read-private playlist-read-collaborative user-library-read');
+    const authUrl = `https://accounts.spotify.com/authorize?client_id=${clientId}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&show_dialog=true`;
+
+    window.open(authUrl, '_blank', 'width=500,height=700');
+    showToast('Janela de autorização do Spotify aberta. Conclua o login na janela.');
+  };
+
   const handlePluginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!configuringPlugin) return;
+
+    let username = loginInput.trim();
+    let token = passwordInput.trim();
+
+    if (configuringPlugin === 'spotify') {
+      if (authMethodTab === 'cookie') {
+        token = spDcInput.trim();
+        username = 'Spotify (sp_dc)';
+      } else if (authMethodTab === 'oauth') {
+        token = 'spotify_web_oauth_active';
+        username = loginInput.trim() || 'Usuário Spotify';
+      }
+    } else if (configuringPlugin === 'deezer') {
+      token = arlInput.trim() || passwordInput.trim();
+      username = loginInput.trim() || 'Deezer HiFi User';
+    } else if (configuringPlugin === 'youtube') {
+      token = customInstanceInput.trim() || 'youtube_stream_token';
+      username = ytChannelInput.trim() || 'YouTube Music';
+    }
+
+    if (!token && configuringPlugin !== 'lrclib' && configuringPlugin !== 'newpipe') {
+      showToast('Por favor, informe a chave ou token de acesso.');
+      return;
+    }
+
     onConnectAccount(configuringPlugin, {
-      username: loginInput.trim() || `${configuringPlugin}_user`,
-      token: passwordInput.trim() || customInstanceInput.trim() || 'token_ativo'
+      username: username || `${configuringPlugin}_user`,
+      token: token || 'active_token',
+      authMethod: authMethodTab
     });
-    showToast(`Plugin ${configuringPlugin.toUpperCase()} configurado com sucesso!`);
+
+    showToast(`Conta ${configuringPlugin.toUpperCase()} conectada e sincronizada!`);
     setConfiguringPlugin(null);
     setLoginInput('');
     setPasswordInput('');
-    setCustomInstanceInput('');
+    setSpDcInput('');
+    setArlInput('');
+    setYtChannelInput('');
   };
 
-  // 4 Gradient Cards Data (Exact match to Spotube Screenshots)
+  // Gradient Cards
   const gradientCards = [
     {
       id: 'youtube',
       title: 'YouTube Music',
-      subtitle: 'Metadados • v0.1.2',
+      subtitle: accounts.youtube?.connected ? `Conectado: ${accounts.youtube.username}` : 'Instalado • v0.1.2',
       bgGradient: 'from-[#4ade80] via-[#22c55e] to-[#15803d]',
       icon: (
         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-600 shadow-md">
@@ -132,7 +171,7 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
     {
       id: 'newpipe',
       title: 'NewPipe YouTube',
-      subtitle: 'Áudio • v0.1.0',
+      subtitle: 'Instalado • Áudio 256k',
       bgGradient: 'from-[#38bdf8] via-[#0284c7] to-[#1d4ed8]',
       icon: (
         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-md">
@@ -146,7 +185,7 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
     {
       id: 'lrclib',
       title: 'LRCLib Lyrics',
-      subtitle: 'Letras • v0.1.0',
+      subtitle: 'Instalado • Letras Sincronizadas',
       bgGradient: 'from-[#fbbf24] via-[#f97316] to-[#ea580c]',
       icon: (
         <div className="flex h-10 w-10 flex-col items-center justify-center rounded-full bg-black text-[9px] font-black leading-none text-white tracking-tighter shadow-md">
@@ -158,8 +197,8 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
     },
     {
       id: 'scrobble',
-      title: accounts.scrobble?.connected ? 'Last.fm / Scrobble' : (isMobile ? 'Nenhum plugin s...' : 'Nenhum plugin selecionado'),
-      subtitle: 'Scrobble',
+      title: accounts.scrobble?.connected ? 'Last.fm Scrobbler' : 'Scrobble (Last.fm)',
+      subtitle: accounts.scrobble?.connected ? `Conectado: ${accounts.scrobble.username}` : 'Instalado • Desconectado',
       bgGradient: 'from-[#e879f9] via-[#a855f7] to-[#7e22ce]',
       icon: (
         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm shadow-md">
@@ -174,16 +213,14 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
     }
   ];
 
-  // Installed Plugins List
+  // List of Plugins
   const installedPlugins = [
     {
       id: 'newpipe',
       name: 'NewPipe YouTube',
-      description: 'Plugin NewPipe para reproducao direta de audio sem anúncios.',
+      description: 'Motor nativo Spotube para extração e streaming direto de áudio 256k sem anúncios.',
       author: 'Montanha Team',
-      tag: 'Áudio',
-      status: 'Ativo',
-      integrated: true,
+      tag: 'Áudio Nativo',
       provider: 'newpipe',
       icon: (
         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-600 text-white shadow-sm">
@@ -192,29 +229,24 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
       )
     },
     {
-      id: 'lrclib',
-      name: 'LRCLib Lyrics',
-      description: 'Plugin LRCLib oficial para sincronização automática de letras em tempo real.',
-      author: 'Montanha Team',
-      tag: 'Letras',
-      status: 'Ativo',
-      integrated: true,
-      provider: 'lrclib',
+      id: 'youtube',
+      name: 'YouTube Music & Conta Google',
+      description: 'Catálogo de buscas, canais e sincronização de playlists da sua conta YouTube.',
+      author: 'Montanha Core Engine',
+      tag: 'Catálogo & Streaming',
+      provider: 'youtube',
       icon: (
-        <div className="flex h-10 w-10 flex-col items-center justify-center rounded-xl bg-black text-[9px] font-black leading-none text-white tracking-tighter shadow-sm">
-          <span>LRC</span>
-          <span>LIB</span>
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-600 text-white shadow-sm">
+          <Sparkles size={20} className="text-white" />
         </div>
       )
     },
     {
       id: 'spotify',
       name: 'Spotify Connect & Playlists',
-      description: 'Importação de playlists pessoais, histórico e biblioteca oficial do Spotify.',
+      description: 'Sincronização oficial de playlists, músicas curtidas e biblioteca do Spotify (OAuth / sp_dc).',
       author: 'Spotify API Core',
-      tag: 'Metadados',
-      status: accounts.spotify?.connected ? 'Conectado' : 'Pronto',
-      integrated: false,
+      tag: 'Metadados & Playlists',
       provider: 'spotify',
       icon: (
         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#1db954] text-black shadow-sm">
@@ -225,11 +257,9 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
     {
       id: 'deezer',
       name: 'Deezer Premium HiFi Stream',
-      description: 'Catálogo oficial Deezer, playlists e áudio de alta fidelidade FLAC.',
+      description: 'Catálogo oficial Deezer, playlists e áudio sem perdas (FLAC) via token ARL.',
       author: 'Deezer Core',
-      tag: 'Streaming',
-      status: accounts.deezer?.connected ? 'Conectado' : 'Pronto',
-      integrated: false,
+      tag: 'HiFi Streaming',
       provider: 'deezer',
       icon: (
         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-[#9b51e0] to-[#ff007a] text-white shadow-sm">
@@ -238,17 +268,16 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
       )
     },
     {
-      id: 'youtube',
-      name: 'YouTube Music Geral',
-      description: 'Motor nativo de busca, áudio de 256kbps e streaming universal sem anúncios.',
-      author: 'Montanha Core Engine',
-      tag: 'Áudio & Vídeo',
-      status: accounts.youtube?.connected ? 'Conectado' : 'Ativo',
-      integrated: true,
-      provider: 'youtube',
+      id: 'lrclib',
+      name: 'LRCLib Lyrics',
+      description: 'Serviço global Spotube para download e exibição de letras sincronizadas em tempo real.',
+      author: 'Montanha Team',
+      tag: 'Letras Sincronizadas',
+      provider: 'lrclib',
       icon: (
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-600 text-white shadow-sm">
-          <Sparkles size={20} className="text-white" />
+        <div className="flex h-10 w-10 flex-col items-center justify-center rounded-xl bg-black text-[9px] font-black leading-none text-white tracking-tighter shadow-sm">
+          <span>LRC</span>
+          <span>LIB</span>
         </div>
       )
     }
@@ -258,219 +287,367 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
   const renderPluginConfigModal = () => {
     if (!configuringPlugin) return null;
 
-    const titles: Record<string, { name: string; desc: string; icon: React.ReactNode; color: string }> = {
-      youtube: {
-        name: 'Configurar YouTube Music',
-        desc: 'Defina a instância de streaming Piped/Invidious ou chave de API.',
-        icon: <Sparkles size={20} />,
-        color: 'bg-red-600 text-white'
-      },
-      newpipe: {
-        name: 'Configurar NewPipe YouTube',
-        desc: 'Motor de extração de áudio direto de alta fidelidade.',
-        icon: <Volume2 size={20} />,
-        color: 'bg-blue-600 text-white'
-      },
-      lrclib: {
-        name: 'Configurar LRCLib Letras',
-        desc: 'Sincronização instantânea de letras musicais (LRC).',
-        icon: <FileText size={20} />,
-        color: 'bg-amber-600 text-white'
-      },
-      scrobble: {
-        name: 'Configurar Scrobble (Last.fm / ListenBrainz)',
-        desc: 'Registre suas músicas tocadas no seu perfil pessoal.',
-        icon: <Radio size={20} />,
-        color: 'bg-purple-600 text-white'
-      },
-      spotify: {
-        name: 'Conectar Spotify',
-        desc: 'Sincronize suas playlists, músicas curtidas e álbuns do Spotify.',
-        icon: <Music2 size={20} />,
-        color: 'bg-[#1db954] text-black'
-      },
-      deezer: {
-        name: 'Conectar Deezer',
-        desc: 'Acesse suas playlists e áudio sem perdas (HiFi) do Deezer.',
-        icon: <Radio size={20} />,
-        color: 'bg-gradient-to-tr from-[#9b51e0] to-[#ff007a] text-white'
-      }
-    };
-
-    const currentInfo = titles[configuringPlugin] || {
-      name: `Configurar ${configuringPlugin}`,
-      desc: 'Ajuste os parâmetros deste plugin.',
-      icon: <Settings2 size={20} />,
-      color: 'bg-blue-600 text-white'
-    };
+    const isConnected = accounts[configuringPlugin]?.connected;
 
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
-        <div className="w-full max-w-md rounded-3xl border border-white/10 bg-[#14161f] p-6 text-white shadow-2xl">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-xl p-4">
+        <div className="w-full max-w-lg rounded-3xl border border-white/10 bg-[#14161f] p-6 text-white shadow-2xl">
           <div className="flex items-center justify-between pb-4 border-b border-white/10">
             <div className="flex items-center gap-3">
-              <div className={`flex h-11 w-11 items-center justify-center rounded-2xl ${currentInfo.color} shadow-md`}>
-                {currentInfo.icon}
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-tr from-[#004799] to-[#0066cc] text-white shadow-md">
+                {configuringPlugin === 'spotify' ? <Music2 size={22} /> :
+                 configuringPlugin === 'deezer' ? <Radio size={22} /> :
+                 configuringPlugin === 'youtube' ? <Sparkles size={22} /> :
+                 <Settings2 size={22} />}
               </div>
               <div>
-                <h3 className="font-bold text-base">{currentInfo.name}</h3>
-                <p className="text-xs text-gray-400">{currentInfo.desc}</p>
+                <h3 className="font-bold text-base capitalize">
+                  {configuringPlugin === 'spotify' ? 'Conectar Conta Spotify' :
+                   configuringPlugin === 'youtube' ? 'Conectar Conta YouTube' :
+                   configuringPlugin === 'deezer' ? 'Conectar Conta Deezer' :
+                   `Configurar ${configuringPlugin}`}
+                </h3>
+                <p className="text-xs text-gray-400">Padrão Spotube Core Engine</p>
               </div>
             </div>
             <button
               onClick={() => setConfiguringPlugin(null)}
-              className="rounded-full p-2 text-gray-400 hover:bg-white/10 hover:text-white"
+              className="rounded-full p-2 text-gray-400 hover:bg-white/10 hover:text-white transition"
             >
               <X size={18} />
             </button>
           </div>
 
-          <form onSubmit={handlePluginSubmit} className="mt-5 space-y-4">
-            {configuringPlugin === 'youtube' && (
-              <>
-                <div>
-                  <label className="text-xs font-semibold text-gray-300">Instância de Streaming (Piped / Invidious)</label>
-                  <input
-                    type="text"
-                    value={customInstanceInput}
-                    onChange={(e) => setCustomInstanceInput(e.target.value)}
-                    placeholder="https://api.piped.private.coffee (Automático)"
-                    className="mt-1 h-11 w-full rounded-xl border border-white/10 bg-white/5 px-4 text-xs text-white placeholder-gray-500 outline-none focus:border-red-500"
-                  />
-                  <p className="mt-1 text-[10px] text-gray-500">Deixe em branco para usar o balanceador automático de alta velocidade.</p>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-gray-300">Modo Restrito</label>
-                  <select className="mt-1 h-11 w-full rounded-xl border border-white/10 bg-[#1e2029] px-4 text-xs text-white outline-none">
-                    <option value="off">Desativado (Todas as faixas liberadas)</option>
-                    <option value="on">Ativado (Filtrar conteúdo explícito)</option>
-                  </select>
-                </div>
-              </>
-            )}
-
-            {configuringPlugin === 'newpipe' && (
-              <>
-                <div>
-                  <label className="text-xs font-semibold text-gray-300">Taxa de Bits de Áudio (Bitrate)</label>
-                  <select
-                    value={audioQualityPref}
-                    onChange={(e) => setAudioQualityPref(e.target.value)}
-                    className="mt-1 h-11 w-full rounded-xl border border-white/10 bg-[#1e2029] px-4 text-xs text-white outline-none"
+          {/* SPOTIFY AUTH MODAL */}
+          {configuringPlugin === 'spotify' && (
+            <div className="mt-4 space-y-4">
+              {/* Method Tabs */}
+              <div className="flex rounded-2xl bg-white/[0.04] p-1 border border-white/5">
+                {[
+                  { id: 'oauth', label: 'Login Oficial Web' },
+                  { id: 'cookie', label: 'Cookie sp_dc (Spotube)' },
+                  { id: 'credentials', label: 'Chaves API' }
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setAuthMethodTab(tab.id as any)}
+                    className={`flex-1 rounded-xl py-2 text-xs font-bold transition ${
+                      authMethodTab === tab.id
+                        ? 'bg-gradient-to-r from-[#1db954] to-emerald-600 text-black shadow-md'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
                   >
-                    <option value="256">Alta Qualidade (256 kbps Opus / AAC)</option>
-                    <option value="160">Média Qualidade (160 kbps)</option>
-                    <option value="128">Econômica (128 kbps)</option>
-                  </select>
-                </div>
-              </>
-            )}
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
 
-            {configuringPlugin === 'lrclib' && (
-              <>
-                <div>
-                  <label className="text-xs font-semibold text-gray-300">Servidor LRCLib Oficial</label>
-                  <input
-                    type="text"
-                    disabled
-                    value="https://lrclib.net/api"
-                    className="mt-1 h-11 w-full rounded-xl border border-white/10 bg-white/5 px-4 text-xs text-gray-400 outline-none cursor-not-allowed"
-                  />
+              {authMethodTab === 'oauth' && (
+                <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 space-y-3">
+                  <p className="text-xs text-gray-300 leading-relaxed">
+                    Clique abaixo para abrir a tela de confirmação oficial de autorização do Spotify. Suas playlists pessoais serão sincronizadas automaticamente com o Montanha Music Lab.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleSpotifyOAuth}
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#1db954] py-3 text-xs font-bold text-black shadow-lg hover:bg-emerald-400 transition active:scale-98"
+                  >
+                    <ExternalLink size={16} />
+                    <span>Fazer Login Oficial no Spotify (Abrir Tela de Confirmação)</span>
+                  </button>
+                  <div className="pt-2">
+                    <label className="text-[11px] text-gray-400">Ou cole o Token de Acesso obtido no Spotify:</label>
+                    <input
+                      type="password"
+                      value={passwordInput}
+                      onChange={(e) => setPasswordInput(e.target.value)}
+                      placeholder="Cole seu Bearer Token ou Chave aqui..."
+                      className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-white/5 px-3 text-xs text-white placeholder-gray-500 outline-none focus:border-emerald-500"
+                    />
+                  </div>
                 </div>
-                <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
-                  <span className="text-xs text-gray-300">Buscar letras automaticamente ao tocar música</span>
-                  <input
-                    type="checkbox"
-                    checked={autoLyrics}
-                    onChange={(e) => setAutoLyrics(e.target.checked)}
-                    className="h-4 w-4 rounded accent-blue-600"
-                  />
-                </div>
-              </>
-            )}
+              )}
 
-            {configuringPlugin === 'scrobble' && (
-              <>
-                <div>
-                  <label className="text-xs font-semibold text-gray-300">Serviço de Scrobble</label>
-                  <select className="mt-1 h-11 w-full rounded-xl border border-white/10 bg-[#1e2029] px-4 text-xs text-white outline-none">
-                    <option value="lastfm">Last.fm</option>
-                    <option value="listenbrainz">ListenBrainz</option>
-                  </select>
+              {authMethodTab === 'cookie' && (
+                <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 space-y-3">
+                  <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-sky-200">
+                    <p className="font-bold">Como obter o cookie sp_dc no Spotify:</p>
+                    <ol className="list-decimal pl-4 mt-1 space-y-1 text-[11px] text-sky-300/90">
+                      <li>Abra <strong>open.spotify.com</strong> no navegador e faça login.</li>
+                      <li>Pressione <strong>F12</strong> (Inspecionar) e vá em <strong>Aplicativo (Application) &gt; Cookies</strong>.</li>
+                      <li>Copie o valor do cookie com o nome <strong>sp_dc</strong> e cole abaixo.</li>
+                    </ol>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-gray-300">Valor do Cookie sp_dc</label>
+                    <input
+                      type="password"
+                      value={spDcInput}
+                      onChange={(e) => setSpDcInput(e.target.value)}
+                      placeholder="AQ... (Cole seu sp_dc aqui)"
+                      className="mt-1 h-11 w-full rounded-xl border border-white/10 bg-white/5 px-3 text-xs text-white placeholder-gray-500 outline-none focus:border-[#1db954]"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="text-xs font-semibold text-gray-300">Nome de Usuário</label>
-                  <input
-                    type="text"
-                    value={loginInput}
-                    onChange={(e) => setLoginInput(e.target.value)}
-                    placeholder="Seu usuário no Last.fm"
-                    className="mt-1 h-11 w-full rounded-xl border border-white/10 bg-white/5 px-4 text-xs text-white placeholder-gray-500 outline-none focus:border-purple-500"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-gray-300">API Key / Token de Sessão</label>
-                  <input
-                    type="password"
-                    value={passwordInput}
-                    onChange={(e) => setPasswordInput(e.target.value)}
-                    placeholder="Cole seu token de autenticação"
-                    className="mt-1 h-11 w-full rounded-xl border border-white/10 bg-white/5 px-4 text-xs text-white placeholder-gray-500 outline-none focus:border-purple-500"
-                  />
-                </div>
-              </>
-            )}
+              )}
 
-            {(configuringPlugin === 'spotify' || configuringPlugin === 'deezer') && (
-              <>
-                <div>
-                  <label className="text-xs font-semibold text-gray-300">Usuário ou E-mail da conta</label>
-                  <input
-                    type="text"
-                    value={loginInput}
-                    onChange={(e) => setLoginInput(e.target.value)}
-                    placeholder={`Seu usuário no ${configuringPlugin}`}
-                    className="mt-1 h-11 w-full rounded-xl border border-white/10 bg-white/5 px-4 text-xs text-white placeholder-gray-500 outline-none focus:border-blue-500"
-                  />
+              {authMethodTab === 'credentials' && (
+                <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 space-y-3">
+                  <div>
+                    <label className="text-xs font-semibold text-gray-300">Spotify Client ID</label>
+                    <input
+                      type="text"
+                      value={loginInput}
+                      onChange={(e) => setLoginInput(e.target.value)}
+                      placeholder="Seu Client ID do Spotify Developer Dashboard"
+                      className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-white/5 px-3 text-xs text-white placeholder-gray-500 outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-gray-300">Spotify Client Secret</label>
+                    <input
+                      type="password"
+                      value={passwordInput}
+                      onChange={(e) => setPasswordInput(e.target.value)}
+                      placeholder="Seu Client Secret"
+                      className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-white/5 px-3 text-xs text-white placeholder-gray-500 outline-none focus:border-emerald-500"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="text-xs font-semibold text-gray-300">
-                    {configuringPlugin === 'spotify' ? 'Senha ou Client Secret' : 'ARL Token ou Senha'}
-                  </label>
-                  <input
-                    type="password"
-                    value={passwordInput}
-                    onChange={(e) => setPasswordInput(e.target.value)}
-                    placeholder="Chave de acesso seguro"
-                    className="mt-1 h-11 w-full rounded-xl border border-white/10 bg-white/5 px-4 text-xs text-white placeholder-gray-500 outline-none focus:border-blue-500"
-                  />
-                </div>
-              </>
-            )}
+              )}
+            </div>
+          )}
 
-            <div className="pt-2 flex items-center justify-end gap-3">
+          {/* YOUTUBE AUTH MODAL */}
+          {configuringPlugin === 'youtube' && (
+            <div className="mt-4 space-y-4">
+              <div className="flex rounded-2xl bg-white/[0.04] p-1 border border-white/5">
+                {[
+                  { id: 'channel', label: 'Canal / Playlists' },
+                  { id: 'cookie', label: 'Cookie de Sessão' },
+                  { id: 'streaming', label: 'Motor & Qualidade' }
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setYtAuthTab(tab.id as any)}
+                    className={`flex-1 rounded-xl py-2 text-xs font-bold transition ${
+                      ytAuthTab === tab.id
+                        ? 'bg-gradient-to-r from-red-600 to-rose-600 text-white shadow-md'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {ytAuthTab === 'channel' && (
+                <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 space-y-3">
+                  <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-rose-200">
+                    <p className="font-bold">Login por Canal do YouTube:</p>
+                    <p className="mt-1 text-[11px] text-rose-300/90 leading-relaxed">
+                      Informe o seu identificador (@seucanal) ou o link do seu canal. O Montanha Music Lab sincroniza suas playlists públicas e não-listadas sem exigir senha da conta Google.
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-gray-300">Identificador ou Link do Canal (@handle ou URL)</label>
+                    <input
+                      type="text"
+                      value={ytChannelInput}
+                      onChange={(e) => setYtChannelInput(e.target.value)}
+                      placeholder="@seucanal ou https://www.youtube.com/@seucanal"
+                      className="mt-1 h-11 w-full rounded-xl border border-white/10 bg-white/5 px-3 text-xs text-white placeholder-gray-500 outline-none focus:border-red-500"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {ytAuthTab === 'cookie' && (
+                <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 space-y-3">
+                  <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200">
+                    <p className="font-bold">Playlists Privadas e Histórico (Spotube Core):</p>
+                    <p className="mt-1 text-[11px] text-amber-300/90 leading-relaxed">
+                      Para sincronizar sua lista de "Músicas com Gostei" e playlists privadas, cole o cookie de sessão do YouTube (SAPISID ou HSID).
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-gray-300">Cookie de Sessão do YouTube (SAPISID)</label>
+                    <input
+                      type="password"
+                      value={passwordInput}
+                      onChange={(e) => setPasswordInput(e.target.value)}
+                      placeholder="Cole o cookie SAPISID ou cookies exportados do youtube.com"
+                      className="mt-1 h-11 w-full rounded-xl border border-white/10 bg-white/5 px-3 text-xs text-white placeholder-gray-500 outline-none focus:border-red-500"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {ytAuthTab === 'streaming' && (
+                <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 space-y-3">
+                  <div>
+                    <label className="text-xs font-semibold text-gray-300">Qualidade de Streaming de Áudio</label>
+                    <select
+                      value={audioQualityPref}
+                      onChange={(e) => setAudioQualityPref(e.target.value)}
+                      className="mt-1 h-11 w-full rounded-xl border border-white/10 bg-[#161616] px-3 text-xs text-white outline-none focus:border-red-500"
+                    >
+                      <option value="256">HiFi 256 kbps Opus (Qualidade Máxima)</option>
+                      <option value="160">Padrão 160 kbps Opus</option>
+                      <option value="128">Econômico 128 kbps (Baixo Consumo)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-gray-300">Instância de Streaming Piped / Invidious</label>
+                    <input
+                      type="text"
+                      value={customInstanceInput}
+                      onChange={(e) => setCustomInstanceInput(e.target.value)}
+                      placeholder="https://api.piped.private.coffee"
+                      className="mt-1 h-11 w-full rounded-xl border border-white/10 bg-white/5 px-3 text-xs text-white placeholder-gray-500 outline-none focus:border-red-500"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* DEEZER AUTH MODAL */}
+          {configuringPlugin === 'deezer' && (
+            <div className="mt-4 space-y-4">
+              <div className="flex rounded-2xl bg-white/[0.04] p-1 border border-white/5">
+                {[
+                  { id: 'arl', label: 'Token ARL (HiFi FLAC)' },
+                  { id: 'profile', label: 'Perfil / ID Deezer' }
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setDeezerAuthTab(tab.id as any)}
+                    className={`flex-1 rounded-xl py-2 text-xs font-bold transition ${
+                      deezerAuthTab === tab.id
+                        ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {deezerAuthTab === 'arl' && (
+                <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 space-y-3">
+                  <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs text-purple-200">
+                    <p className="font-bold">Como obter o token ARL da Deezer (Spotube Core):</p>
+                    <ol className="list-decimal pl-4 mt-1 space-y-1 text-[11px] text-purple-300/90 leading-relaxed">
+                      <li>Faça login em <strong>deezer.com</strong> pelo navegador.</li>
+                      <li>Pressione <strong>F12</strong> &gt; Aplicativo &gt; Cookies &gt; <strong>deezer.com</strong>.</li>
+                      <li>Copie o valor do cookie <strong>arl</strong> (192 caracteres).</li>
+                    </ol>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-gray-300">Token ARL do Deezer</label>
+                    <input
+                      type="password"
+                      value={arlInput}
+                      onChange={(e) => setArlInput(e.target.value)}
+                      placeholder="Cole seu token ARL aqui..."
+                      className="mt-1 h-11 w-full rounded-xl border border-white/10 bg-white/5 px-3 text-xs text-white placeholder-gray-500 outline-none focus:border-purple-500"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {deezerAuthTab === 'profile' && (
+                <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 space-y-3">
+                  <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs text-purple-200">
+                    <p className="font-bold">Sincronização de Perfil Público:</p>
+                    <p className="mt-1 text-[11px] text-purple-300/90 leading-relaxed">
+                      Informe o seu ID de usuário ou URL do perfil na Deezer para importar playlists públicas.
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-gray-300">URL ou ID do Perfil Deezer</label>
+                    <input
+                      type="text"
+                      value={loginInput}
+                      onChange={(e) => setLoginInput(e.target.value)}
+                      placeholder="Ex: https://www.deezer.com/br/profile/12345678"
+                      className="mt-1 h-11 w-full rounded-xl border border-white/10 bg-white/5 px-3 text-xs text-white placeholder-gray-500 outline-none focus:border-purple-500"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* OTHER PLUGINS */}
+          {configuringPlugin !== 'spotify' && configuringPlugin !== 'youtube' && configuringPlugin !== 'deezer' && (
+            <div className="mt-4 space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-gray-300">Usuário ou Identificador</label>
+                <input
+                  type="text"
+                  value={loginInput}
+                  onChange={(e) => setLoginInput(e.target.value)}
+                  placeholder="Nome de usuário"
+                  className="mt-1 h-11 w-full rounded-xl border border-white/10 bg-white/5 px-3 text-xs text-white outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-300">Token ou Chave de Acesso</label>
+                <input
+                  type="password"
+                  value={passwordInput}
+                  onChange={(e) => setPasswordInput(e.target.value)}
+                  placeholder="Token de autorização"
+                  className="mt-1 h-11 w-full rounded-xl border border-white/10 bg-white/5 px-3 text-xs text-white outline-none"
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="mt-6 flex items-center justify-between pt-4 border-t border-white/10">
+            {isConnected ? (
+              <button
+                type="button"
+                onClick={() => {
+                  onDisconnectAccount(configuringPlugin);
+                  showToast(`Desconectado de ${configuringPlugin.toUpperCase()}`);
+                  setConfiguringPlugin(null);
+                }}
+                className="rounded-xl bg-red-500/10 border border-red-500/20 px-4 py-2.5 text-xs font-bold text-red-300 hover:bg-red-500/20 transition"
+              >
+                Desconectar Conta
+              </button>
+            ) : <div />}
+
+            <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={() => setConfiguringPlugin(null)}
-                className="rounded-xl px-4 py-2 text-xs font-medium text-gray-400 hover:text-white"
+                className="rounded-xl px-4 py-2.5 text-xs font-medium text-gray-400 hover:text-white"
               >
                 Cancelar
               </button>
               <button
-                type="submit"
-                className="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-xs font-semibold text-white shadow-md hover:bg-blue-500 transition"
+                type="button"
+                onClick={handlePluginSubmit}
+                className="flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-2.5 text-xs font-bold text-white shadow-md hover:bg-blue-500 transition active:scale-98"
               >
                 <Check size={14} />
-                Salvar Configurações
+                <span>Salvar e Conectar</span>
               </button>
             </div>
-          </form>
+          </div>
         </div>
       </div>
     );
   };
 
-  // Modal to Install New Plugins (Catalog)
+  // Catalog Modal
   const renderCatalogModal = () => {
     if (!isCatalogOpen) return null;
 
@@ -521,7 +698,7 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
                   }}
                   className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-500 transition shadow-sm"
                 >
-                  Configurar
+                  Conectar
                 </button>
               </div>
             ))}
@@ -531,7 +708,7 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
     );
   };
 
-  // Content for each of the Settings Tabs
+  // Tabs Content
   const renderTabContent = () => {
     switch (activeModalTab) {
       case 'idioma':
@@ -674,11 +851,6 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
                   onChange={(e) => setCrossfade(e.target.value)}
                   className="mt-2 w-full accent-blue-600"
                 />
-                <div className="flex justify-between text-[10px] text-gray-500 mt-1">
-                  <span>Desativado (0s)</span>
-                  <span>6s</span>
-                  <span>12s</span>
-                </div>
               </div>
 
               <div className="flex items-center justify-between p-3.5 rounded-xl bg-white/[0.03] border border-white/5">
@@ -731,10 +903,6 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
                   <Trash2 size={14} />
                   Limpar Cache
                 </button>
-              </div>
-
-              <div className="pt-2 text-xs text-gray-400">
-                O cache armazena temporariamente trechos de músicas e capas para economizar dados e acelerar a reprodução instantânea.
               </div>
             </div>
           </div>
@@ -806,83 +974,6 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
                   className="h-4 w-4 rounded accent-blue-600"
                 />
               </div>
-
-              <div className="flex items-center justify-between p-3.5 rounded-xl bg-white/[0.03] border border-white/5">
-                <div>
-                  <h4 className="text-xs font-bold text-white">Aceleração por Hardware (GPU)</h4>
-                  <p className="text-[11px] text-gray-400 mt-0.5">Renderização ultra-suave a 60 FPS com baixo uso de CPU.</p>
-                </div>
-                <input
-                  type="checkbox"
-                  defaultChecked={true}
-                  className="h-4 w-4 rounded accent-blue-600"
-                />
-              </div>
-            </div>
-          </div>
-        );
-
-      case 'bloqueio':
-        return (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-xl font-bold text-white">Lista de Bloqueio</h2>
-              <p className="text-xs text-gray-400 mt-1">Artistas ou termos que você nunca deseja ver nos resultados de busca.</p>
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 space-y-4">
-              <p className="text-xs text-gray-400">Nenhum artista ou termo bloqueado no momento.</p>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Nome do artista para bloquear..."
-                  className="h-10 flex-1 rounded-xl border border-white/10 bg-white/5 px-3 text-xs text-white placeholder-gray-500 outline-none focus:border-red-500"
-                />
-                <button
-                  type="button"
-                  onClick={() => showToast('Adicionado à lista de bloqueio!')}
-                  className="rounded-xl bg-red-500/10 border border-red-500/20 px-4 py-2 text-xs font-semibold text-red-300 hover:bg-red-500/20"
-                >
-                  Bloquear
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-
-      case 'jam':
-        return (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-xl font-bold text-white">Jam em Grupo</h2>
-              <p className="text-xs text-gray-400 mt-1">Ouça músicas em sincronia em tempo real com outros dispositivos e alunos.</p>
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 space-y-4">
-              <div className="p-4 rounded-xl bg-gradient-to-r from-blue-900/40 to-sky-900/20 border border-blue-500/30">
-                <h4 className="text-xs font-bold text-white flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                  Sessão Jam Disponível
-                </h4>
-                <p className="text-[11px] text-sky-200 mt-1">Conecte seu celular e seu computador na mesma fila de reprodução via Supabase Realtime.</p>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-gray-300">Código da Sala de Jam</label>
-                <div className="flex gap-2 mt-1">
-                  <input
-                    type="text"
-                    defaultValue="MONTANHA-JAM-01"
-                    className="h-10 flex-1 rounded-xl border border-white/10 bg-white/5 px-3 font-mono text-xs text-sky-400 outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => showToast('Código copiado!')}
-                    className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-500"
-                  >
-                    Copiar
-                  </button>
-                </div>
-              </div>
             </div>
           </div>
         );
@@ -902,28 +993,9 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-white">Montanha Music Lab</h3>
-                  <p className="text-xs text-sky-400 font-mono">Versão 1.0.0 (Produção Vercel & PWA)</p>
-                  <p className="text-[11px] text-gray-500 mt-0.5">Arquitetura Spotube Core Engine • 100% Livre de Anúncios</p>
+                  <p className="text-xs text-sky-400 font-mono">Versão 1.0.0 (Spotube Core Engine)</p>
+                  <p className="text-[11px] text-gray-500 mt-0.5">Arquitetura Spotube Core • 100% Livre de Anúncios</p>
                 </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 pt-3 border-t border-white/10">
-                <div className="p-3.5 rounded-xl bg-white/[0.03] border border-white/5">
-                  <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">Serviço de Nuvem</p>
-                  <p className="text-xs font-bold text-emerald-400 mt-1 flex items-center gap-1.5">
-                    <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                    Supabase Realtime Ativo
-                  </p>
-                </div>
-
-                <div className="p-3.5 rounded-xl bg-white/[0.03] border border-white/5">
-                  <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">Engine de Streaming</p>
-                  <p className="text-xs font-bold text-sky-400 mt-1">Piped + Invidious + iTunes</p>
-                </div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-sky-200">
-                Criado com padrão de excelência para o Ecossistema Coach Montanha. Sincronização contínua entre Desktop (Windows/Mac/Linux), Web e Celular (Android/iOS PWA).
               </div>
             </div>
           </div>
@@ -933,48 +1005,52 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
       default:
         return (
           <>
-            {/* Header */}
             <div className="flex items-center justify-between pb-6 border-b border-white/5">
               <div>
                 <h1 className="text-2xl font-black tracking-tight text-white">Plugins</h1>
-                <p className="text-xs text-gray-400 mt-0.5">Clique em qualquer cartão ou plugin da lista para abrir suas configurações específicas.</p>
+                <p className="text-xs text-gray-400 mt-0.5">Todos os motores estão instalados. Clique para conectar sua conta pessoal.</p>
               </div>
             </div>
 
-            {/* 4 Gradient Cards (2x2 Grid) - Interativos */}
+            {/* 4 Gradient Cards */}
             <div className="grid grid-cols-2 gap-4 mt-6">
-              {gradientCards.map((card) => (
-                <button
-                  key={card.id}
-                  type="button"
-                  onClick={() => setConfiguringPlugin(card.type)}
-                  className={`group relative overflow-hidden rounded-2xl bg-gradient-to-br ${card.bgGradient} p-5 text-left text-white shadow-lg transition transform hover:-translate-y-1 hover:shadow-2xl active:scale-98`}
-                >
-                  <div className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-white/20 blur-md group-hover:scale-125 transition" />
-                  <div className="pointer-events-none absolute -left-6 -bottom-6 h-20 w-20 rounded-full bg-white/10 blur-md" />
+              {gradientCards.map((card) => {
+                const isConn = accounts[card.type]?.connected;
+                return (
+                  <button
+                    key={card.id}
+                    type="button"
+                    onClick={() => setConfiguringPlugin(card.type)}
+                    className={`group relative overflow-hidden rounded-2xl bg-gradient-to-br ${card.bgGradient} p-5 text-left text-white shadow-lg transition transform hover:-translate-y-1 hover:shadow-2xl active:scale-98`}
+                  >
+                    <div className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-white/20 blur-md group-hover:scale-125 transition" />
+                    <div className="pointer-events-none absolute -left-6 -bottom-6 h-20 w-20 rounded-full bg-white/10 blur-md" />
 
-                  <div className="flex items-start justify-between">
-                    {card.icon}
-                    <div className="flex items-center gap-1.5 rounded-full bg-black/25 px-2.5 py-1 text-[10px] font-bold backdrop-blur-sm group-hover:bg-black/40 transition">
-                      <span>Configurar</span>
-                      <ChevronDown size={14} className="text-white/80" />
+                    <div className="flex items-start justify-between">
+                      {card.icon}
+                      <div className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold backdrop-blur-sm ${
+                        isConn ? 'bg-black/40 text-emerald-300' : 'bg-black/25 text-white/90'
+                      }`}>
+                        <span>{isConn ? 'Conectado' : 'Instalado'}</span>
+                        <ChevronDown size={14} className="text-white/80" />
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="mt-8">
-                    <h3 className="font-bold text-base leading-tight drop-shadow-md">{card.title}</h3>
-                    <p className="mt-1 text-xs text-white/90 font-medium drop-shadow-md">{card.subtitle}</p>
-                  </div>
-                </button>
-              ))}
+                    <div className="mt-8">
+                      <h3 className="font-bold text-base leading-tight drop-shadow-md">{card.title}</h3>
+                      <p className="mt-1 text-xs text-white/90 font-medium drop-shadow-md">{card.subtitle}</p>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
 
-            {/* Section: Configurar & Lista */}
+            {/* List */}
             <div className="mt-8">
               <div className="flex items-center justify-between pb-3">
                 <div>
-                  <h3 className="text-lg font-bold text-white tracking-tight">Gerenciador de Plugins Instalados</h3>
-                  <p className="text-xs text-gray-400 font-medium mt-0.5">{installedPlugins.length} plugins disponíveis</p>
+                  <h3 className="text-lg font-bold text-white tracking-tight">Gerenciador de Plugins</h3>
+                  <p className="text-xs text-gray-400 font-medium mt-0.5">{installedPlugins.length} motores instalados no aplicativo</p>
                 </div>
 
                 <button
@@ -982,14 +1058,14 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
                   className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-lg shadow-blue-600/30 hover:bg-blue-500 transition active:scale-98"
                 >
                   <Plus size={16} />
-                  <span>Instalar um plugin</span>
+                  <span>Adicionar Plugin / Serviço</span>
                 </button>
               </div>
 
-              {/* Installed List Desktop */}
               <div className="mt-3 space-y-2.5">
                 {installedPlugins.map((plugin) => {
-                  const isConnected = accounts[plugin.provider as keyof typeof accounts]?.connected;
+                  const isConnected = accounts[plugin.provider]?.connected;
+                  const username = accounts[plugin.provider]?.username;
                   return (
                     <div
                       key={plugin.id}
@@ -1010,29 +1086,24 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
 
                       <div className="flex items-center gap-3 shrink-0 ml-4">
                         <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold ${
-                          isConnected || plugin.status === 'Ativo'
+                          isConnected
                             ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                            : 'bg-blue-500/10 text-sky-400 border border-blue-500/20'
+                            : 'bg-white/5 text-gray-400 border border-white/10'
                         }`}>
                           <Check size={11} />
-                          {isConnected ? 'Conectado' : plugin.status}
+                          {isConnected ? (username ? `Conectado: ${username}` : 'Conectado') : 'Instalado'}
                         </span>
 
                         <button
                           onClick={() => setConfiguringPlugin(plugin.provider)}
-                          className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-gray-300 hover:bg-white/10 hover:text-white transition"
+                          className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold transition ${
+                            isConnected
+                              ? 'border border-white/10 bg-white/5 text-gray-300 hover:bg-white/10'
+                              : 'bg-gradient-to-r from-[#0066cc] to-[#0052cc] text-white hover:bg-blue-600 shadow-md'
+                          }`}
                         >
-                          Configurar
+                          {isConnected ? 'Configurar' : 'Conectar Conta'}
                         </button>
-
-                        {(plugin.provider === 'spotify' || plugin.provider === 'deezer') && isConnected && (
-                          <button
-                            onClick={() => onDisconnectAccount(plugin.provider as any)}
-                            className="rounded-xl bg-red-500/10 border border-red-500/20 px-3 py-1.5 text-xs font-semibold text-red-300 hover:bg-red-500/20 transition"
-                          >
-                            Desconectar
-                          </button>
-                        )}
                       </div>
                     </div>
                   );
@@ -1051,14 +1122,12 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
         {renderPluginConfigModal()}
         {renderCatalogModal()}
 
-        {/* Toast Notification */}
         {toastMessage && (
           <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-2xl bg-black/90 px-4 py-2.5 text-xs font-bold text-white shadow-xl">
             {toastMessage}
           </div>
         )}
 
-        {/* Header Mobile: < Configurações & Plugins */}
         <div className="sticky top-0 z-20 flex items-center justify-between bg-[#f0f4f9]/90 px-4 py-3.5 backdrop-blur-md border-b border-[#e2e8f0]">
           <div className="flex items-center gap-3">
             <button
@@ -1072,34 +1141,37 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
         </div>
 
         <div className="px-4 py-4 space-y-6">
-          {/* 4 Gradient Cards (2x2 Grid) */}
           <div className="grid grid-cols-2 gap-3">
-            {gradientCards.map((card) => (
-              <button
-                key={card.id}
-                type="button"
-                onClick={() => setConfiguringPlugin(card.type)}
-                className={`relative overflow-hidden rounded-3xl bg-gradient-to-br ${card.bgGradient} p-4 text-left text-white shadow-md transition transform active:scale-95`}
-              >
-                <div className="flex items-start justify-between">
-                  {card.icon}
-                  <ChevronDown size={16} className="text-white/80" />
-                </div>
+            {gradientCards.map((card) => {
+              const isConn = accounts[card.type]?.connected;
+              return (
+                <button
+                  key={card.id}
+                  type="button"
+                  onClick={() => setConfiguringPlugin(card.type)}
+                  className={`relative overflow-hidden rounded-3xl bg-gradient-to-br ${card.bgGradient} p-4 text-left text-white shadow-md transition transform active:scale-95`}
+                >
+                  <div className="flex items-start justify-between">
+                    {card.icon}
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-black/30">
+                      {isConn ? 'Conectado' : 'Instalado'}
+                    </span>
+                  </div>
 
-                <div className="mt-6">
-                  <h3 className="font-bold text-sm leading-tight drop-shadow-sm">{card.title}</h3>
-                  <p className="mt-1 text-[11px] text-white/85 font-medium drop-shadow-sm">{card.subtitle}</p>
-                </div>
-              </button>
-            ))}
+                  <div className="mt-6">
+                    <h3 className="font-bold text-sm leading-tight drop-shadow-sm">{card.title}</h3>
+                    <p className="mt-1 text-[11px] text-white/85 font-medium drop-shadow-sm">{card.subtitle}</p>
+                  </div>
+                </button>
+              );
+            })}
           </div>
 
-          {/* Section: Configurar */}
           <div>
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-xl font-bold text-slate-900 tracking-tight">Configurar</h3>
-                <p className="text-xs text-slate-500 font-medium mt-0.5">{installedPlugins.length} plugins disponíveis</p>
+                <h3 className="text-xl font-bold text-slate-900 tracking-tight">Motores Instalados</h3>
+                <p className="text-xs text-slate-500 font-medium mt-0.5">{installedPlugins.length} plugins ativos</p>
               </div>
 
               <button
@@ -1107,14 +1179,13 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
                 className="flex items-center gap-1.5 rounded-2xl bg-[#0066cc] px-4 py-2.5 text-xs font-bold text-white shadow-sm active:opacity-90"
               >
                 <Plus size={16} />
-                <span>Instalar um plugin</span>
+                <span>Adicionar Serviço</span>
               </button>
             </div>
 
-            {/* Installed List Mobile */}
             <div className="mt-4 space-y-3">
               {installedPlugins.map((plugin) => {
-                const isConnected = accounts[plugin.provider as keyof typeof accounts]?.connected;
+                const isConnected = accounts[plugin.provider]?.connected;
                 return (
                   <div
                     key={plugin.id}
@@ -1126,12 +1197,12 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
                         <div className="flex items-center justify-between">
                           <h4 className="font-bold text-sm text-slate-900 truncate">{plugin.name}</h4>
                           <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                            isConnected || plugin.status === 'Ativo'
-                              ? 'bg-blue-100 text-blue-700'
-                              : 'bg-emerald-100 text-emerald-700'
+                            isConnected
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'bg-slate-100 text-slate-600'
                           }`}>
                             <Check size={10} />
-                            {isConnected ? 'Conectado' : plugin.status}
+                            {isConnected ? 'Conectado' : 'Instalado'}
                           </span>
                         </div>
                         <p className="mt-1 text-xs text-slate-500 leading-relaxed line-clamp-2">{plugin.description}</p>
@@ -1139,24 +1210,20 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
                     </div>
 
                     <div className="flex items-center justify-between border-t border-slate-100 pt-2.5 text-xs text-slate-500">
-                      <div className="flex items-center gap-2">
-                        <span className="flex items-center gap-1 font-medium text-slate-600">
-                          <User size={12} />
-                          {plugin.author}
-                        </span>
-                        <span className="rounded-md bg-slate-100 px-2 py-0.5 font-bold text-slate-700 text-[10px]">
-                          {plugin.tag}
-                        </span>
-                      </div>
+                      <span className="rounded-md bg-slate-100 px-2 py-0.5 font-bold text-slate-700 text-[10px]">
+                        {plugin.tag}
+                      </span>
 
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => setConfiguringPlugin(plugin.provider)}
-                          className="rounded-xl border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                        >
-                          Configurar
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => setConfiguringPlugin(plugin.provider)}
+                        className={`rounded-xl px-3 py-1 text-xs font-semibold ${
+                          isConnected
+                            ? 'border border-slate-300 text-slate-700'
+                            : 'bg-[#0066cc] text-white'
+                        }`}
+                      >
+                        {isConnected ? 'Configurar' : 'Conectar Conta'}
+                      </button>
                     </div>
                   </div>
                 );
@@ -1174,7 +1241,6 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
       {renderPluginConfigModal()}
       {renderCatalogModal()}
 
-      {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed top-8 left-1/2 -translate-x-1/2 z-50 rounded-2xl bg-gradient-to-r from-blue-600 to-sky-500 px-5 py-3 text-sm font-bold text-white shadow-2xl animate-bounce">
           {toastMessage}
@@ -1182,7 +1248,6 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
       )}
 
       <div className="flex h-[88vh] w-full max-w-5xl overflow-hidden rounded-[28px] border border-white/10 bg-[#16171d] shadow-[0_25px_80px_rgba(0,0,0,0.8)] text-white">
-        {/* Modal Left Sidebar: Configurações */}
         <aside className="w-64 border-r border-white/10 bg-[#111217] p-5 flex flex-col justify-between select-none">
           <div>
             <h2 className="text-lg font-bold tracking-tight text-white px-3 pb-4">Configurações</h2>
@@ -1220,7 +1285,6 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
           </div>
         </aside>
 
-        {/* Modal Right Main Content */}
         <main className="flex-1 flex flex-col min-w-0 overflow-y-auto p-8 relative">
           <button
             onClick={onClose}

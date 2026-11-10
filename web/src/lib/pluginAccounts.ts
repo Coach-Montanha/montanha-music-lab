@@ -1,15 +1,17 @@
 import { supabase } from './supabase';
 
 export interface PluginAccountData {
-  provider: 'youtube' | 'spotify' | 'deezer';
+  provider: 'youtube' | 'spotify' | 'deezer' | 'lrclib' | 'newpipe' | 'scrobble';
   connected: boolean;
+  installed: boolean;
   username?: string;
   avatar?: string;
   token?: string;
+  authMethod?: 'oauth' | 'cookie' | 'credentials';
   lastSync?: string;
 }
 
-const STORAGE_KEY = 'montanha_music_lab_plugins_v2';
+const STORAGE_KEY = 'montanha_music_lab_plugins_v3';
 
 export const getStoredPluginAccounts = (): Record<string, PluginAccountData> => {
   try {
@@ -21,39 +23,65 @@ export const getStoredPluginAccounts = (): Record<string, PluginAccountData> => 
     console.error('Failed to read plugin accounts from storage', err);
   }
 
-  // Contas padrão ativas do ecossistema
+  // Padrão Spotube oficial: Plugins estão INSTALADOS nativamente, mas NÃO conectados até login real
   return {
     youtube: {
       provider: 'youtube',
-      connected: true,
-      username: 'Montanha YouTube Core',
-      token: 'yt_direct_stream_token'
+      connected: false,
+      installed: true,
+      username: undefined,
+      token: undefined
+    },
+    newpipe: {
+      provider: 'newpipe',
+      connected: false,
+      installed: true,
+      username: undefined,
+      token: undefined
+    },
+    lrclib: {
+      provider: 'lrclib',
+      connected: false,
+      installed: true,
+      username: undefined,
+      token: undefined
     },
     spotify: {
       provider: 'spotify',
-      connected: true,
-      username: 'Spotify Premium Connected',
-      token: 'spotify_auth_token_active'
+      connected: false,
+      installed: true,
+      username: undefined,
+      token: undefined
     },
     deezer: {
       provider: 'deezer',
-      connected: true,
-      username: 'Deezer HiFi Studio',
-      token: 'deezer_hifi_active'
+      connected: false,
+      installed: true,
+      username: undefined,
+      token: undefined
+    },
+    scrobble: {
+      provider: 'scrobble',
+      connected: false,
+      installed: true,
+      username: undefined,
+      token: undefined
     }
   };
 };
 
 export const savePluginAccount = async (
-  provider: 'youtube' | 'spotify' | 'deezer',
-  data: { username?: string; token?: string }
+  provider: string,
+  data: { username?: string; token?: string; authMethod?: 'oauth' | 'cookie' | 'credentials' }
 ): Promise<Record<string, PluginAccountData>> => {
   const current = getStoredPluginAccounts();
   current[provider] = {
-    provider,
+    provider: provider as any,
     connected: true,
-    username: data.username || `${provider}_user`,
-    token: data.token || 'auth_token_ok',
+    installed: true,
+    username: data.username || `${provider}_conectado`,
+    token: data.token || 'auth_token_valid',
+    authMethod: data.authMethod || 'credentials',
     lastSync: new Date().toISOString()
   };
 
@@ -63,16 +91,16 @@ export const savePluginAccount = async (
     console.error('Failed to write plugin accounts to localStorage', err);
   }
 
-  // Tentar sincronizar com Supabase se usuário estiver logado
+  // Sincronizar com Supabase sob o ID do usuário ativo
   try {
     const { data: sessionData } = await supabase.auth.getSession();
     const userId = sessionData.session?.user?.id;
     if (userId) {
-      await supabase.from('user_settings').upsert({
+      await supabase.from('montanha_playlists').upsert({
         user_id: userId,
-        plugins: current,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'user_id' });
+        name: `Sync: ${provider.toUpperCase()}`,
+        description: `Conectado como ${data.username || provider}`
+      }, { onConflict: 'user_id,name' });
     }
   } catch (supabaseErr) {
     console.warn('Supabase sync skipped for plugin account:', supabaseErr);
@@ -82,14 +110,16 @@ export const savePluginAccount = async (
 };
 
 export const removePluginAccount = async (
-  provider: 'youtube' | 'spotify' | 'deezer'
+  provider: string
 ): Promise<Record<string, PluginAccountData>> => {
   const current = getStoredPluginAccounts();
   current[provider] = {
-    provider,
+    provider: provider as any,
     connected: false,
+    installed: true,
     username: undefined,
     token: undefined,
+    authMethod: undefined,
     lastSync: new Date().toISOString()
   };
 

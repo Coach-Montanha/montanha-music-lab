@@ -137,6 +137,10 @@ interface YoutubeSearchResult {
   url: string;
   thumbnail?: string | null;
   channel?: string | null;
+  artist?: string | null;
+  album?: string | null;
+  previewUrl?: string | null;
+  source?: string | null;
   duration?: string | null;
   durationSeconds?: number | null;
   position?: number;
@@ -652,6 +656,50 @@ export default function App() {
 
   const [songs, setSongs] = useState<Song[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Auto-search debounce for mobile & desktop
+  useEffect(() => {
+    const q = searchTerm.trim();
+    if (q.length >= 2) {
+      const timer = window.setTimeout(() => {
+        void searchYoutubeInsideApp(q);
+      }, 500);
+      return () => window.clearTimeout(timer);
+    }
+  }, [searchTerm]);
+
+  // Capture Spotify OAuth Token from URL hash or popup message
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleSpotifyHash = (hash: string) => {
+      const params = new URLSearchParams(hash.replace(/^#/, ''));
+      const token = params.get('access_token');
+      if (token) {
+        savePluginAccount('spotify', {
+          username: 'Spotify Autorizado',
+          token,
+          authMethod: 'oauth'
+        }).then((updated) => {
+          setPluginAccounts(updated);
+          setDownloadMessage('Spotify conectado com sucesso via OAuth oficial!');
+        });
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
+    };
+
+    if (window.location.hash.includes('access_token')) {
+      handleSpotifyHash(window.location.hash);
+    }
+
+    const onMessage = (e: MessageEvent) => {
+      if (e.data?.type === 'SPOTIFY_AUTH_SUCCESS' && e.data?.hash) {
+        handleSpotifyHash(e.data.hash);
+      }
+    };
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, []);
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackMode, setPlaybackMode] = useState<PlaybackMode>('audio');
@@ -1034,6 +1082,9 @@ export default function App() {
 
   const getPlaybackUrl = async (song: Song, mode: PlaybackMode) => {
     if (mode === 'audio') {
+      if (song.path && (song.path.startsWith('http://') || song.path.startsWith('https://'))) {
+        return song.path;
+      }
       const playbackUrl = await resolveAudioPlaybackUrl({
         songId: song.id,
         baseUrl: String(api.defaults.baseURL || ''),
@@ -2691,6 +2742,33 @@ export default function App() {
     }
   };
 
+  const playYoutubeTrack = async (result: YoutubeSearchResult) => {
+    setPlayerNotice(`Reproduzindo "${result.title}"...`);
+    let streamUrl = result.previewUrl || '';
+    if (!streamUrl && result.id) {
+      try {
+        const streamRes = await fetch(`/api/youtube/stream?id=${encodeURIComponent(result.id)}`);
+        if (streamRes.ok) {
+          const data = await streamRes.json();
+          if (data?.url) streamUrl = data.url;
+        }
+      } catch {}
+    }
+    const songId = result.id ? `yt-${result.id}` : `yt-${Date.now()}`;
+    const song: Song = {
+      id: songId,
+      title: result.title,
+      artist: result.artist || 'Artista',
+      thumbnail: result.thumbnail,
+      source: 'youtube',
+      youtubeUrl: result.url,
+      path: streamUrl || result.url,
+      hasAudio: true,
+      hasVideo: false
+    };
+    void playSong(song);
+  };
+
   const buildFallbackYoutubeTrackAnalysis = (result: YoutubeSearchResult): YoutubeAnalysis => ({
     kind: 'single',
     url: result.url,
@@ -4124,15 +4202,75 @@ export default function App() {
                     })}
                   </div>
 
-                  {!searchTerm.trim() ? (
+                  {isSearchingYoutube ? (
                     <div className="flex h-72 flex-col items-center justify-center text-center">
-                      <p className="text-sm font-medium text-slate-400">Comece a digitar para buscar</p>
+                      <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+                      <p className="mt-3 text-xs font-semibold text-slate-600">Buscando no YouTube e catálogo...</p>
+                      <p className="mt-1 text-[11px] text-slate-400">Consultando provedores de alta fidelidade</p>
+                    </div>
+                  ) : !searchTerm.trim() ? (
+                    <div className="flex h-72 flex-col items-center justify-center text-center">
+                      <Search size={36} className="text-slate-300 mb-2" />
+                      <p className="text-sm font-semibold text-slate-500">Comece a digitar para buscar</p>
+                      <p className="mt-1 text-xs text-slate-400 max-w-xs">Encontre músicas no YouTube, Deezer e Spotify pelo Montanha Music Lab</p>
                     </div>
                   ) : (
-                    <div className="mt-4 space-y-2">
+                    <div className="mt-4 space-y-2.5">
+                      {/* YouTube Online Results */}
+                      {youtubeSearchResults.map((result) => (
+                        <div
+                          key={`mob-${result.id}-${result.url}`}
+                          onClick={() => void playYoutubeTrack(result)}
+                          className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm active:scale-[0.98] transition cursor-pointer"
+                        >
+                          <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-slate-100 border border-slate-200 relative">
+                            {result.thumbnail ? (
+                              <img src={result.thumbnail} alt={result.title} className="h-full w-full object-cover" />
+                            ) : (
+                              <Music size={20} className="text-slate-400 m-auto mt-3" />
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-bold text-slate-900">{result.title}</p>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[9px] font-bold text-blue-600 uppercase">
+                                {result.source === 'itunes' ? 'Catálogo' : 'YouTube'}
+                              </span>
+                              <span className="text-[10px] text-slate-400">•</span>
+                              <p className="truncate text-xs text-slate-500">{result.artist || 'Artista'}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void selectYoutubeSearchResult(result);
+                              }}
+                              title="Opções de Download"
+                              className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-600 active:scale-90 transition hover:bg-slate-100"
+                            >
+                              <Download size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void playYoutubeTrack(result);
+                              }}
+                              title="Tocar Agora"
+                              className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-white shadow-md active:scale-90 transition hover:bg-blue-700"
+                            >
+                              <Play size={14} fill="currentColor" className="ml-0.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+
+                      {/* Local Matching Songs */}
                       {filteredSongs.map((song) => (
                         <div
-                          key={song.id}
+                          key={`mob-local-${song.id}`}
                           onClick={() => void playSong(song)}
                           className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm active:scale-[0.98] transition cursor-pointer"
                         >
@@ -4145,19 +4283,40 @@ export default function App() {
                           </div>
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-bold text-slate-900">{song.title}</p>
-                            <p className="truncate text-xs text-slate-500">{song.artist || 'Artista desconhecido'}</p>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[9px] font-bold text-emerald-600 uppercase">
+                                Local
+                              </span>
+                              <span className="text-[10px] text-slate-400">•</span>
+                              <p className="truncate text-xs text-slate-500">{song.artist || 'Artista desconhecido'}</p>
+                            </div>
                           </div>
                           <button
+                            type="button"
                             onClick={(e) => {
                               e.stopPropagation();
                               void playSong(song);
                             }}
-                            className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-white shadow-md active:scale-90 transition"
+                            className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-600 text-white shadow-md active:scale-90 transition"
                           >
-                            <Play size={15} fill="currentColor" className="ml-0.5" />
+                            <Play size={14} fill="currentColor" className="ml-0.5" />
                           </button>
                         </div>
                       ))}
+
+                      {/* No Results Message */}
+                      {youtubeSearchResults.length === 0 && filteredSongs.length === 0 && !isSearchingYoutube && (
+                        <div className="rounded-2xl border border-dashed border-slate-300 bg-white/60 p-6 text-center">
+                          <p className="text-xs font-semibold text-slate-600">Nenhum resultado direto para "{searchTerm}"</p>
+                          <button
+                            type="button"
+                            onClick={() => void searchYoutubeInsideApp(searchTerm)}
+                            className="mt-3 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm"
+                          >
+                            Tentar Novamente
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
