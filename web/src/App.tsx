@@ -774,6 +774,7 @@ export default function App() {
   const [isDesktopOnboardingOpen, setIsDesktopOnboardingOpen] = useState(false);
   const [desktopOnboardingStepIndex, setDesktopOnboardingStepIndex] = useState(0);
   const [supabaseUser, setSupabaseUser] = useState<SupabaseUser | null>(null);
+  const [isAuthInitialized, setIsAuthInitialized] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [sidebarLibraryExpanded, setSidebarLibraryExpanded] = useState(true);
   const [sidebarDeviceExpanded, setSidebarDeviceExpanded] = useState(true);
@@ -1240,10 +1241,14 @@ export default function App() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSupabaseUser(session?.user || null);
+      setIsAuthInitialized(true);
+    }).catch(() => {
+      setIsAuthInitialized(true);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSupabaseUser(session?.user || null);
+      setIsAuthInitialized(true);
     });
 
     return () => {
@@ -3646,6 +3651,17 @@ export default function App() {
     setDuration(nextDuration);
     broadcastSnapshot({ duration: nextDuration });
   };
+
+  if (!isAuthInitialized) {
+    return (
+      <div className="fixed inset-0 flex flex-col items-center justify-center bg-[#07090e] text-white">
+        <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-tr from-[#004799] to-[#0066cc] shadow-[0_0_35px_rgba(0,102,204,0.5)] border border-blue-400/30">
+          <LoaderCircle size={26} className="animate-spin text-white" />
+        </div>
+        <p className="mt-4 text-xs font-semibold tracking-wider text-sky-400 uppercase">Montanha Music Lab</p>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen overflow-hidden bg-[#050505] text-white">
@@ -6257,12 +6273,18 @@ export default function App() {
         onDisconnectAccount={handleDisconnectPluginAccount}
       />
 
-      {/* Supabase Central Auth Modal */}
+      {/* Supabase Central Auth Modal - Obrigatório quando não autenticado */}
       <SupabaseAuthModal
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
+        isOpen={isAuthModalOpen || !supabaseUser}
+        isMandatory={!supabaseUser}
+        onClose={() => {
+          if (supabaseUser) setIsAuthModalOpen(false);
+        }}
         currentUser={supabaseUser}
-        onUserChange={setSupabaseUser}
+        onUserChange={(user) => {
+          setSupabaseUser(user);
+          if (user) setIsAuthModalOpen(false);
+        }}
       />
       {isDesktopOnboardingOpen && activeDesktopOnboardingStep ? (
         <Suspense fallback={null}>

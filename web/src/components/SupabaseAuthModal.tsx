@@ -23,13 +23,15 @@ interface SupabaseAuthModalProps {
   onClose: () => void;
   currentUser: User | null;
   onUserChange: (user: User | null) => void;
+  isMandatory?: boolean;
 }
 
 export const SupabaseAuthModal: React.FC<SupabaseAuthModalProps> = ({
   isOpen,
   onClose,
   currentUser,
-  onUserChange
+  onUserChange,
+  isMandatory = false
 }) => {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [usernameInput, setUsernameInput] = useState('');
@@ -47,7 +49,6 @@ export const SupabaseAuthModal: React.FC<SupabaseAuthModalProps> = ({
   const formatEmailFromLogin = (input: string): string => {
     const cleaned = input.trim().toLowerCase();
     if (cleaned.includes('@')) return cleaned;
-    // Sanitiza caracteres especiais para criar email válido
     const sanitized = cleaned.replace(/[^a-z0-9._-]/g, '');
     return `${sanitized || 'usuario'}@montanhamusiclab.app`;
   };
@@ -88,7 +89,7 @@ export const SupabaseAuthModal: React.FC<SupabaseAuthModalProps> = ({
         }
         onUserChange(data.user);
         setSuccessMessage('Conectado com sucesso! Sincronizando playlists...');
-        setTimeout(() => onClose(), 1000);
+        setTimeout(() => onClose(), 800);
       } else {
         const displayName = name.trim() || usernameInput.trim() || 'Usuário Montanha';
         const { data, error } = await supabase.auth.signUp({
@@ -105,10 +106,10 @@ export const SupabaseAuthModal: React.FC<SupabaseAuthModalProps> = ({
         if (data.user) {
           onUserChange(data.user);
           setSuccessMessage('Conta criada com sucesso! Sincronização em nuvem ativa.');
-          setTimeout(() => onClose(), 1200);
+          setTimeout(() => onClose(), 1000);
         } else {
           setSuccessMessage('Conta cadastrada com sucesso!');
-          setTimeout(() => onClose(), 1200);
+          setTimeout(() => onClose(), 1000);
         }
       }
     } catch (err: any) {
@@ -123,23 +124,24 @@ export const SupabaseAuthModal: React.FC<SupabaseAuthModalProps> = ({
     await supabase.auth.signOut();
     onUserChange(null);
     setIsLoading(false);
-    onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4 backdrop-blur-md">
-      <div className="relative w-full max-w-md overflow-hidden rounded-[32px] border border-white/10 bg-[#0d0f17] p-7 shadow-[0_25px_80px_rgba(0,0,0,0.75)] text-white">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 px-4 backdrop-blur-xl">
+      <div className="relative w-full max-w-md overflow-hidden rounded-[32px] border border-white/10 bg-[#0d0f17] p-7 shadow-[0_25px_80px_rgba(0,0,0,0.85)] text-white">
         {/* Glow de fundo */}
         <div className="pointer-events-none absolute -top-24 -left-24 h-48 w-48 rounded-full bg-blue-600/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-24 -right-24 h-48 w-48 rounded-full bg-sky-500/15 blur-3xl" />
 
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="absolute right-5 top-5 rounded-full p-2 text-gray-400 hover:bg-white/10 hover:text-white transition"
-        >
-          <X size={18} />
-        </button>
+        {/* Close Button (oculto se o login for obrigatório para acesso) */}
+        {!isMandatory && (
+          <button
+            onClick={onClose}
+            className="absolute right-5 top-5 rounded-full p-2 text-gray-400 hover:bg-white/10 hover:text-white transition"
+          >
+            <X size={18} />
+          </button>
+        )}
 
         {/* Modal Header */}
         <div className="mb-6 flex items-center gap-3.5">
@@ -344,16 +346,9 @@ export const SupabaseAuthModal: React.FC<SupabaseAuthModalProps> = ({
               </button>
             </form>
 
-            <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between text-xs text-gray-500">
-              <span>Sincroniza PC e Celular</span>
-              <button
-                type="button"
-                onClick={onClose}
-                className="text-gray-400 hover:text-white font-medium transition"
-              >
-                Acesso direto offline
-              </button>
-            </div>
+            <p className="mt-4 text-center text-[11px] text-gray-500">
+              Suas playlists, favoritas e downloads ficam salvos no servidor e sincronizam automaticamente entre seu PC e celular.
+            </p>
           </>
         )}
       </div>
