@@ -23,9 +23,10 @@ export default async function handler(req, res) {
     'https://api.piped.projectsegfau.lt'
   ];
 
-  // 1. Se não tiver ID direto do YouTube (ex: dz-* ou apenas busca por texto), busca no YouTube Music / Piped
-  if (!cleanId || cleanId.startsWith('dz-')) {
-    const searchTerm = query || id.replace(/^dz-/, '');
+  // 1. Se não for ID válido direto do YouTube (ex: dz-*, sp-* ou busca por texto), busca no YouTube Music / Piped
+  const isValidYoutubeId = /^[a-zA-Z0-9_-]{11}$/.test(cleanId);
+  if (!cleanId || !isValidYoutubeId || cleanId.startsWith('dz-') || cleanId.startsWith('sp-')) {
+    const searchTerm = query || id.replace(/^(dz|sp)-/, '');
     for (const instance of pipedInstances) {
       try {
         const c = new AbortController();

@@ -14,52 +14,31 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'ID ou query do vídeo obrigatório' });
   }
 
-  // 1. Se for ID do Deezer (ex: dz-12345), buscar URL de áudio direta da API Deezer
-  if (id.startsWith('dz-')) {
-    const dzId = id.replace(/^dz-/, '');
-    try {
-      const dzResp = await fetch(`https://api.deezer.com/track/${dzId}`, {
-        headers: { 'User-Agent': 'Mozilla/5.0' }
-      });
-      if (dzResp.ok) {
-        const trackData = await dzResp.json();
-        if (trackData.preview) {
-          return res.status(200).json({
-            url: trackData.preview,
-            title: trackData.title,
-            artist: trackData.artist?.name,
-            mimeType: 'audio/mpeg'
-          });
-        }
-      }
-    } catch (e) {
-      console.warn('Deezer direct fetch failed:', e);
-    }
-  }
-
-  let cleanId = id.replace(/^yt-/, '').replace(/https?:\/\/(www\.)?youtube\.com\/watch\?v=/, '');
+  let cleanId = id.replace(/^yt-/, '').replace(/https?:\/\/(www\.)?youtube\.com\/watch\?v=/, '').split('&')[0];
 
   const pipedInstances = [
     'https://api.piped.private.coffee',
     'https://pipedapi.adminforge.de',
-    'https://piped.video/api/v1'
+    'https://piped.video/api/v1',
+    'https://api.piped.projectsegfau.lt'
   ];
 
-  // 2. Se o ID não for de vídeo direto do YouTube ou query foi passada, tentar Piped Search
-  if (!cleanId || cleanId.startsWith('dz-')) {
-    const searchTerm = query || id.replace(/^dz-/, '');
+  // 1. Se não for ID válido direto do YouTube (ex: dz-*, sp-* ou busca por texto), busca no YouTube Music / Piped
+  const isValidYoutubeId = /^[a-zA-Z0-9_-]{11}$/.test(cleanId);
+  if (!cleanId || !isValidYoutubeId || cleanId.startsWith('dz-') || cleanId.startsWith('sp-')) {
+    const searchTerm = query || id.replace(/^(dz|sp)-/, '');
     for (const instance of pipedInstances) {
       try {
         const c = new AbortController();
         const t = setTimeout(() => c.abort(), 3500);
-        const searchResp = await fetch(`${instance}/search?q=${encodeURIComponent(searchTerm)}&filter=all`, {
+        const searchResp = await fetch(`${instance}/search?q=${encodeURIComponent(searchTerm)}&filter=music_songs`, {
           signal: c.signal,
           headers: { 'User-Agent': 'Mozilla/5.0' }
         });
         clearTimeout(t);
         if (searchResp.ok) {
           const searchData = await searchResp.json();
-          const firstStream = (searchData.items || []).find((item) => item.type === 'stream');
+          const firstStream = (searchData.items || []).find((item) => item.type === 'stream' || item.url);
           if (firstStream?.url) {
             cleanId = firstStream.url.replace('/watch?v=', '').split('&')[0];
             break;
@@ -69,7 +48,7 @@ export default async function handler(req, res) {
     }
   }
 
-  // 3. Tentar extrair áudio direto das instâncias Piped
+  // 2. Extrair áudio de alta fidelidade completo (Opus/AAC 160-320kbps) das instâncias Piped
   if (cleanId && !cleanId.startsWith('dz-')) {
     for (const instance of pipedInstances) {
       try {
@@ -90,6 +69,8 @@ export default async function handler(req, res) {
             return res.status(200).json({
               url: audioStreams[0].url,
               title: data.title,
+              artist: data.uploader,
+              duration: data.duration,
               mimeType: audioStreams[0].mimeType || 'audio/webm'
             });
           }
@@ -98,27 +79,15 @@ export default async function handler(req, res) {
     }
   }
 
-  // 4. Fallback garantido: Buscar áudio na API Deezer pela query/título
-  const fallbackQuery = query || cleanId;
-  if (fallbackQuery) {
-    try {
-      const dzResp = await fetch(`https://api.deezer.com/search?q=${encodeURIComponent(fallbackQuery)}&limit=1`, {
-        headers: { 'User-Agent': 'Mozilla/5.0' }
-      });
-      if (dzResp.ok) {
-        const dzData = await dzResp.json();
-        const first = dzData.data?.[0];
-        if (first?.preview) {
-          return res.status(200).json({
-            url: first.preview,
-            title: first.title,
-            artist: first.artist?.name,
-            mimeType: 'audio/mpeg'
-          });
-        }
-      }
-    } catch {}
+  // 3. Fallback inteligente: se não conseguiu extrair URL estática, devolve o ID do YouTube limpo
+  // para que o player utilize o YouTube IFrame Player integrado (sem 30s de corte)
+  if (cleanId && !cleanId.startsWith('dz-')) {
+    return res.status(200).json({
+      url: `https://www.youtube.com/watch?v=${cleanId}`,
+      youtubeId: cleanId,
+      mimeType: 'video/youtube'
+    });
   }
 
-  return res.status(500).json({ error: 'Falha ao resolver stream de áudio' });
+  return res.status(404).json({ error: 'Stream de áudio não encontrado' });
 }

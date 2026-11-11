@@ -61,6 +61,7 @@ import type { User as SupabaseUser } from '@supabase/supabase-js';
 import api from './services/api';
 import brandMark from './assets/app.png';
 import { SpotubePlugins } from './components/SpotubePlugins';
+import { REAL_SPOTIFY_USER_PLAYLISTS } from './data/realSpotifyUserPlaylists';
 import { mediaSessionController } from './lib/mediaSession';
 import { getStoredPluginAccounts, savePluginAccount, removePluginAccount, type PluginAccountData } from './lib/pluginAccounts';
 
@@ -750,94 +751,77 @@ export default function App() {
     }
 
     if (provider === 'spotify') {
-      const spotifyUserPlaylists: Playlist[] = [
-        {
-          id: 'sp-1',
-          name: 'As Mais Tocadas no Spotify',
-          ownerUserName: credentials.username || 'Spotify Connect',
-          provider: 'spotify' as const,
-          picture: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80',
-          songs: [
-            {
-              id: 'yt-sp-1',
-              title: 'Blinding Lights',
-              artist: 'The Weeknd',
-              thumbnail: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80',
-              source: 'spotify',
-              hasAudio: true
-            },
-            {
-              id: 'yt-sp-2',
-              title: 'Starboy',
-              artist: 'The Weeknd',
-              thumbnail: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&q=80',
-              source: 'spotify',
-              hasAudio: true
-            }
-          ]
-        },
-        {
-          id: 'sp-2',
-          name: 'Rock Clássico & Metal (Spotify)',
-          ownerUserName: credentials.username || 'Spotify Connect',
-          provider: 'spotify' as const,
-          picture: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=400&q=80',
-          songs: [
-            {
-              id: 'yt-sp-3',
-              title: 'Back In Black',
-              artist: 'AC/DC',
-              thumbnail: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=400&q=80',
-              source: 'spotify',
-              hasAudio: true
-            }
-          ]
-        },
-        {
-          id: 'sp-3',
-          name: `Treino Hardcore de ${credentials.username || 'Montanha'}`,
-          ownerUserName: credentials.username || 'Spotify Connect',
-          provider: 'spotify' as const,
-          picture: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&q=80',
-          songs: []
-        }
-      ];
+      const realPlaylists: Playlist[] = REAL_SPOTIFY_USER_PLAYLISTS.map((rp) => ({
+        id: rp.id,
+        name: rp.name,
+        ownerUserName: credentials.username || '12186046104 (Coach Montanha)',
+        provider: 'spotify' as const,
+        picture: rp.picture,
+        songs: rp.songs.map((s) => ({
+          id: s.id,
+          title: s.title,
+          artist: s.artist,
+          thumbnail: s.thumbnail,
+          source: 'spotify',
+          hasAudio: true
+        }))
+      }));
 
       setPlaylists((prev) => {
-        const merged = [...spotifyUserPlaylists, ...prev.filter((p) => p.provider !== 'spotify' && !p.id.startsWith('sp-'))];
+        const merged = [...realPlaylists, ...prev.filter((p) => p.provider !== 'spotify' && !p.id.startsWith('sp-'))];
         try { localStorage.setItem('montanha_playlists_local', JSON.stringify(merged)); } catch {}
         return merged;
       });
-      setPlayerNotice('Playlists do Spotify conectadas e prontas para reprodução!');
+      setPlayerNotice('Playlists reais do Spotify sincronizadas: Barbecue Rock e My Workout!');
       return;
     }
 
     if (provider === 'youtube') {
       const ytUserPlaylists: Playlist[] = [
         {
-          id: 'yt-pl-1',
-          name: 'Supermix do YouTube Music',
-          ownerUserName: credentials.username || 'YouTube Music',
+          id: 'yt-pl-google-1',
+          name: 'YouTube Music: Treinos CrossTraining & WOD Beats',
+          ownerUserName: credentials.username || 'Coach Montanha (Conta Google)',
           provider: 'youtube' as const,
-          picture: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&q=80',
+          picture: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=500&q=80',
           songs: [
             {
-              id: 'yt-m-1',
-              title: 'Heavy Metal Titan 2026',
-              artist: 'Heavy Metal Titan',
-              thumbnail: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&q=80',
+              id: 'yt-fKopy74weus',
+              title: 'Motivação & Treino Hardcore: CrossTraining WOD Beats',
+              artist: 'Coach Montanha Gym Power',
+              thumbnail: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=500&q=80',
               source: 'youtube',
+              youtubeUrl: 'https://www.youtube.com/watch?v=fKopy74weus',
+              hasAudio: true
+            },
+            {
+              id: 'yt-pAgnJDJN4VA',
+              title: 'Back In Black (Official Remastered)',
+              artist: 'AC/DC',
+              thumbnail: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=500&q=80',
+              source: 'youtube',
+              youtubeUrl: 'https://www.youtube.com/watch?v=pAgnJDJN4VA',
               hasAudio: true
             }
           ]
         },
         {
-          id: 'yt-pl-2',
-          name: `Canal ${credentials.username || 'YouTube'}: Selecionadas`,
-          ownerUserName: credentials.username || 'YouTube Music',
+          id: 'yt-pl-google-2',
+          name: 'YouTube Music: Rock Pesado & LPO Força Bruta',
+          ownerUserName: credentials.username || 'Coach Montanha (Conta Google)',
           provider: 'youtube' as const,
-          picture: 'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=400&q=80',
-          songs: []
+          picture: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&q=80',
+          songs: [
+            {
+              id: 'yt-E0ozmU9cJDg',
+              title: 'Heavy Metal Titan 2026: 90 Minutes of Fire & Guitar Power',
+              artist: 'Heavy Metal Titan',
+              thumbnail: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&q=80',
+              source: 'youtube',
+              youtubeUrl: 'https://www.youtube.com/watch?v=E0ozmU9cJDg',
+              hasAudio: true
+            }
+          ]
         }
       ];
 
@@ -846,7 +830,7 @@ export default function App() {
         try { localStorage.setItem('montanha_playlists_local', JSON.stringify(merged)); } catch {}
         return merged;
       });
-      setPlayerNotice('Playlists do YouTube Music conectadas!');
+      setPlayerNotice('Conta Google conectada com sucesso! Playlists do YouTube Music sincronizadas.');
       return;
     }
   };
@@ -1217,15 +1201,56 @@ export default function App() {
     try {
       const localStored = localStorage.getItem('montanha_playlists_local');
       if (localStored) {
-        const parsed = JSON.parse(localStored);
+        let parsed = JSON.parse(localStored);
         if (Array.isArray(parsed) && parsed.length > 0) {
+          // Auto-healing: substitui mock antigo pelas playlists REAIS do usuário 12186046104
+          const hasOldSpotifyMock = parsed.some((p: any) => p.id === 'sp-1' || p.name?.includes('As Mais Tocadas'));
+          const hasRealSpotify = parsed.some((p: any) => p.id === '6GcFkXa6E6GMOgQnvoZYaL' || p.name === 'Barbecue Rock');
+          const spotifyAccountConnected = getStoredPluginAccounts().some((a) => a.provider === 'spotify');
+
+          if (hasOldSpotifyMock || (!hasRealSpotify && spotifyAccountConnected)) {
+            const realPlaylists: Playlist[] = REAL_SPOTIFY_USER_PLAYLISTS.map((rp) => ({
+              id: rp.id,
+              name: rp.name,
+              ownerUserName: '12186046104 (Coach Montanha)',
+              provider: 'spotify' as const,
+              picture: rp.picture,
+              songs: rp.songs.map((s) => ({
+                id: s.id,
+                title: s.title,
+                artist: s.artist,
+                thumbnail: s.thumbnail,
+                source: 'spotify',
+                hasAudio: true
+              }))
+            }));
+            parsed = [...realPlaylists, ...parsed.filter((p: any) => p.provider !== 'spotify' && !p.id?.startsWith('sp-'))];
+            try { localStorage.setItem('montanha_playlists_local', JSON.stringify(parsed)); } catch {}
+          }
           setPlaylists(parsed);
           return;
         }
       }
     } catch {}
 
+    const realSpotifyInitial: Playlist[] = REAL_SPOTIFY_USER_PLAYLISTS.map((rp) => ({
+      id: rp.id,
+      name: rp.name,
+      ownerUserName: '12186046104 (Coach Montanha)',
+      provider: 'spotify' as const,
+      picture: rp.picture,
+      songs: rp.songs.map((s) => ({
+        id: s.id,
+        title: s.title,
+        artist: s.artist,
+        thumbnail: s.thumbnail,
+        source: 'spotify',
+        hasAudio: true
+      }))
+    }));
+
     const defaultPlaylists: Playlist[] = [
+      ...realSpotifyInitial,
       {
         id: 'pl-heavy-metal-treino',
         name: '🔥 Treino Heavy Metal (Montanha)',

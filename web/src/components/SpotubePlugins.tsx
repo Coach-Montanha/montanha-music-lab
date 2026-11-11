@@ -406,54 +406,35 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
           {/* YOUTUBE AUTH MODAL */}
           {configuringPlugin === 'youtube' && (
             <div className="mt-4 space-y-4">
-              <div className="flex rounded-2xl bg-white/[0.04] p-1 border border-white/5">
-                {[
-                  { id: 'google', label: 'Conta Google (Login)' },
-                  { id: 'channel', label: 'Canal / @Handle' },
-                  { id: 'cookie', label: 'Cookie de Sessão' },
-                  { id: 'free', label: 'Acesso Livre (Sem Login)' }
-                ].map((tab) => (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setYtAuthTab(tab.id as any)}
-                    className={`flex-1 rounded-xl py-2 text-xs font-bold transition ${
-                      ytAuthTab === tab.id
-                        ? 'bg-gradient-to-r from-red-600 to-rose-600 text-white shadow-md'
-                        : 'text-gray-400 hover:text-white'
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-
-              {ytAuthTab === 'google' && (
-                <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-5 space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white p-2.5 shadow-md">
-                      <svg viewBox="0 0 24 24" className="h-6 w-6">
-                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                        <span>Entrar com a Conta do Google</span>
-                        <span className="rounded-full bg-blue-500/20 border border-blue-500/30 px-2 py-0.5 text-[10px] font-bold text-blue-400">
-                          Oficial
-                        </span>
-                      </h4>
-                      <p className="text-[11px] text-gray-400">Acesse suas playlists salvas, curtidas e inscrições do YouTube Music.</p>
-                    </div>
+              <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-5 space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white p-2.5 shadow-md">
+                    <svg viewBox="0 0 24 24" className="h-6 w-6">
+                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                    </svg>
                   </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                      <span>Conectar Conta Google / YouTube Music</span>
+                      <span className="rounded-full bg-blue-500/20 border border-blue-500/30 px-2 py-0.5 text-[10px] font-bold text-blue-400">
+                        Oficial
+                      </span>
+                    </h4>
+                    <p className="text-[11px] text-gray-400">Acesso ilimitado a buscas, playlists salvas e histrico do YouTube Music.</p>
+                  </div>
+                </div>
 
-                  <p className="text-xs text-gray-300 leading-relaxed">
-                    Clique no botão abaixo para abrir a janela oficial do Google no navegador e autorizar seu acesso, ou conecte sua conta em 1 clique:
+                <div className="p-3.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-sky-200 leading-relaxed">
+                  <p className="font-semibold text-white">Acesso Livre sem Login j  a base padrão do aplicativo.</p>
+                  <p className="mt-1 text-[11px] text-sky-300/90">
+                    Ao conectar sua Conta Google, o Montanha Music Lab sincroniza diretamente suas playlists reais, faixas salvas e recomendaoes personalizadas com o motor Spotube.
                   </p>
+                </div>
 
+                <div className="space-y-2.5 pt-1">
                   <button
                     type="button"
                     onClick={() => window.open('https://accounts.google.com/signin/v2/identifier?service=youtube', '_blank', 'width=520,height=680')}
@@ -465,106 +446,20 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
                       <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
                       <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
                     </svg>
-                    <span>Fazer Login com a Conta Google</span>
+                    <span>Fazer Login com a Conta Google (Janela Oficial)</span>
                     <ExternalLink size={14} className="text-gray-500" />
                   </button>
 
                   <button
                     type="button"
                     onClick={() => handleQuickConnect('youtube', 'Coach Montanha (Conta Google)')}
-                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-red-600 to-rose-600 py-3 text-xs font-bold text-white shadow-lg hover:brightness-110 transition active:scale-98"
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-red-600 to-rose-600 py-3.5 text-xs font-bold text-white shadow-lg hover:brightness-110 transition active:scale-98"
                   >
                     <Check size={16} />
                     <span>Conectar Conta Google do Coach Montanha em 1 Clique</span>
                   </button>
                 </div>
-              )}
-
-              {ytAuthTab === 'free' && (
-                <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-5 space-y-3">
-                  <div className="flex items-center gap-2 text-emerald-400">
-                    <Check size={18} />
-                    <h4 className="text-sm font-bold text-white">Acesso Livre sem Login Ativo</h4>
-                  </div>
-                  <p className="text-xs text-gray-300 leading-relaxed">
-                    Você NÃO precisa de login para pesquisar, selecionar e ouvir qualquer música no YouTube.
-                    O catálogo aberto do YouTube e YouTube Music funciona de forma ilimitada diretamente pelo player.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setConfiguringPlugin(null);
-                    }}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-500 py-2.5 text-xs font-bold text-black shadow-md hover:bg-cyan-400 transition"
-                  >
-                    <Search size={14} />
-                    <span>Ir Direto para Buscar e Ouvir no YouTube</span>
-                  </button>
-                </div>
-              )}
-
-              {ytAuthTab === 'channel' && (
-                <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 space-y-3">
-                  <button
-                    type="button"
-                    onClick={() => window.open('https://accounts.google.com/signin', '_blank', 'width=500,height=700')}
-                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-black border border-red-500/40 py-3 text-xs font-bold text-red-300 shadow-md hover:bg-red-950/30 transition active:scale-98"
-                  >
-                    <ExternalLink size={16} />
-                    <span>🌐 Abrir Tela Oficial de Login Google / YouTube</span>
-                  </button>
-                  <div>
-                    <label className="text-xs font-semibold text-gray-300">Canal do YouTube (@handle ou Link)</label>
-                    <input
-                      type="text"
-                      value={ytChannelInput}
-                      onChange={(e) => setYtChannelInput(e.target.value)}
-                      placeholder="@CoachMontanha ou https://www.youtube.com/@CoachMontanha"
-                      className="mt-1 h-11 w-full rounded-xl border border-white/10 bg-white/5 px-3 text-xs text-white placeholder-gray-500 outline-none focus:border-red-500"
-                    />
-                  </div>
-                  <p className="text-[11px] text-gray-400 leading-relaxed">
-                    Importa todas as suas playlists públicas e não listadas do seu canal do YouTube sem precisar de senha Google.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickConnect('youtube', ytChannelInput.trim() || '@CoachMontanha')}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-red-600 py-2.5 text-xs font-bold text-white shadow-md hover:bg-red-500 transition"
-                  >
-                    <Check size={14} />
-                    <span>Conectar Canal do YouTube</span>
-                  </button>
-                </div>
-              )}
-
-              
-
-              {ytAuthTab === 'streaming' && (
-                <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 space-y-3">
-                  <div>
-                    <label className="text-xs font-semibold text-gray-300">Qualidade de Streaming de Áudio</label>
-                    <select
-                      value={audioQualityPref}
-                      onChange={(e) => setAudioQualityPref(e.target.value)}
-                      className="mt-1 h-11 w-full rounded-xl border border-white/10 bg-[#161616] px-3 text-xs text-white outline-none focus:border-red-500"
-                    >
-                      <option value="256">HiFi 256 kbps Opus (Qualidade Máxima)</option>
-                      <option value="160">Padrão 160 kbps Opus</option>
-                      <option value="128">Econômico 128 kbps (Baixo Consumo)</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-gray-300">Instância de Streaming Piped / Invidious</label>
-                    <input
-                      type="text"
-                      value={customInstanceInput}
-                      onChange={(e) => setCustomInstanceInput(e.target.value)}
-                      placeholder="https://api.piped.private.coffee"
-                      className="mt-1 h-11 w-full rounded-xl border border-white/10 bg-white/5 px-3 text-xs text-white placeholder-gray-500 outline-none focus:border-red-500"
-                    />
-                  </div>
-                </div>
-              )}
+              </div>
             </div>
           )}
 
