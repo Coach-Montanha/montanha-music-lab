@@ -8,11 +8,120 @@ export default async function handler(req, res) {
   }
 
   const query = (req.body?.query || req.query?.q || req.query?.query || '').trim();
+  const filter = (req.body?.filter || req.query?.filter || req.query?.type || 'tudo').toLowerCase().trim();
+
   if (!query) {
     return res.status(400).json({ error: 'Query de busca vazia' });
   }
 
-  // 1. Tentar Piped APIs (instâncias públicas de alta disponibilidade)
+  const results = [];
+  const playlists = [];
+  const albums = [];
+  const artists = [];
+
+  // 1. Deezer API (Instantânea, sem CORS, com alta disponibilidade e dados estruturados)
+  try {
+    if (filter === 'playlists') {
+      const dzResp = await fetch(`https://api.deezer.com/search/playlist?q=${encodeURIComponent(query)}&limit=25`, {
+        headers: { 'User-Agent': 'Mozilla/5.0' }
+      });
+      if (dzResp.ok) {
+        const dzData = await dzResp.json();
+        for (const pl of dzData.data || []) {
+          playlists.push({
+            id: `dz-pl-${pl.id}`,
+            title: pl.title || 'Playlist sem título',
+            author: pl.user?.name || 'Deezer Curador',
+            url: pl.link || `https://www.deezer.com/playlist/${pl.id}`,
+            thumbnail: pl.picture_big || pl.picture_medium || '',
+            videosCount: pl.nb_tracks || 0,
+            source: 'deezer'
+          });
+        }
+      }
+    } else if (filter === 'albuns') {
+      const dzResp = await fetch(`https://api.deezer.com/search/album?q=${encodeURIComponent(query)}&limit=25`, {
+        headers: { 'User-Agent': 'Mozilla/5.0' }
+      });
+      if (dzResp.ok) {
+        const dzData = await dzResp.json();
+        for (const alb of dzData.data || []) {
+          albums.push({
+            id: `dz-alb-${alb.id}`,
+            title: alb.title || 'Álbum',
+            artist: alb.artist?.name || 'Artista',
+            thumbnail: alb.cover_big || alb.cover_medium || '',
+            tracksCount: alb.nb_tracks || 0,
+            source: 'deezer'
+          });
+        }
+      }
+    } else if (filter === 'artistas') {
+      const dzResp = await fetch(`https://api.deezer.com/search/artist?q=${encodeURIComponent(query)}&limit=25`, {
+        headers: { 'User-Agent': 'Mozilla/5.0' }
+      });
+      if (dzResp.ok) {
+        const dzData = await dzResp.json();
+        for (const art of dzData.data || []) {
+          artists.push({
+            id: `dz-art-${art.id}`,
+            name: art.name || 'Artista',
+            thumbnail: art.picture_big || art.picture_medium || '',
+            fansCount: art.nb_fan || 0,
+            source: 'deezer'
+          });
+        }
+      }
+    } else {
+      // 'tudo' ou 'faixas'
+      const dzResp = await fetch(`https://api.deezer.com/search?q=${encodeURIComponent(query)}&limit=30`, {
+        headers: { 'User-Agent': 'Mozilla/5.0' }
+      });
+      if (dzResp.ok) {
+        const dzData = await dzResp.json();
+        for (const track of dzData.data || []) {
+          results.push({
+            id: `dz-${track.id}`,
+            title: track.title || 'Música sem título',
+            artist: track.artist?.name || 'Artista desconhecido',
+            album: track.album?.title || 'Álbum',
+            duration: track.duration || 180,
+            thumbnail: track.album?.cover_big || track.album?.cover_medium || '',
+            url: track.link || `https://www.deezer.com/track/${track.id}`,
+            previewUrl: track.preview || '',
+            source: 'deezer'
+          });
+        }
+      }
+
+      // Se for 'tudo', busca também algumas playlists
+      if (filter === 'tudo') {
+        try {
+          const dzPl = await fetch(`https://api.deezer.com/search/playlist?q=${encodeURIComponent(query)}&limit=10`, {
+            headers: { 'User-Agent': 'Mozilla/5.0' }
+          });
+          if (dzPl.ok) {
+            const dzPlData = await dzPl.json();
+            for (const pl of dzPlData.data || []) {
+              playlists.push({
+                id: `dz-pl-${pl.id}`,
+                title: pl.title || 'Playlist sem título',
+                author: pl.user?.name || 'Deezer Curador',
+                url: pl.link || `https://www.deezer.com/playlist/${pl.id}`,
+                thumbnail: pl.picture_big || pl.picture_medium || '',
+                videosCount: pl.nb_tracks || 0,
+                source: 'deezer'
+              });
+            }
+          }
+        } catch {}
+      }
+    }
+  } catch (dzErr) {
+    console.error('Deezer search error:', dzErr);
+  }
+
+  // 2. YouTube (via Piped instances)
   const pipedInstances = [
     'https://api.piped.private.coffee',
     'https://pipedapi.adminforge.de',
@@ -22,7 +131,7 @@ export default async function handler(req, res) {
   for (const instance of pipedInstances) {
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 4000);
+      const timeout = setTimeout(() => controller.abort(), 3500);
 
       const resp = await fetch(`${instance}/search?q=${encodeURIComponent(query)}&filter=all`, {
         signal: controller.signal,
@@ -34,11 +143,8 @@ export default async function handler(req, res) {
         const data = await resp.json();
         const items = Array.isArray(data.items) ? data.items : [];
 
-        const results = [];
-        const playlists = [];
-
         for (const item of items) {
-          if (item.type === 'stream') {
+          if (item.type === 'stream' && (filter === 'tudo' || filter === 'faixas')) {
             const videoId = (item.url || '').replace('/watch?v=', '').split('&')[0];
             results.push({
               id: videoId || `yt-${Math.random().toString(36).slice(2, 8)}`,
@@ -50,7 +156,7 @@ export default async function handler(req, res) {
               url: `https://www.youtube.com/watch?v=${videoId}`,
               source: 'youtube'
             });
-          } else if (item.type === 'playlist') {
+          } else if (item.type === 'playlist' && (filter === 'tudo' || filter === 'playlists')) {
             const playlistId = (item.url || '').replace('/playlist?list=', '').split('&')[0];
             playlists.push({
               id: playlistId || `pl-${Math.random().toString(36).slice(2, 8)}`,
@@ -58,45 +164,20 @@ export default async function handler(req, res) {
               author: item.uploaderName || 'YouTube Music',
               url: `https://www.youtube.com/playlist?list=${playlistId}`,
               thumbnail: item.thumbnail || '',
-              videosCount: item.videos || 0
+              videosCount: item.videos || 0,
+              source: 'youtube'
             });
           }
         }
-
-        if (results.length > 0 || playlists.length > 0) {
-          return res.status(200).json({ results, playlists });
-        }
+        break;
       }
-    } catch {
-      // continua para a próxima instância
-    }
+    } catch {}
   }
 
-  // 2. Fallback de alta velocidade: Deezer Music Catalog API (Zero Apple Music)
-  try {
-    const dzResp = await fetch(
-      `https://api.deezer.com/search?q=${encodeURIComponent(query)}&limit=25`,
-      { headers: { 'User-Agent': 'Mozilla/5.0' } }
-    );
-    if (dzResp.ok) {
-      const dzData = await dzResp.json();
-      const results = (dzData.data || []).map((track) => ({
-        id: `dz-${track.id}`,
-        title: track.title || 'Música sem título',
-        artist: track.artist?.name || 'Artista desconhecido',
-        album: track.album?.title || 'Álbum',
-        duration: track.duration || 180,
-        thumbnail: track.album?.cover_big || track.album?.cover_medium || '',
-        url: track.link || `https://www.deezer.com/track/${track.id}`,
-        previewUrl: track.preview || '',
-        source: 'deezer'
-      }));
-
-      return res.status(200).json({ results, playlists: [] });
-    }
-  } catch (err) {
-    console.error('Deezer fallback error:', err);
-  }
-
-  return res.status(500).json({ error: 'Nenhum provedor de busca respondeu no momento.' });
+  return res.status(200).json({
+    results,
+    playlists,
+    albums,
+    artists
+  });
 }

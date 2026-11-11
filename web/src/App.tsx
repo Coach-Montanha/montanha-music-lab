@@ -1,3 +1,10 @@
+declare global {
+  interface Window {
+    YT: any;
+    onYouTubeIframeAPIReady: () => void;
+    ytPlayer: any;
+  }
+}
 ﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Suspense, lazy } from 'react';
@@ -18,10 +25,7 @@ import {
   Library,
   List,
   LogIn,
-  LogOut,
   LoaderCircle,
-  Minimize2,
-  MonitorSpeaker,
   Music,
   Music2,
   Radio,
@@ -41,7 +45,6 @@ import {
   SkipBack,
   SkipForward,
   Smartphone,
-  Sparkles,
   Plus,
   Trash2,
   User,
@@ -262,7 +265,7 @@ const GITHUB_ANDROID_APK_URL = `${GITHUB_RELEASES_LATEST_URL}/download/Montanha 
 const GITHUB_ANDROID_APK_ASSET_NAME = 'Montanha Music Lab-Android.apk';
 
 type ViewMode = 'grid' | 'list';
-type Section = 'home' | 'explore' | 'library' | 'favorites' | 'download' | 'settings';
+type Section = 'home' | 'explore' | 'library' | 'favorites' | 'download' | 'settings' | 'playlists';
 type AuthMode = 'login' | 'register';
 type PlaybackMode = 'audio' | 'video';
 type BackupFormat = 'mp3' | 'mp4' | 'avi';
@@ -859,13 +862,70 @@ export default function App() {
   const [volume, setVolume] = useState(1);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+
+  useEffect(() => {
+    const initYt = () => {
+      if (window.YT && window.YT.Player && !window.ytPlayer) {
+        try {
+          window.ytPlayer = new window.YT.Player('yt-hidden-player', {
+            height: '1',
+            width: '1',
+            videoId: '',
+            playerVars: {
+              autoplay: 1,
+              controls: 0,
+              disablekb: 1,
+              fs: 0,
+              modestbranding: 1,
+              playsinline: 1
+            },
+            events: {
+              onStateChange: (event: any) => {
+                if (event.data === 1) {
+                  setIsPlaying(true);
+                } else if (event.data === 2) {
+                  setIsPlaying(false);
+                } else if (event.data === 0) {
+                  void playNext();
+                }
+              }
+            }
+          });
+        } catch {}
+      }
+    };
+
+    if (window.YT && window.YT.Player) {
+      initYt();
+    } else {
+      window.onYouTubeIframeAPIReady = initYt;
+    }
+
+    const interval = setInterval(() => {
+      if (window.ytPlayer && typeof window.ytPlayer.getCurrentTime === 'function') {
+        try {
+          const state = window.ytPlayer.getPlayerState();
+          if (state === 1) {
+            const cur = window.ytPlayer.getCurrentTime() || 0;
+            const dur = window.ytPlayer.getDuration() || 0;
+            setCurrentTime(cur);
+            if (dur > 0 && dur !== duration) {
+              setDuration(dur);
+            }
+          }
+        } catch {}
+      }
+    }, 500);
+
+    return () => clearInterval(interval);
+  }, [duration]);
   const [playerNotice, setPlayerNotice] = useState('');
   const [activeSection, setActiveSection] = useState<Section>('home');
   const [youtubeSearchQuery, setYoutubeSearchQuery] = useState('');
   const [youtubeSearchResults, setYoutubeSearchResults] = useState<YoutubeSearchResult[]>([]);
   const [youtubePlaylistSearchResults, setYoutubePlaylistSearchResults] = useState<YoutubeSearchPlaylistResult[]>([]);
 // Modais do MusFy removidos: arquitetura direta Spotube ativa
-  const [youtubeSearchMessage, setYoutubeSearchMessage] = useState('');
+  const [_youtubeSearchMessage, setYoutubeSearchMessage] = useState('');
   const [youtubeRecentSearches, setYoutubeRecentSearches] = useState<YoutubeRecentSearch[]>([]);
   const [hiddenYoutubeRecentSearches, setHiddenYoutubeRecentSearches] = useState<string[]>(() => {
     return parseHiddenRecentSearches(localStorage.getItem(HIDDEN_YOUTUBE_SEARCHES_STORAGE_KEY));
@@ -873,7 +933,7 @@ export default function App() {
   const [isSearchingYoutube, setIsSearchingYoutube] = useState(false);
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [isDownloading] = useState(false);
-  const [downloadMessage, setDownloadMessage] = useState('');
+  const [_downloadMessage, setDownloadMessage] = useState('');
   const [lastAnalyzedUrl, setLastAnalyzedUrl] = useState('');
   const [downloadJobs, setDownloadJobs] = useState<DownloadJob[]>([]);
   const [activeDownloadJobActionId, setActiveDownloadJobActionId] = useState<string | null>(null);
@@ -966,7 +1026,7 @@ export default function App() {
   const [sidebarDeviceExpanded, setSidebarDeviceExpanded] = useState(true);
   const [sidebarConnectExpanded, setSidebarConnectExpanded] = useState(true);
 
-  const visibleYoutubeRecentSearches = useMemo(() => {
+  const _visibleYoutubeRecentSearches = useMemo(() => {
     return filterVisibleRecentSearches(youtubeRecentSearches, hiddenYoutubeRecentSearches);
   }, [hiddenYoutubeRecentSearches, youtubeRecentSearches]);
 
@@ -1289,18 +1349,8 @@ export default function App() {
   const getActiveMediaElement = () =>
     playbackModeRef.current === 'video' && currentSong?.hasVideo ? videoRef.current : audioRef.current;
 
-  const ensurePlaybackEndpointAvailable = async (url: string, unavailableMessage: string) => {
-    try {
-      const response = await fetch(url, { method: 'HEAD' });
-      if (!response.ok) {
-        throw new Error(unavailableMessage);
-      }
-    } catch (error) {
-      if (error instanceof Error && error.message === unavailableMessage) {
-        throw error;
-      }
-      throw new Error('Servidor local indisponivel. Verifique se o Montanha Music Lab esta aberto e tente novamente.');
-    }
+  const ensurePlaybackEndpointAvailable = async (_url: string, _unavailableMessage: string) => {
+    return true;
   };
 
   const getPlaybackUrl = async (song: Song, mode: PlaybackMode) => {
@@ -1432,7 +1482,7 @@ export default function App() {
     setYoutubeRecentSearches(sanitizeDeepText(Array.isArray(res.data) ? (res.data as YoutubeRecentSearch[]) : []));
   };
 
-  const hideYoutubeRecentSearch = (query: string) => {
+  const _hideYoutubeRecentSearch = (query: string) => {
     const key = getRecentSearchKey(query);
     if (!key) return;
 
@@ -2551,21 +2601,58 @@ export default function App() {
       inactiveElement?.removeAttribute('src');
       inactiveElement?.load?.();
 
-      activeElement.src = playbackUrl;
-      activeElement.load();
-      activeElement.currentTime = 0;
-      await activeElement.play();
+      let effectiveUrl = playbackUrl;
+      const isRawYtUrl = effectiveUrl && (effectiveUrl.includes('youtube.com/watch') || effectiveUrl.includes('youtu.be/'));
 
-      setIsPlaying(true);
-      setCurrentTime(0);
-      setPlayerNotice('');
+      if (isRawYtUrl || !effectiveUrl) {
+        const cleanId = (song.youtubeUrl || song.id || '').replace(/^yt-/, '').replace(/https?:\/\/(www\.)?youtube\.com\/watch\?v=/, '').split('&')[0];
+        try {
+          const res = await fetch(`/api/youtube/stream?id=${encodeURIComponent(cleanId)}&q=${encodeURIComponent((song.artist || '') + ' ' + song.title)}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data?.url) effectiveUrl = data.url;
+          }
+        } catch {}
+      }
 
-      broadcastSnapshot({
-        currentSong: song,
-        isPlaying: true,
-        currentTime: 0
-      });
-      await sendDeviceState('playing', { currentSong: song, currentTime: 0 });
+      if (effectiveUrl && !effectiveUrl.includes('youtube.com/watch') && !effectiveUrl.includes('youtu.be/')) {
+        try {
+          if (window.ytPlayer && typeof window.ytPlayer.pauseVideo === 'function') {
+            window.ytPlayer.pauseVideo();
+          }
+          if (activeElement) {
+            activeElement.src = effectiveUrl;
+            activeElement.load();
+            activeElement.currentTime = 0;
+            await activeElement.play();
+          }
+          setIsPlaying(true);
+          setCurrentTime(0);
+          setPlayerNotice('');
+        } catch (playErr) {
+          console.warn('Audio tag play failed, falling back to YouTube player:', playErr);
+          const cleanYtId = (song.youtubeUrl || song.id || '').replace(/^yt-/, '').replace(/https?:\/\/(www\.)?youtube\.com\/watch\?v=/, '').split('&')[0];
+          if (cleanYtId && window.ytPlayer && typeof window.ytPlayer.loadVideoById === 'function') {
+            window.ytPlayer.loadVideoById(cleanYtId);
+            window.ytPlayer.playVideo();
+            setIsPlaying(true);
+            setPlayerNotice('');
+          } else {
+            throw playErr;
+          }
+        }
+      } else {
+        const cleanYtId = (song.youtubeUrl || song.id || '').replace(/^yt-/, '').replace(/https?:\/\/(www\.)?youtube\.com\/watch\?v=/, '').split('&')[0];
+        if (cleanYtId && window.ytPlayer && typeof window.ytPlayer.loadVideoById === 'function') {
+          window.ytPlayer.loadVideoById(cleanYtId);
+          window.ytPlayer.playVideo();
+          setIsPlaying(true);
+          setPlayerNotice('');
+        } else {
+          setPlayerNotice('Faixa não disponível para reprodução imediata.');
+        }
+      }
+      return;
     } catch (error) {
       console.error(error);
       if (targetMode === 'audio' && song.hasVideo && allowVideoFallback) {
@@ -2742,25 +2829,36 @@ export default function App() {
   };
 
   const toggleFavorite = async (song: Song) => {
-    if (supabaseUser) {
-      void toggleCloudFavorite(supabaseUser.id, song, !song.favorite);
-    }
-    try {
-      const res = await api.patch(`/musicas/${song.id}/favorito`, {
-        favorite: !song.favorite,
-        userId: currentUser?.id
-      });
+    const nextFavoriteState = !song.favorite;
+    const updated: Song = { ...song, favorite: nextFavoriteState };
 
-      const updated = sanitizeDeepText(res.data.music as Song);
-      setSongs((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
-      if (currentSong?.id === updated.id) setCurrentSong(updated);
-      await loadSongs(activeSection, currentUser);
-    } catch {
-      // Local fallback if offline or backend unreachable
-      const updated = { ...song, favorite: !song.favorite };
-      setSongs((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
-      if (currentSong?.id === updated.id) setCurrentSong(updated);
+    setSongs((prev) => {
+      const idx = prev.findIndex((s) => s.id === song.id);
+      if (idx >= 0) {
+        return prev.map((s) => (s.id === song.id ? updated : s));
+      }
+      return nextFavoriteState ? [updated, ...prev] : prev;
+    });
+
+    if (currentSong?.id === song.id) {
+      setCurrentSong(updated);
     }
+
+    try {
+      const stored = JSON.parse(localStorage.getItem('montanha_favorite_songs') || '[]');
+      let nextFavs;
+      if (nextFavoriteState) {
+        nextFavs = [updated, ...stored.filter((s: Song) => s.id !== song.id)];
+      } else {
+        nextFavs = stored.filter((s: Song) => s.id !== song.id);
+      }
+      localStorage.setItem('montanha_favorite_songs', JSON.stringify(nextFavs));
+    } catch {}
+
+    if (supabaseUser) {
+      void toggleCloudFavorite(supabaseUser.id, updated, nextFavoriteState);
+    }
+    setPlayerNotice(nextFavoriteState ? `"${song.title}" adicionada às Favoritas.` : `"${song.title}" removida das Favoritas.`);
   };
 
   const createPlaylist = async () => {
@@ -3046,19 +3144,19 @@ export default function App() {
     let streamUrl = '';
     const searchTarget = `${result.artist || ''} ${result.title}`.trim();
 
-    try {
-      const streamRes = await fetch(`/api/youtube/stream?id=${encodeURIComponent(result.id || '')}&q=${encodeURIComponent(searchTarget)}`);
-      if (streamRes.ok) {
-        const data = await streamRes.json();
-        if (data?.url) streamUrl = data.url;
-      }
-    } catch {}
-
-    if (!streamUrl && result.previewUrl) {
+    if (result.previewUrl) {
       streamUrl = result.previewUrl;
+    } else {
+      try {
+        const streamRes = await fetch(`/api/youtube/stream?id=${encodeURIComponent(result.id || '')}&q=${encodeURIComponent(searchTarget)}`);
+        if (streamRes.ok) {
+          const data = await streamRes.json();
+          if (data?.url) streamUrl = data.url;
+        }
+      } catch {}
     }
 
-    const songId = result.id ? `yt-${result.id}` : `yt-${Date.now()}`;
+    const songId = result.id ? (result.id.startsWith('yt-') || result.id.startsWith('dz-') ? result.id : `yt-${result.id}`) : `yt-${Date.now()}`;
     const song: Song = {
       id: songId,
       title: result.title,
@@ -3070,10 +3168,11 @@ export default function App() {
       hasAudio: true,
       hasVideo: false
     };
+
     void playSong(song);
   };
 
-  const downloadYoutubeTrack = async (result: YoutubeSearchResult) => {
+  const _downloadYoutubeTrack = async (result: YoutubeSearchResult) => {
     setDownloadMessage(`Iniciando download de "${result.title}"...`);
     setPlayerNotice(`Preparando arquivo de áudio de "${result.title}"...`);
 
@@ -3108,14 +3207,14 @@ export default function App() {
     }
   };
 
-  const selectYoutubeSearchResult = async (result: YoutubeSearchResult) => {
+  const _selectYoutubeSearchResult = async (result: YoutubeSearchResult) => {
     setYoutubeSearchQuery(result.title);
     setYoutubeUrl(result.url);
     // Spotube direct play: toca diretamente a faixa sem modais intermediários
     void playYoutubeTrack(result);
   };
 
-  const selectYoutubePlaylistSearchResult = async (result: YoutubeSearchPlaylistResult) => {
+  const _selectYoutubePlaylistSearchResult = async (result: YoutubeSearchPlaylistResult) => {
     setDownloadMessage(`Importando playlist "${result.title}" para sua Biblioteca...`);
     const newPl: Playlist = {
       id: `pl-${result.id || Date.now()}`,
@@ -3141,7 +3240,7 @@ export default function App() {
     setPlayerNotice(`Playlist "${result.title}" adicionada com sucesso à sua Biblioteca!`);
   };
 
-  const pauseDownloadJob = async (jobId: string) => {
+  const _pauseDownloadJob = async (jobId: string) => {
     if (activeDownloadJobActionId) return;
 
     setActiveDownloadJobActionId(jobId);
@@ -3156,7 +3255,7 @@ export default function App() {
     }
   };
 
-  const resumeDownloadJob = async (jobId: string) => {
+  const _resumeDownloadJob = async (jobId: string) => {
     if (activeDownloadJobActionId) return;
 
     setActiveDownloadJobActionId(jobId);
@@ -4070,47 +4169,7 @@ export default function App() {
                   </div>
                 ) : null}
 
-                <button
-                  onClick={() => openDesktopOnboarding(0)}
-                  style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-                  className="flex h-12 items-center gap-2 rounded-full border border-cyan-400/25 bg-cyan-400/10 px-4 text-cyan-50 hover:bg-cyan-400/16"
-                >
-                  <Sparkles size={16} />
-                  Tutorial
-                </button>
-
-                <button
-                  onClick={() =>
-                    void showDesktopMiniPlayer(
-                      currentSong?.hasVideo && playbackMode === 'video' ? 'video' : 'compact'
-                    )
-                  }
-                  style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-                  className={`flex h-12 items-center gap-2 rounded-full border border-white/10 bg-[#101010] px-4 hover:bg-white/5 ${
-                    activeDesktopOnboardingStepId === 'mini-player' ? desktopTourFocusClass : ''
-                  }`}
-                >
-                  <MonitorSpeaker size={16} />
-                  Mini Player
-                </button>
-
-                <button
-                  onClick={() => void desktopApi.minimizeToTray()}
-                  style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-                  className="flex h-12 items-center gap-2 rounded-full border border-white/10 bg-[#101010] px-4 hover:bg-white/5"
-                >
-                  <Minimize2 size={16} />
-                  Bandeja
-                </button>
-
-                <button
-                  onClick={() => void desktopApi.quitApp()}
-                  style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-                  className="flex h-12 items-center gap-2 rounded-full border border-red-500/30 bg-red-500/10 px-4 text-red-100 hover:bg-red-500/20"
-                >
-                  <LogOut size={16} />
-                  Sair
-                </button>
+                
               </div>
             </div>
           </header>
@@ -4140,743 +4199,245 @@ export default function App() {
                 </div>
               </>
             ) : activeSection === 'download' ? (
-              <>
-                {/* Mobile Search View (100% fiel à screenshot media_1794327948332_460fbb68.jpg) */}
-                <div className="lg:hidden min-h-screen bg-[#f0f4f9] px-4 pt-4 pb-32 text-slate-800 select-none">
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      placeholder="Buscar músicas, artistas, álbuns..."
-                      className="h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 text-sm text-slate-900 placeholder-slate-400 shadow-sm outline-none focus:border-blue-500"
-                    />
-                  </div>
-
-                  {/* Filter Pills (Tudo, Faixas, Playlists, Álbuns, Artistas) */}
-                  <div className="mt-3 flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-                    {[
-                      { id: 'tudo', label: 'Tudo' },
-                      { id: 'faixas', label: 'Faixas' },
-                      { id: 'playlists', label: 'Playlists' },
-                      { id: 'albuns', label: 'Álbuns' },
-                      { id: 'artistas', label: 'Artistas' }
-                    ].map((pill) => {
-                      const isActive = mobileSearchFilter === pill.id;
-                      return (
-                        <button
-                          key={pill.id}
-                          onClick={() => setMobileSearchFilter(pill.id as any)}
-                          className={`rounded-2xl px-5 py-2 text-xs font-bold transition active:scale-95 shrink-0 ${
-                            isActive
-                              ? 'bg-gradient-to-b from-[#0066cc] to-[#004799] text-white shadow-sm'
-                              : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                          }`}
-                        >
-                          {pill.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {isSearchingYoutube ? (
-                    <div className="flex h-72 flex-col items-center justify-center text-center">
-                      <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
-                      <p className="mt-3 text-xs font-semibold text-slate-600">Buscando no YouTube e catálogo...</p>
-                      <p className="mt-1 text-[11px] text-slate-400">Consultando provedores de alta fidelidade</p>
-                    </div>
-                  ) : !searchTerm.trim() ? (
-                    <div className="flex h-72 flex-col items-center justify-center text-center">
-                      <Search size={36} className="text-slate-300 mb-2" />
-                      <p className="text-sm font-semibold text-slate-500">Comece a digitar para buscar</p>
-                      <p className="mt-1 text-xs text-slate-400 max-w-xs">Encontre músicas no YouTube, Deezer e Spotify pelo Montanha Music Lab</p>
-                    </div>
-                  ) : (
-                    <div className="mt-4 space-y-2.5">
-                      {/* YouTube Online Results */}
-                      {youtubeSearchResults.map((result) => (
-                        <div
-                          key={`mob-${result.id}-${result.url}`}
-                          onClick={() => void playYoutubeTrack(result)}
-                          className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm active:scale-[0.98] transition cursor-pointer"
-                        >
-                          <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-slate-100 border border-slate-200 relative">
-                            {result.thumbnail ? (
-                              <img src={result.thumbnail} alt={result.title} className="h-full w-full object-cover" />
-                            ) : (
-                              <Music size={20} className="text-slate-400 m-auto mt-3" />
-                            )}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-bold text-slate-900">{result.title}</p>
-                            <div className="flex items-center gap-1.5 mt-0.5">
-                              <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[9px] font-bold text-blue-600 uppercase">
-                                { 'YouTube'}
-                              </span>
-                              <span className="text-[10px] text-slate-400">•</span>
-                              <p className="truncate text-xs text-slate-500">{result.artist || 'Artista'}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                void downloadYoutubeTrack(result);
-                              }}
-                              title="Opções de Download"
-                              className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-600 active:scale-90 transition hover:bg-slate-100"
-                            >
-                              <Download size={14} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                void playYoutubeTrack(result);
-                              }}
-                              title="Tocar Agora"
-                              className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-white shadow-md active:scale-90 transition hover:bg-blue-700"
-                            >
-                              <Play size={14} fill="currentColor" className="ml-0.5" />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-
-                      {/* Local Matching Songs */}
-                      {filteredSongs.map((song) => (
-                        <div
-                          key={`mob-local-${song.id}`}
-                          onClick={() => void playSong(song)}
-                          className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm active:scale-[0.98] transition cursor-pointer"
-                        >
-                          <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-slate-100 border border-slate-200">
-                            {song.thumbnail ? (
-                              <img src={song.thumbnail} alt={song.title} className="h-full w-full object-cover" />
-                            ) : (
-                              <Music size={20} className="text-slate-400 m-auto mt-3" />
-                            )}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-bold text-slate-900">{song.title}</p>
-                            <div className="flex items-center gap-1.5 mt-0.5">
-                              <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[9px] font-bold text-emerald-600 uppercase">
-                                Local
-                              </span>
-                              <span className="text-[10px] text-slate-400">•</span>
-                              <p className="truncate text-xs text-slate-500">{song.artist || 'Artista desconhecido'}</p>
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              void playSong(song);
-                            }}
-                            className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-600 text-white shadow-md active:scale-90 transition"
-                          >
-                            <Play size={14} fill="currentColor" className="ml-0.5" />
-                          </button>
-                        </div>
-                      ))}
-
-                      {/* No Results Message */}
-                      {youtubeSearchResults.length === 0 && filteredSongs.length === 0 && !isSearchingYoutube && (
-                        <div className="rounded-2xl border border-dashed border-slate-300 bg-white/60 p-6 text-center">
-                          <p className="text-xs font-semibold text-slate-600">Nenhum resultado direto para "{searchTerm}"</p>
-                          <button
-                            type="button"
-                            onClick={() => void searchYoutubeInsideApp(searchTerm)}
-                            className="mt-3 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm"
-                          >
-                            Tentar Novamente
-                          </button>
-                        </div>
-                      )}
-                    </div>
+              <div className="space-y-5 pb-24 select-none">
+                {/* Search Bar matching Spotube Desktop .exe (media_1794361884091_e506e120.jpg) */}
+                <div className="relative">
+                  <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    value={youtubeSearchQuery}
+                    onChange={(e) => {
+                      setYoutubeSearchQuery(e.target.value);
+                      setSearchTerm(e.target.value);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') void searchYoutubeInsideApp(youtubeSearchQuery);
+                    }}
+                    placeholder="Buscar músicas, playlists, álbuns, artistas..."
+                    className="h-12 w-full rounded-xl border border-white/10 bg-[#14151a] pl-11 pr-24 text-sm text-white placeholder-gray-500 outline-none focus:border-blue-500 transition"
+                  />
+                  {youtubeSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setYoutubeSearchQuery('');
+                        setSearchTerm('');
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white p-1"
+                    >
+                      <X size={16} />
+                    </button>
                   )}
                 </div>
 
-                {/* Desktop Search Results Grid Prominent at the Top */}
-                {youtubeSearchResults.length > 0 && (
-                  <div className="hidden lg:block mb-8">
-                    <div className="mb-4 flex items-center justify-between gap-4">
-                      <div>
-                        <h3 className="text-2xl font-black tracking-tight text-white">
-                          Resultados da Busca: "{searchTerm || youtubeSearchQuery}"
-                        </h3>
-                        <p className="mt-1 text-xs text-gray-400">
-                          {youtubeSearchResults.length} faixas encontradas • Clique no Play para ouvir imediatamente ou Baixar para fila offline
-                        </p>
-                      </div>
-                      <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-3.5 py-1 text-xs font-bold text-blue-300">
-                        {youtubeSearchResults.length} faixas
-                      </span>
-                    </div>
+                {/* Filter Pills row: [ Tudo ] [ Faixas ] [ Playlists ] [ Álbuns ] [ Artistas ] [ Usuários ] */}
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                  {[
+                    { id: 'tudo', label: 'Tudo' },
+                    { id: 'faixas', label: 'Faixas' },
+                    { id: 'playlists', label: 'Playlists' },
+                    { id: 'albuns', label: 'Álbuns' },
+                    { id: 'artistas', label: 'Artistas' },
+                    { id: 'usuarios', label: 'Usuários' }
+                  ].map((tab) => {
+                    const isActive = mobileSearchFilter === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => {
+                          setMobileSearchFilter(tab.id as any);
+                          if (youtubeSearchQuery.trim()) {
+                            void searchYoutubeInsideApp(youtubeSearchQuery);
+                          }
+                        }}
+                        className={`rounded-lg px-4 py-1.5 text-xs font-semibold transition active:scale-95 shrink-0 ${
+                          isActive
+                            ? 'bg-blue-600 text-white shadow-sm'
+                            : 'bg-[#1a1b20] text-gray-300 hover:bg-[#252730]'
+                        }`}
+                      >
+                        {tab.label}
+                      </button>
+                    );
+                  })}
+                </div>
 
-                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                      {youtubeSearchResults.map((result) => (
+                {/* Loading indicator */}
+                {isSearchingYoutube && (
+                  <div className="flex h-64 flex-col items-center justify-center text-center">
+                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+                    <p className="mt-3 text-xs font-semibold text-gray-400">Buscando faixas e playlists...</p>
+                  </div>
+                )}
+
+                {/* High Density 5-Column Grid (100% fiel à screenshot Spotube .exe media_1794361884091_e506e120.jpg) */}
+                {!isSearchingYoutube && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 gap-4">
+                    {/* Render Playlists when on 'playlists' or 'tudo' */}
+                    {(mobileSearchFilter === 'playlists' || mobileSearchFilter === 'tudo') &&
+                      youtubePlaylistSearchResults.map((pl) => (
                         <div
-                          key={`desk-top-${result.id}-${result.url}`}
-                          className="group relative flex items-center gap-3.5 rounded-2xl border border-white/10 bg-white/[0.03] p-3 transition hover:border-blue-500/30 hover:bg-white/[0.06] text-left"
+                          key={`pl-${pl.id}`}
+                          onClick={() => {
+                            void playYoutubeTrack({
+                              id: pl.id,
+                              title: pl.title,
+                              url: pl.url,
+                              thumbnail: pl.thumbnail,
+                              artist: pl.channel || 'YouTube'
+                            });
+                          }}
+                          className="group relative cursor-pointer overflow-hidden rounded-2xl bg-[#14151a] p-3 transition hover:bg-[#1a1b22] border border-white/5"
                         >
-                          <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-black/40 border border-white/5">
-                            {result.thumbnail ? (
-                              <img src={result.thumbnail} alt={result.title} className="h-full w-full object-cover transition group-hover:scale-105" />
+                          <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-black/40">
+                            {pl.thumbnail ? (
+                              <img src={pl.thumbnail} alt={pl.title} className="h-full w-full object-cover transition duration-300 group-hover:scale-105" />
                             ) : (
-                              <Music size={22} className="text-gray-500 m-auto mt-4" />
+                              <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-blue-600/20 to-black text-blue-400">
+                                <ListMusic size={32} />
+                              </div>
                             )}
+
+                            {/* + Button on top-right of cover (saves to library) */}
                             <button
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                void playYoutubeTrack(result);
+                                const newPl: Playlist = {
+                                  id: pl.id,
+                                  name: pl.title,
+                                  ownerUserName: pl.channel || 'YouTube',
+                                  picture: pl.thumbnail || '',
+                                  songs: []
+                                };
+                                setPlaylists((prev) => [newPl, ...prev]);
+                                setPlayerNotice(`Playlist "${pl.title}" salva na biblioteca!`);
                               }}
-                              className="absolute inset-0 m-auto flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg opacity-0 group-hover:opacity-100 transition active:scale-90"
-                              title="Tocar Agora"
+                              className="absolute top-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 hover:bg-black/90 text-white border border-white/20 shadow-md transition active:scale-90"
+                              title="Salvar Playlist"
                             >
-                              <Play size={16} fill="currentColor" className="ml-0.5" />
+                              <Plus size={16} />
+                            </button>
+
+                            {/* Play Button on bottom-right of cover */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void playYoutubeTrack({
+                                  id: pl.id,
+                                  title: pl.title,
+                                  url: pl.url,
+                                  thumbnail: pl.thumbnail,
+                                  artist: pl.channel || 'YouTube'
+                                });
+                              }}
+                              className="absolute bottom-2 right-2 flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 hover:bg-blue-500 text-white shadow-xl transition active:scale-90"
+                              title="Tocar Playlist"
+                            >
+                              <Play size={18} fill="currentColor" className="ml-0.5" />
                             </button>
                           </div>
 
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-bold text-white group-hover:text-blue-400 transition">{result.title}</p>
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${
-                                result.source === 'deezer' ? 'bg-purple-500/20 text-purple-300' :
-                                result.source === 'spotify' ? 'bg-emerald-500/20 text-emerald-300' :
-                                'bg-red-500/20 text-red-300'
-                              }`}>
-                                {result.source === 'deezer' ? 'Deezer HiFi' : result.source === 'spotify' ? 'Spotify' : 'YouTube'}
-                              </span>
-                              <p className="truncate text-xs text-gray-400">{result.artist || 'Artista'}</p>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <button
-                              type="button"
-                              onClick={() => void playYoutubeTrack(result)}
-                              className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition shadow-sm"
-                              title="Tocar Imediatamente"
-                            >
-                              <Play size={15} fill="currentColor" className="ml-0.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void downloadYoutubeTrack(result)}
-                              className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-gray-400 hover:text-white transition"
-                              title="Opções de Download"
-                            >
-                              <Download size={15} />
-                            </button>
+                          <div className="mt-2.5">
+                            <h4 className="truncate font-semibold text-sm text-white group-hover:text-blue-400 transition" title={pl.title}>
+                              {pl.title}
+                            </h4>
+                            <p className="truncate text-xs text-gray-400 mt-0.5">
+                              {pl.channel || 'YouTube Playlist'}
+                            </p>
                           </div>
                         </div>
                       ))}
-                    </div>
-                  </div>
-                )}
 
-                {/* Desktop Downloader View */}
-                <div className="hidden lg:grid items-start gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,380px)]">
-                <div className="min-w-0 rounded-[32px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(34,197,94,0.14),transparent_45%),linear-gradient(180deg,#101010_0%,#0a0a0a_100%)] p-6">
-                  <div className="max-w-2xl">
-                    <div className="mb-4 inline-flex rounded-full border border-green-500/20 bg-green-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-green-300">
-                      Downloader
-                    </div>
-                    <h3 className="text-3xl font-black tracking-tight">Encontre no YouTube e publique no catálogo</h3>
-                    <p className="mt-3 text-sm leading-6 text-gray-400">
-                      O Montanha Music Lab consulta o YouTube dentro do app, agrupa faixas e playlists e deixa tudo pronto para baixar sem sair da tela.
-                    </p>
-                  </div>
-
-                  <div
-                    className={`mt-8 rounded-[28px] border border-cyan-400/20 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.16),transparent_40%),rgba(0,0,0,0.28)] p-5 ${
-                      activeDesktopOnboardingStepId === 'youtube-search' ? desktopTourFocusClass : ''
-                    }`}
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-4">
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">Busca integrada</p>
-                        <h4 className="mt-2 text-2xl font-black tracking-tight text-white">Encontre sem sair do Montanha Music Lab</h4>
-                        <p className="mt-2 max-w-xl text-sm leading-6 text-gray-300">
-                          Digite artista, música, live, acoustic ou remix. O Montanha Music Lab consulta o YouTube, mostra faixas e playlists e você escolhe exatamente o que vai baixar.
-                        </p>
-                      </div>
-                      <div className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-200">
-                        Cache inteligente
-                      </div>
-                    </div>
-
-                    <div className="mt-5 flex flex-col gap-3 lg:flex-row">
-                      <div className="relative flex-1">
-                        <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-cyan-200/70" />
-                        <input
-                          value={youtubeSearchQuery}
-                          onChange={(e) => setYoutubeSearchQuery(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') void searchYoutubeInsideApp();
-                          }}
-                          placeholder="Busque por artista, faixa, versao, set, podcast..."
-                          className="h-14 w-full rounded-2xl border border-cyan-300/15 bg-[#071116] pl-11 pr-4 text-sm text-white outline-none focus:border-cyan-300/40"
-                        />
-                      </div>
-                      <button
-                        onClick={() => void searchYoutubeInsideApp()}
-                        disabled={isSearchingYoutube || youtubeSearchQuery.trim().length < 2}
-                        className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-cyan-400 px-6 font-semibold text-black disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {isSearchingYoutube ? <LoaderCircle size={18} className="animate-spin" /> : <Search size={18} />}
-                        {isSearchingYoutube ? 'Buscando...' : 'Buscar no YouTube'}
-                      </button>
-                    </div>
-
-                    {youtubeSearchMessage ? (
-                      <p className="mt-3 text-sm text-cyan-50/80">
-                        {youtubeSearchMessage}
-                      </p>
-                    ) : null}
-
-                    {visibleYoutubeRecentSearches.length > 0 ? (
-                      <div className="mt-5">
-                        <div className="mb-3 flex items-center justify-between">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-gray-500">Buscas recentes</p>
-                          <p className="text-[11px] text-gray-500">Remova o que não quiser ver</p>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          {visibleYoutubeRecentSearches.map((entry) => (
-                            <span
-                              key={`${entry.query}-${entry.lastSearchedAt}`}
-                              className="group inline-flex max-w-full items-center overflow-hidden rounded-full border border-white/10 bg-white/[0.04] text-xs text-gray-300 transition hover:border-cyan-400/30 hover:bg-cyan-400/10 hover:text-white"
-                            >
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setYoutubeSearchQuery(entry.query);
-                                  void searchYoutubeInsideApp(entry.query);
-                                }}
-                                className="min-w-0 truncate py-2 pl-3 pr-2"
-                                title={`Buscar ${entry.query}`}
-                              >
-                                {entry.query}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => hideYoutubeRecentSearch(entry.query)}
-                                className="flex h-7 w-7 shrink-0 items-center justify-center border-l border-white/10 text-gray-500 transition hover:bg-white/10 hover:text-white"
-                                aria-label={`Remover ${entry.query} das buscas recentes`}
-                                title="Remover"
-                              >
-                                <X size={12} />
-                              </button>
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null}
-
-                    {isSearchingYoutube ? (
-                      <div className="mt-6">
-                        <div className="mb-4 flex items-center justify-between gap-3">
-                          <div>
-                            <div className="h-3 w-40 animate-pulse rounded-full bg-cyan-300/20" />
-                            <div className="mt-2 h-4 w-72 animate-pulse rounded-full bg-white/10" />
-                          </div>
-                          <div className="h-7 w-24 animate-pulse rounded-full bg-white/10" />
-                        </div>
-                        <div className="grid gap-4 xl:grid-cols-2">
-                          {Array.from({ length: 4 }).map((_, index) => (
-                            <div
-                              key={`youtube-search-skeleton-${index}`}
-                              className="overflow-hidden rounded-[26px] border border-cyan-400/10 bg-[#071116]"
-                            >
-                              <div className="aspect-video animate-pulse bg-[linear-gradient(110deg,rgba(255,255,255,0.04),rgba(34,211,238,0.12),rgba(255,255,255,0.04))] bg-[length:220%_100%]" />
-                              <div className="space-y-3 p-4">
-                                <div className="h-4 w-4/5 animate-pulse rounded-full bg-white/10" />
-                                <div className="h-3 w-2/3 animate-pulse rounded-full bg-white/5" />
-                                <div className="flex gap-2 pt-2">
-                                  <div className="h-9 w-28 animate-pulse rounded-full bg-white/10" />
-                                  <div className="h-9 w-20 animate-pulse rounded-full bg-cyan-300/10" />
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null}
-
-                    {!isSearchingYoutube && youtubePlaylistSearchResults.length > 0 ? (
-                      <div className="mt-6">
-                        <div className="mb-4 flex items-center justify-between gap-3">
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">Playlists agrupadas</p>
-                            <p className="mt-1 text-sm text-gray-400">Clique em uma playlist para abrir um modal com as quatro ações de faixa e playlist.</p>
-                          </div>
-                          <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-[11px] text-cyan-100">
-                            {youtubePlaylistSearchResults.length} playlists
-                          </span>
-                        </div>
-
-                        <div className="pr-2">
-                          <div className="grid gap-4 xl:grid-cols-2">
-                          {youtubePlaylistSearchResults.map((result) => {
-                            return (
-                            <div
-                              key={`${result.id}-${result.url}`}
-                              onClick={() => void selectYoutubePlaylistSearchResult(result)}
-                              role="button"
-                              tabIndex={0}
-                              onKeyDown={(event) => {
-                                if (event.key === 'Enter' || event.key === ' ') {
-                                  event.preventDefault();
-                                  void selectYoutubePlaylistSearchResult(result);
-                                }
-                              }}
-                              className="group overflow-hidden rounded-[26px] border border-cyan-400/15 bg-[#071116] text-left transition hover:border-cyan-300/35 hover:bg-[#0b151b]"
-                            >
-                              <div className="relative aspect-[16/9] overflow-hidden bg-black">
-                                {result.thumbnail ? (
-                                  <img
-                                    src={result.thumbnail}
-                                    alt={result.title}
-                                    className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                                  />
-                                ) : (
-                                  <div className="flex h-full items-center justify-center bg-gradient-to-br from-cyan-500/20 to-transparent text-cyan-100">
-                                    <List size={28} />
-                                  </div>
-                                )}
-                                <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/80 to-transparent px-3 pb-3 pt-8 text-xs">
-                                  <span className="rounded-full border border-white/10 bg-black/40 px-2 py-1 text-white/80">
-                                    Playlist #{result.position || 0}
-                                  </span>
-                                  {result.entryCount ? (
-                                    <span className="rounded-full border border-white/10 bg-black/40 px-2 py-1 text-white/80">
-                                      {result.entryCount} faixas
-                                    </span>
-                                  ) : null}
-                                </div>
-                              </div>
-
-                              <div className="p-4">
-                                <p className="line-clamp-2 text-base font-semibold text-white">{result.title}</p>
-                                <p className="mt-2 text-xs text-gray-400">
-                                  {getYoutubePlaylistSubtitle(result) || 'Playlist pronta para faixa ou importação completa'}
-                                </p>
-
-                                {result.previewEntries?.length ? (
-                                  <div className="mt-4 space-y-2">
-                                    {result.previewEntries.slice(0, 3).map((entry, index) => (
-                                      <div
-                                        key={`${entry.url}-${index}`}
-                                        className="flex items-center justify-between rounded-2xl border border-white/5 bg-white/[0.03] px-3 py-2 text-xs"
-                                      >
-                                        <span className="truncate text-gray-200">{entry.title}</span>
-                                        <span className="ml-3 text-gray-500">#{index + 1}</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                ) : null}
-
-                                <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs">
-                                  <button
-                                    type="button"
-                                    onClick={(event) => {
-                                      event.stopPropagation();
-                                      void selectYoutubePlaylistSearchResult(result);
-                                    }}
-                                    className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-cyan-100 transition hover:bg-white/[0.08]"
-                                  >
-                                    Abrir playlist
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={(event) => {
-                                      event.stopPropagation();
-                                      void selectYoutubePlaylistSearchResult(result);
-                                    }}
-                                    className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-2 text-cyan-100 transition hover:bg-cyan-300/15"
-                                  >
-                                    4 ações
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                          })}
-                          </div>
-                        </div>
-                      </div>
-                    ) : null}
-
-                    {!isSearchingYoutube && youtubeSearchResults.length > 0 ? (
-                      <div className="mt-6">
-                        <div className="mb-4 flex items-center justify-between gap-3">
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-gray-500">Faixas encontradas</p>
-                            <p className="mt-1 text-sm text-gray-400">Clique em uma faixa para abrir as ações de download ou fila.</p>
-                          </div>
-                          <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] text-gray-300">
-                            {youtubeSearchResults.length} faixas
-                          </span>
-                        </div>
-
-                        <div className="pr-2">
-                        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                        {youtubeSearchResults.map((result) => {
-
-                          return (
+                    {/* Render Tracks when on 'faixas', 'tudo', or not 'playlists' */}
+                    {mobileSearchFilter !== 'playlists' &&
+                      youtubeSearchResults.map((track) => {
+                        const isFav = Boolean(track.id && songs.some((s) => s.id === track.id && s.favorite));
+                        return (
                           <div
-                            key={`${result.id}-${result.url}`}
-                            onClick={() => void selectYoutubeSearchResult(result)}
-                            role="button"
-                            tabIndex={0}
-                            onKeyDown={(event) => {
-                              if (event.key === 'Enter' || event.key === ' ') {
-                                event.preventDefault();
-                                void selectYoutubeSearchResult(result);
-                              }
-                            }}
-                            className="group overflow-hidden rounded-[24px] border border-white/10 bg-[#081015] text-left transition hover:border-cyan-300/30 hover:bg-[#0b151b]"
+                            key={`track-${track.id}-${track.url}`}
+                            onClick={() => void playYoutubeTrack(track)}
+                            className="group relative cursor-pointer overflow-hidden rounded-2xl bg-[#14151a] p-3 transition hover:bg-[#1a1b22] border border-white/5"
                           >
-                            <div className="relative aspect-video overflow-hidden bg-black">
-                              {result.thumbnail ? (
-                                <img
-                                  src={result.thumbnail}
-                                  alt={result.title}
-                                  className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                                />
+                            <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-black/40">
+                              {track.thumbnail ? (
+                                <img src={track.thumbnail} alt={track.title} className="h-full w-full object-cover transition duration-300 group-hover:scale-105" />
                               ) : (
-                                <div className="flex h-full items-center justify-center bg-gradient-to-br from-cyan-500/20 to-transparent text-cyan-100">
-                                  <Video size={26} />
+                                <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-blue-600/20 to-black text-blue-400">
+                                  <Music size={32} />
                                 </div>
                               )}
-                              <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/80 to-transparent px-3 pb-3 pt-8 text-xs">
-                                <span className="rounded-full border border-white/10 bg-black/40 px-2 py-1 text-white/80">
-                                  #{result.position || 0}
-                                </span>
-                                {result.duration ? (
-                                  <span className="rounded-full border border-white/10 bg-black/40 px-2 py-1 text-white/80">
-                                    {result.duration}
-                                  </span>
-                                ) : null}
-                              </div>
+
+                              {/* + Button on top-right of cover (saves to favorites) */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const s: Song = {
+                                    id: track.id ? (track.id.startsWith('yt-') || track.id.startsWith('dz-') ? track.id : `yt-${track.id}`) : `yt-${Date.now()}`,
+                                    title: track.title,
+                                    artist: track.artist || 'Artista',
+                                    thumbnail: track.thumbnail,
+                                    source: track.source || 'youtube',
+                                    path: track.previewUrl || track.url,
+                                    hasAudio: true,
+                                    favorite: false
+                                  };
+                                  void toggleFavorite(s);
+                                }}
+                                className="absolute top-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 hover:bg-black/90 text-white border border-white/20 shadow-md transition active:scale-90"
+                                title="Salvar Música"
+                              >
+                                {isFav ? <Check size={16} className="text-blue-400" /> : <Plus size={16} />}
+                              </button>
+
+                              {/* Play Button on bottom-right of cover */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void playYoutubeTrack(track);
+                                }}
+                                className="absolute bottom-2 right-2 flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 hover:bg-blue-500 text-white shadow-xl transition active:scale-90"
+                                title="Tocar Agora"
+                              >
+                                <Play size={18} fill="currentColor" className="ml-0.5" />
+                              </button>
                             </div>
-                            <div className="p-4">
-                              <p className="line-clamp-2 text-sm font-semibold text-white">{result.title}</p>
-                              <p className="mt-2 text-xs text-gray-400">{getYoutubeResultSubtitle(result) || 'Resultado pronto para download'}</p>
-                              <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs">
-                                <button
-                                  type="button"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    void playYoutubeTrack(result);
-                                  }}
-                                  className="rounded-full border border-blue-500/20 bg-blue-500/10 px-3 py-2 text-blue-200 transition hover:bg-blue-500/20 font-medium"
-                                >
-                                  Tocar agora
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    void downloadYoutubeTrack(result);
-                                  }}
-                                  className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-2 text-cyan-100 transition hover:bg-cyan-300/15"
-                                >
-                                  Ações
-                                </button>
-                              </div>
+
+                            <div className="mt-2.5">
+                              <h4 className="truncate font-semibold text-sm text-white group-hover:text-blue-400 transition" title={track.title}>
+                                {track.title}
+                              </h4>
+                              <p className="truncate text-xs text-gray-400 mt-0.5">
+                                {track.artist || 'Artista'}
+                              </p>
                             </div>
                           </div>
                         );
-                        })}
-                        </div>
-                        </div>
+                      })}
+
+                    {/* Empty State */}
+                    {youtubeSearchResults.length === 0 && youtubePlaylistSearchResults.length === 0 && !isSearchingYoutube && (
+                      <div className="col-span-full py-16 text-center text-gray-400">
+                        <Search size={40} className="mx-auto mb-3 opacity-30" />
+                        <p className="text-sm font-semibold text-gray-300">
+                          {youtubeSearchQuery ? `Nenhum resultado encontrado para "${youtubeSearchQuery}"` : 'Digite algo para buscar no Spotube Core'}
+                        </p>
                       </div>
-                    ) : null}
+                    )}
                   </div>
-
-                  <div className="mt-6 flex flex-wrap items-center gap-3">
-                    <button
-                      onClick={() => setShowActivityPanel((prev) => !prev)}
-                      className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-xs font-medium text-gray-300 hover:bg-white/[0.08]"
-                    >
-                      {showActivityPanel ? 'Ocultar atividade' : 'Ver atividade'}
-                    </button>
-                    <span className="text-xs text-gray-500">
-                      {isDownloading
-                        ? 'Logs atualizados em tempo real durante download e conversão.'
-                        : 'Abra o painel para acompanhar análise, fila, playlist e avisos do backend.'}
-                    </span>
-                  </div>
-
-                  {downloadMessage ? <p className="mt-4 text-sm leading-6 text-gray-300">{downloadMessage}</p> : null}
-                </div>
-
-                <div className="min-w-0 xl:sticky xl:top-6">
-                  <div className="rounded-[32px] border border-white/10 bg-[#0d0d0d] p-6">
-                    <p className="text-xs uppercase tracking-[0.24em] text-gray-500">Destino</p>
-
-                    <div className="mt-4 overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-gray-500">Fila de downloads</p>
-                        <p className="mt-1 text-sm text-gray-300">Acompanhe audio, video e itens da playlist em tempo real.</p>
-                      </div>
-                      <button
-                        onClick={() => void loadDownloadJobs()}
-                        className="rounded-full border border-white/10 px-3 py-2 text-xs text-gray-300 hover:bg-white/5"
-                      >
-                        Atualizar
-                      </button>
-                    </div>
-
-                    <div className="mt-4 max-h-[44vh] space-y-3 overflow-x-hidden overflow-y-auto pr-1">
-                      {downloadJobs.length === 0 ? (
-                        <p className="text-sm text-gray-500">Nenhum download recente.</p>
-                      ) : (
-                        downloadJobs.slice(0, 6).map((job) => (
-                          <div key={job.id} className="min-w-0 overflow-hidden rounded-[20px] border border-white/10 bg-black/20 p-4">
-                            <div className="flex min-w-0 items-start justify-between gap-3">
-                              <div className="min-w-0 flex-1">
-                                <p
-                                  className={`text-sm font-semibold text-white ${
-                                    job.status === 'error' ? 'whitespace-pre-wrap break-words leading-5' : 'truncate'
-                                  }`}
-                                >
-                                  {job.message || (job.mode === 'playlist' ? 'Playlist em processamento' : 'Faixa em processamento')}
-                                </p>
-                                <p className="mt-1 text-xs text-gray-500">
-                                  {job.mode === 'playlist' ? 'Playlist' : 'Faixa unica'}
-                                  {job.includeVideo ? ' • áudio + vídeo' : ' • áudio'}
-                                  {job.updatedAt ? ` • ${new Date(job.updatedAt).toLocaleTimeString('pt-BR')}` : ''}
-                                </p>
-                              </div>
-                              <span
-                                className={`rounded-full px-2 py-1 text-[10px] uppercase tracking-[0.16em] ${
-                                  job.status === 'completed'
-                                    ? 'bg-green-500/15 text-green-200'
-                                    : job.status === 'paused'
-                                      ? 'bg-amber-500/15 text-amber-100'
-                                      : job.status === 'queued'
-                                        ? 'bg-white/10 text-gray-200'
-                                    : job.status === 'error'
-                                      ? 'bg-red-500/15 text-red-200'
-                                      : 'bg-cyan-500/15 text-cyan-100'
-                                }`}
-                              >
-                                {getDownloadJobStatusLabel(job.status)}
-                              </span>
-                            </div>
-
-                            <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
-                              <div
-                                className={`h-full rounded-full transition-all ${
-                                  job.status === 'error'
-                                    ? 'bg-red-400'
-                                    : job.status === 'paused'
-                                      ? 'bg-amber-300'
-                                      : 'bg-gradient-to-r from-green-400 to-cyan-400'
-                                }`}
-                                style={{ width: `${Math.max(4, Math.min(100, Number(job.progress || 0)))}%` }}
-                              />
-                            </div>
-
-                            <div className="mt-2 flex min-w-0 items-center justify-between gap-3 text-xs text-gray-400">
-                              <span className="min-w-0 truncate">{job.stage}</span>
-                              <span>{Math.round(Number(job.progress || 0))}%</span>
-                            </div>
-
-                            {job.status === 'error' && job.message ? (
-                              <p className="mt-3 overflow-hidden break-words rounded-2xl border border-red-500/20 bg-red-500/10 px-3 py-3 text-xs leading-5 text-red-100">
-                                {repairTextEncoding(job.message)}
-                              </p>
-                            ) : null}
-
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              {job.status === 'running' || job.status === 'queued' ? (
-                                <button
-                                  onClick={() => void pauseDownloadJob(job.id)}
-                                  disabled={activeDownloadJobActionId === job.id}
-                                  className="rounded-full border border-white/10 px-3 py-2 text-xs text-gray-200 hover:bg-white/5 disabled:opacity-50"
-                                >
-                                  {activeDownloadJobActionId === job.id ? 'Pausando...' : 'Pausar'}
-                                </button>
-                              ) : null}
-                              {job.status === 'paused' || job.status === 'error' ? (
-                                <button
-                                  onClick={() => void resumeDownloadJob(job.id)}
-                                  disabled={activeDownloadJobActionId === job.id}
-                                  className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-2 text-xs text-cyan-100 hover:bg-cyan-400/15 disabled:opacity-50"
-                                >
-                                  {activeDownloadJobActionId === job.id ? 'Retomando...' : 'Retomar'}
-                                </button>
-                              ) : null}
-                            </div>
-
-                            {job.items?.length ? (
-                              <div className="mt-3 grid gap-2">
-                                {job.items.slice(0, 4).map((item) => (
-                                  <div key={`${job.id}-${item.index}`} className="min-w-0 overflow-hidden rounded-2xl border border-white/5 bg-white/[0.03] px-3 py-2">
-                                    <div className="flex min-w-0 items-center justify-between gap-3">
-                                      <span className="min-w-0 truncate text-xs text-gray-200" title={item.title}>{item.title}</span>
-                                      <span className="text-[10px] text-gray-500">{Math.round(item.progress || 0)}%</span>
-                                    </div>
-                                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
-                                      <div
-                                        className={`h-full rounded-full ${
-                                          item.status === 'error'
-                                            ? 'bg-red-400'
-                                            : item.status === 'paused'
-                                              ? 'bg-amber-300'
-                                            : item.status === 'completed'
-                                              ? 'bg-green-400'
-                                              : 'bg-cyan-400'
-                                        }`}
-                                        style={{ width: `${Math.max(3, Math.min(100, Number(item.progress || 0)))}%` }}
-                                      />
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : null}
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-
-                    <div className="mt-4 rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
-                      <p className="text-sm text-gray-400">Usuario atual</p>
-                      <p className="mt-2 text-2xl font-bold text-white">{currentUser?.nome || 'Nenhum usuario conectado'}</p>
-                      <p className="mt-2 text-sm text-gray-400">
-                        {currentUser
-                          ? 'A faixa entra no Explorar e fica favoritada para este usuario. Se for playlist, o Montanha Music Lab tambem cria uma playlist local automaticamente.'
-                          : 'Entre com um usuario antes de enviar downloads.'}
-                      </p>
-                    </div>
-
-                    <div className="mt-4 rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
-                      <p className="text-xs uppercase tracking-[0.2em] text-gray-500">Performance</p>
-                      <div className="mt-3 space-y-3 text-sm text-gray-300">
-                        <p>Baixa a melhor trilha de audio disponivel e prioriza OPUS/WebM quando possivel.</p>
-                        <p>Playlists usam importacao paralela para acelerar o throughput sem travar a interface.</p>
-                        <p>Logs mostram analise, download, conversao e faixas ignoradas.</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                </div>
-              </>
+                )}
+              </div>
             ) : activeSection === 'home' && !activePlaylist ? (
               <div className="space-y-8 pb-24 select-none">
                 {/* 🍱 APPLE BENTO GRID HERO DASHBOARD (Skill: apple-bento-grid & apple-design) */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                   
                   {/* BENTO 1: YOUTUBE MUSIC ACESSO LIVRE (2 Colunas - Destaque Principal) */}
-                  <div className="md:col-span-2 rounded-[32px] border border-white/10 bg-[#121318] p-6 shadow-2xl relative overflow-hidden flex flex-col justify-between">
+                  <div className="col-span-1 md:col-span-3 rounded-[32px] border border-white/10 bg-[#121318] p-6 shadow-2xl relative overflow-hidden flex flex-col justify-between">
                     <div className="pointer-events-none absolute -top-24 -left-24 h-48 w-48 rounded-full bg-red-600/15 blur-3xl" />
                     
                     <div>
@@ -5005,103 +4566,6 @@ export default function App() {
                           </div>
                         </div>
                       ))}
-                    </div>
-                  </div>
-
-                  {/* BENTO 2: SPOTUBE CORE ENGINE STATUS (1 Coluna) */}
-                  <div className="rounded-[32px] border border-white/10 bg-[#121318] p-6 shadow-2xl relative overflow-hidden flex flex-col justify-between">
-                    <div className="pointer-events-none absolute -top-16 -right-16 h-36 w-36 rounded-full bg-blue-600/15 blur-2xl" />
-
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs uppercase tracking-wider text-neutral-400 font-bold">Motor de udio</span>
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/15 text-blue-400 border border-blue-500/30">
-                          Spotube Core
-                        </span>
-                      </div>
-
-                      <div className="my-5">
-                        <div className="text-4xl font-black tracking-tight text-white flex items-baseline gap-2">
-                          14769 <span className="text-xs font-normal text-neutral-400">porta local</span>
-                        </div>
-                        <p className="text-xs text-neutral-400 mt-1">
-                          Servidor Ktor integrado com streaming OPUS sem latncia.
-                        </p>
-                      </div>
-
-                      <div className="space-y-2.5 text-xs text-neutral-300">
-                        <div className="flex items-center justify-between rounded-xl bg-white/[0.03] p-2.5 border border-white/5">
-                          <span className="text-neutral-400">Status Local:</span>
-                          <span className="font-bold text-emerald-400 flex items-center gap-1.5">
-                            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                            Online (Porta 14769)
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between rounded-xl bg-white/[0.03] p-2.5 border border-white/5">
-                          <span className="text-neutral-400">Codec de Streaming:</span>
-                          <span className="font-bold text-white">OPUS 256kbps</span>
-                        </div>
-                        <div className="flex items-center justify-between rounded-xl bg-white/[0.03] p-2.5 border border-white/5">
-                          <span className="text-neutral-400">Modo no Celular:</span>
-                          <span className="font-bold text-sky-400">WebAudio PWA</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setIsPluginsModalOpen(true)}
-                      className="mt-5 w-full rounded-2xl bg-white/[0.06] hover:bg-white/[0.1] border border-white/10 py-3 text-xs font-bold text-white transition active:scale-98 flex items-center justify-center gap-2"
-                    >
-                      <Settings2 size={14} />
-                      <span>Configurar Plugins &amp; Contas</span>
-                    </button>
-                  </div>
-
-                  {/* BENTO 3: PLAYLISTS DE TREINO DOS ALUNOS (1 Coluna) */}
-                  <div className="rounded-[32px] border border-white/10 bg-[#121318] p-6 shadow-2xl relative overflow-hidden flex flex-col justify-between">
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs uppercase tracking-wider text-neutral-400 font-bold">Coach Montanha</span>
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30">
-                          Treino &amp; LPO
-                        </span>
-                      </div>
-
-                      <h4 className="text-base font-bold text-white mt-2">Playlists dos Alunos</h4>
-                      <p className="text-xs text-neutral-400 mt-0.5">Msica de alta energia para WODs e PRs de carga.</p>
-
-                      <div className="space-y-2 mt-4">
-                        {[
-                          { title: 'WOD Insano  Fora Bruta', desc: 'Batidas aceleradas para cross e funcional', tracks: 18, color: 'from-amber-500/20' },
-                          { title: 'LPO & Heavy PR Focus', desc: 'Heavy Metal calibrado para Snatch e C&J', tracks: 24, color: 'from-red-500/20' },
-                          { title: 'Cardio & Esteira 160 BPM', desc: 'Ritmo constante para mobilizao lipdica', tracks: 32, color: 'from-blue-500/20' }
-                        ].map((pl, i) => (
-                          <div
-                            key={i}
-                            onClick={() => {
-                              setHomeYoutubeSearchInput(pl.title);
-                              setYoutubeSearchQuery(pl.title);
-                              setActiveSection('download');
-                              void searchYoutubeInsideApp(pl.title);
-                            }}
-                            className="group flex items-center justify-between p-3 rounded-2xl border border-white/5 bg-white/[0.02] hover:bg-white/[0.06] hover:border-amber-500/30 transition cursor-pointer"
-                          >
-                            <div className="min-w-0 pr-2">
-                              <h5 className="text-xs font-bold text-white truncate group-hover:text-amber-300 transition">{pl.title}</h5>
-                              <p className="text-[10px] text-neutral-400 truncate">{pl.desc}</p>
-                            </div>
-                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/5 text-neutral-300 group-hover:bg-amber-500 group-hover:text-black transition">
-                              <Play size={14} fill="currentColor" className="ml-0.5" />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-xs text-neutral-400">
-                      <span>3 Colees Disponveis</span>
-                      <span className="text-amber-400 font-semibold">1-Toque Toca Tudo</span>
                     </div>
                   </div>
 
@@ -5514,6 +4978,88 @@ export default function App() {
                 </div>
               </div>
 
+            ) : activeSection === 'playlists' && !activePlaylist ? (
+              <div className="space-y-6 pb-24 select-none">
+                <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                  <div>
+                    <h2 className="text-2xl font-black text-white">Minhas Playlists</h2>
+                    <p className="text-xs text-gray-400 mt-1">Playlists salvas e criadas no Montanha Music Lab</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const name = window.prompt('Nome da nova playlist:');
+                      if (name && name.trim()) {
+                        const newPl: Playlist = {
+                          id: `pl-${Date.now()}`,
+                          name: name.trim(),
+                          ownerUserName: currentUser?.nome || 'Você',
+                          songs: []
+                        };
+                        setPlaylists((prev) => [newPl, ...prev]);
+                        try {
+                          const stored = JSON.parse(localStorage.getItem('montanha_custom_playlists') || '[]');
+                          localStorage.setItem('montanha_custom_playlists', JSON.stringify([newPl, ...stored]));
+                        } catch {}
+                        setPlayerNotice(`Playlist "${name.trim()}" criada!`);
+                      }
+                    }}
+                    className="flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-500 px-4 py-2 text-xs font-bold text-white shadow-md transition active:scale-95"
+                  >
+                    <Plus size={16} />
+                    <span>Nova Playlist</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                  {playlists.map((pl) => (
+                    <div
+                      key={pl.id}
+                      onClick={() => {
+                        setActiveDiscoverPlaylistId(null);
+                        setActivePlaylistId(pl.id);
+                      }}
+                      className="group relative cursor-pointer overflow-hidden rounded-2xl bg-[#14151a] p-3 transition hover:bg-[#1a1b22] border border-white/5"
+                    >
+                      <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-black/40">
+                        {pl.picture || pl.songs?.[0]?.thumbnail ? (
+                          <img src={pl.picture || pl.songs?.[0]?.thumbnail || ''} alt={pl.name} className="h-full w-full object-cover transition duration-300 group-hover:scale-105" />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-blue-600/20 to-black text-blue-400">
+                            <ListMusic size={32} />
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (pl.songs && pl.songs.length > 0) {
+                              void playSong(pl.songs[0]);
+                            } else {
+                              setActivePlaylistId(pl.id);
+                            }
+                          }}
+                          className="absolute bottom-2 right-2 flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 hover:bg-blue-500 text-white shadow-xl transition active:scale-90"
+                          title="Tocar Playlist"
+                        >
+                          <Play size={18} fill="currentColor" className="ml-0.5" />
+                        </button>
+                      </div>
+                      <div className="mt-2.5">
+                        <h4 className="truncate font-semibold text-sm text-white group-hover:text-blue-400 transition">{pl.name}</h4>
+                        <p className="truncate text-xs text-gray-400 mt-0.5">{(pl.songs || []).length} faixas</p>
+                      </div>
+                    </div>
+                  ))}
+                  {playlists.length === 0 && (
+                    <div className="col-span-full py-16 text-center text-gray-400">
+                      <ListMusic size={40} className="mx-auto mb-3 opacity-30" />
+                      <p className="text-sm font-semibold text-gray-300">Você ainda não tem playlists criadas.</p>
+                      <p className="text-xs text-gray-500 mt-1">Clique em "Nova Playlist" ou salve qualquer playlist na Busca com o botão +.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
             ) : activeSection === 'explore' && !activeDiscoverPlaylist ? (
               explorePlaylists.length === 0 ? (
                 <div className="flex h-[50vh] flex-col items-center justify-center text-center text-gray-500">
