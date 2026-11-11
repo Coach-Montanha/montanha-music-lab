@@ -53,7 +53,9 @@ import {
   Volume2,
   RotateCcw,
   RotateCw,
-  X
+  X,
+  ChevronLeft,
+  Sparkles
 } from 'lucide-react';
 import { supabase, getCloudFavorites, toggleCloudFavorite } from './lib/supabase';
 import { SupabaseAuthModal } from './components/SupabaseAuthModal';
@@ -267,7 +269,7 @@ const GITHUB_ANDROID_APK_URL = `${GITHUB_RELEASES_LATEST_URL}/download/Montanha 
 const GITHUB_ANDROID_APK_ASSET_NAME = 'Montanha Music Lab-Android.apk';
 
 type ViewMode = 'grid' | 'list';
-type Section = 'home' | 'explore' | 'library' | 'favorites' | 'download' | 'settings' | 'playlists';
+type Section = 'home' | 'search' | 'playlists' | 'albums' | 'favorites' | 'local_files' | 'downloads' | 'settings' | 'explore' | 'library' | 'download';
 type AuthMode = 'login' | 'register';
 type PlaybackMode = 'audio' | 'video';
 type BackupFormat = 'mp3' | 'mp4' | 'avi';
@@ -1019,6 +1021,96 @@ export default function App() {
       setPlayerNotice(`Conta Google / YouTube conectada com sucesso! ${fetchedPlaylists.length} playlists sincronizadas.`);
       return;
     }
+  };
+
+    const [isLoadingPlaylistSongs, setIsLoadingPlaylistSongs] = useState(false);
+
+  const openPlaylist = async (pl: Playlist) => {
+    // 1. Registra a playlist no estado imediatamente para que isPlaylistDetailView a encontre
+    setPlaylists((prev) => {
+      const existing = prev.find((p) => p.id === pl.id);
+      if (!existing) {
+        const next = [pl, ...prev];
+        try { localStorage.setItem('montanha_playlists_local', JSON.stringify(next)); } catch {}
+        return next;
+      }
+      return prev;
+    });
+
+    setActivePlaylistId(pl.id);
+    setActiveDiscoverPlaylistId(null);
+
+    // 2. Se já tiver faixas, encerra
+    if (pl.songs && pl.songs.length > 0) return;
+
+    // 3. Busca faixas da playlist via API
+    setIsLoadingPlaylistSongs(true);
+    setPlayerNotice(`Carregando faixas da playlist "${pl.name}"...`);
+
+    try {
+      const res = await fetch(`/api/youtube/playlist?id=${encodeURIComponent(pl.id)}&title=${encodeURIComponent(pl.name)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.songs) && data.songs.length > 0) {
+          const updatedPl: Playlist = { ...pl, songs: data.songs };
+          setPlaylists((prev) => {
+            const next = prev.map((p) => (p.id === pl.id ? updatedPl : p));
+            if (!next.some((p) => p.id === pl.id)) next.push(updatedPl);
+            try { localStorage.setItem('montanha_playlists_local', JSON.stringify(next)); } catch {}
+            return next;
+          });
+          setPlayerNotice(`"${pl.name}": ${data.songs.length} faixas carregadas!`);
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn('Erro ao carregar playlist:', err);
+    } finally {
+      setIsLoadingPlaylistSongs(false);
+    }
+  };
+
+  const playPlaylistDirectly = async (pl: Playlist) => {
+    // Registra no estado
+    setPlaylists((prev) => {
+      if (!prev.some((p) => p.id === pl.id)) {
+        const next = [pl, ...prev];
+        try { localStorage.setItem('montanha_playlists_local', JSON.stringify(next)); } catch {}
+        return next;
+      }
+      return prev;
+    });
+
+    if (pl.songs && pl.songs.length > 0) {
+      void playSong(pl.songs[0]);
+      return;
+    }
+
+    setPlayerNotice(`Carregando e reproduzindo "${pl.name}"...`);
+    setIsLoadingPlaylistSongs(true);
+    try {
+      const res = await fetch(`/api/youtube/playlist?id=${encodeURIComponent(pl.id)}&title=${encodeURIComponent(pl.name)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.songs) && data.songs.length > 0) {
+          const updatedPl: Playlist = { ...pl, songs: data.songs };
+          setPlaylists((prev) => {
+            const next = prev.map((p) => (p.id === pl.id ? updatedPl : p));
+            if (!next.some((p) => p.id === pl.id)) next.push(updatedPl);
+            try { localStorage.setItem('montanha_playlists_local', JSON.stringify(next)); } catch {}
+            return next;
+          });
+          void playSong(data.songs[0]);
+          return;
+        }
+      }
+    } catch {} finally {
+      setIsLoadingPlaylistSongs(false);
+    }
+
+    setYoutubeSearchQuery(pl.name);
+    setActiveSection('search');
+    void searchYoutubeInsideApp(pl.name);
   };
 
   const handleDisconnectPluginAccount = async (provider: 'youtube' | 'spotify' | 'deezer') => {
@@ -4359,7 +4451,7 @@ export default function App() {
           </div>
 
           <div className="flex-1 overflow-y-auto px-3 py-4 space-y-3">
-            {/* 1. Início (Home) - 100% Spotube Desktop (media_1794327858965_5bfa75a2.jpg) */}
+            {/* 1. Início (Home) */}
             <div>
               <button
                 onClick={() => {
@@ -4368,26 +4460,26 @@ export default function App() {
                   setActiveSection('home');
                 }}
                 className={`flex w-full items-center gap-3 rounded-2xl px-3.5 py-2.5 text-sm font-semibold transition ${
-                  activeSection === 'home' || activeSection === 'explore'
+                  activeSection === 'home' && !isPlaylistDetailView
                     ? 'bg-gradient-to-r from-[#0066cc] to-[#0052cc] text-white shadow-[0_4px_16px_rgba(0,102,204,0.45)]'
                     : 'text-gray-300 hover:bg-white/[0.05] hover:text-white'
                 }`}
               >
-                <Home size={18} className={activeSection === 'home' || activeSection === 'explore' ? 'text-white' : 'text-gray-400'} />
+                <Home size={18} className={activeSection === 'home' && !isPlaylistDetailView ? 'text-white' : 'text-gray-400'} />
                 <span>Início</span>
               </button>
             </div>
 
-            {/* 2. Buscar Item */}
+            {/* 2. Buscar Item (Rota isolada 'search') */}
             <div>
               <button
                 onClick={() => {
                   setActivePlaylistId(null);
                   setActiveDiscoverPlaylistId(null);
-                  setActiveSection('download');
+                  setActiveSection('search');
                 }}
                 className={`flex w-full items-center gap-3 rounded-2xl px-3.5 py-2.5 text-sm font-medium transition ${
-                  activeSection === 'download'
+                  activeSection === 'search' || activeSection === 'download'
                     ? 'bg-gradient-to-r from-[#0066cc] to-[#0052cc] text-white shadow-[0_4px_16px_rgba(0,102,204,0.45)]'
                     : 'text-gray-400 hover:bg-white/[0.04] hover:text-white'
                 }`}
@@ -4409,39 +4501,25 @@ export default function App() {
 
               {sidebarLibraryExpanded && (
                 <div className="mt-1 space-y-1 pl-1">
+                  {/* Playlists (Rota isolada 'playlists') */}
                   <button
                     onClick={() => {
                       setActivePlaylistId(null);
                       setActiveDiscoverPlaylistId(null);
-                      setActiveSection('home');
+                      setActiveSection('playlists');
                     }}
                     className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition ${
-                      activeSection === 'home'
+                      activeSection === 'playlists' || isPlaylistDetailView
                         ? 'bg-gradient-to-r from-blue-600 to-sky-500 text-white shadow-[0_4px_16px_rgba(37,99,235,0.4)]'
                         : 'text-gray-400 hover:bg-white/[0.04] hover:text-white'
                     }`}
                   >
                     <ListMusic size={18} />
                     <span>Playlists</span>
-                    <span className="ml-auto text-xs text-gray-500">{playlists.length + homePlaylists.length}</span>
+                    <span className="ml-auto text-xs text-gray-500">{playlists.length}</span>
                   </button>
 
-                  <button
-                    onClick={() => {
-                      setActivePlaylistId(null);
-                      setActiveDiscoverPlaylistId(null);
-                      setActiveSection('explore');
-                    }}
-                    className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition ${
-                      activeSection === 'explore'
-                        ? 'bg-gradient-to-r from-blue-600 to-sky-500 text-white shadow-[0_4px_16px_rgba(37,99,235,0.4)]'
-                        : 'text-gray-400 hover:bg-white/[0.04] hover:text-white'
-                    }`}
-                  >
-                    <Disc size={18} />
-                    <span>Álbuns</span>
-                  </button>
-
+                  {/* Favoritas (Likes) */}
                   <button
                     onClick={() => {
                       setActivePlaylistId(null);
@@ -4454,11 +4532,9 @@ export default function App() {
                         : 'text-gray-400 hover:bg-white/[0.04] hover:text-white'
                     }`}
                   >
-                    <Heart size={18} className={activeSection === 'favorites' ? 'fill-white' : ''} />
+                    <Heart size={18} />
                     <span>Favoritas (Likes)</span>
-                    <span className="ml-auto text-xs text-gray-500">
-                      {songs.filter((s) => s.favorite).length}
-                    </span>
+                    <span className="ml-auto text-xs text-gray-500">{songs.filter((s) => s.favorite).length}</span>
                   </button>
                 </div>
               )}
@@ -4476,14 +4552,15 @@ export default function App() {
 
               {sidebarDeviceExpanded && (
                 <div className="mt-1 space-y-1 pl-1">
+                  {/* Arquivos locais (Rota isolada 'local_files') */}
                   <button
                     onClick={() => {
                       setActivePlaylistId(null);
                       setActiveDiscoverPlaylistId(null);
-                      setActiveSection('library');
+                      setActiveSection('local_files');
                     }}
                     className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition ${
-                      activeSection === 'library'
+                      activeSection === 'local_files'
                         ? 'bg-gradient-to-r from-blue-600 to-sky-500 text-white shadow-[0_4px_16px_rgba(37,99,235,0.4)]'
                         : 'text-gray-400 hover:bg-white/[0.04] hover:text-white'
                     }`}
@@ -4493,27 +4570,28 @@ export default function App() {
                     <span className="ml-auto text-xs text-gray-500">{songs.length}</span>
                   </button>
 
+                  {/* Downloads (Rota isolada 'downloads') */}
                   <button
                     onClick={() => {
                       setActivePlaylistId(null);
                       setActiveDiscoverPlaylistId(null);
-                      setActiveSection('download');
+                      setActiveSection('downloads');
                     }}
                     className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition ${
-                      activeSection === 'download'
+                      activeSection === 'downloads'
                         ? 'bg-gradient-to-r from-blue-600 to-sky-500 text-white shadow-[0_4px_16px_rgba(37,99,235,0.4)]'
                         : 'text-gray-400 hover:bg-white/[0.04] hover:text-white'
                     }`}
                   >
                     <Download size={18} />
                     <span>Downloads</span>
-                    <span className="ml-auto text-xs text-gray-500">{offlineSongIds.length || downloadJobs.length}</span>
+                    <span className="ml-auto text-xs text-gray-500">0</span>
                   </button>
                 </div>
               )}
             </div>
 
-            {/* Group: Conectar */}
+            {/* Group: Conectar / Plugins */}
             <div>
               <button
                 onClick={() => setSidebarConnectExpanded((prev) => !prev)}
@@ -4526,26 +4604,29 @@ export default function App() {
               {sidebarConnectExpanded && (
                 <div className="mt-1 space-y-1 pl-1">
                   <button
-                    onClick={() => setShowDevicePicker(true)}
+                    onClick={() => setIsPluginsModalOpen(true)}
                     className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-gray-400 hover:bg-white/[0.04] hover:text-white transition"
                   >
-                    <Smartphone size={18} />
-                    <span>Dispositivos</span>
-                    {devices.length > 0 && (
-                      <span className="ml-auto rounded-full bg-blue-500/20 px-2 py-0.5 text-[10px] text-sky-400">
-                        {devices.length}
-                      </span>
-                    )}
+                    <Sparkles size={18} />
+                    <span>Serviços / Plugins</span>
                   </button>
                 </div>
               )}
             </div>
 
-            {/* Links inferiores */}
-            <div className="pt-2 border-t border-white/5 space-y-1">
+            {/* Configurações */}
+            <div className="pt-2">
               <button
-                onClick={() => setIsPluginsModalOpen(true)}
-                className="flex w-full items-center gap-3 rounded-2xl px-3.5 py-2.5 text-sm font-medium text-gray-400 hover:bg-white/[0.05] hover:text-white transition"
+                onClick={() => {
+                  setActivePlaylistId(null);
+                  setActiveDiscoverPlaylistId(null);
+                  setActiveSection('settings');
+                }}
+                className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
+                  activeSection === 'settings'
+                    ? 'bg-gradient-to-r from-blue-600 to-sky-500 text-white shadow-[0_4px_16px_rgba(37,99,235,0.4)]'
+                    : 'text-gray-400 hover:bg-white/[0.04] hover:text-white'
+                }`}
               >
                 <Settings2 size={18} />
                 <span>Configurações</span>
@@ -4553,35 +4634,31 @@ export default function App() {
             </div>
           </div>
 
-          {/* User Account / Supabase Sync Pill */}
-          <div className="p-3 border-t border-white/5 bg-[#07090e]">
-            <button
-              onClick={() => setIsAuthModalOpen(true)}
-              className="flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3 text-left transition hover:border-sky-500/40 hover:bg-white/[0.06]"
+          {/* User Profile / Status Card */}
+          <div className="p-3 border-t border-white/5 space-y-2">
+            <div
+              onClick={() => setIsPluginsModalOpen(true)}
+              className="flex items-center gap-3 p-3 rounded-2xl bg-white/[0.03] border border-white/5 hover:border-white/10 hover:bg-white/[0.06] transition cursor-pointer"
             >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-blue-700 to-sky-400 text-white font-bold text-sm shadow-md">
-                {supabaseUser ? (supabaseUser.email?.[0] || 'U').toUpperCase() : <LogIn size={18} />}
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white font-bold text-sm shadow-md">
+                {currentUser?.nome ? currentUser.nome.charAt(0).toUpperCase() : 'M'}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-semibold text-white">
-                  {supabaseUser ? (supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0]) : 'Sincronizar Conta'}
-                </p>
-                <p className="truncate text-[10px] text-sky-400">
-                  {supabaseUser ? 'Supabase Realtime Ativo' : 'Entrar com Supabase'}
+                <p className="text-xs font-bold text-white truncate">{currentUser?.nome || 'Usuário Local'}</p>
+                <p className="text-[10px] text-gray-400 truncate">
+                  {pluginAccounts.spotify?.connected ? 'Spotify Ativo' : pluginAccounts.youtube?.connected ? 'YouTube Ativo' : 'Offline / Local'}
                 </p>
               </div>
-            </button>
-          </div>
-        
-          {/* Botão de Reset Completo / Zerar Registro */}
-          <div className="p-4 border-t border-white/5">
+            </div>
+
+            {/* Botão Zerar Dados & Reiniciar */}
             <button
               type="button"
-              onClick={handleFullResetAndClear}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-400 hover:bg-red-500/20 transition active:scale-98"
-              title="Limpar todos os caches, contas e começar do zero"
+              onClick={() => void handleFullResetAndClear()}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-red-500/20 bg-red-500/5 hover:bg-red-500/15 text-red-400 py-2 text-xs font-semibold transition active:scale-95"
+              title="Limpar todos os dados locais e reiniciar o app do zero"
             >
-              <RotateCcw size={14} />
+              <Trash2 size={13} />
               <span>Zerar Dados & Reiniciar</span>
             </button>
           </div>
@@ -4619,10 +4696,14 @@ export default function App() {
                 {/* Clean View Title - Spotube Screenshot 1 & 2 */}
                 <div className="hidden lg:flex items-center justify-between">
                   <h2 className="text-2xl font-black tracking-tight text-white">
-                    {activeSection === 'home' || activeSection === 'explore' ? 'Explorar' :
-                     activeSection === 'download' ? 'Buscar' :
+                    {isPlaylistDetailView && activePlaylist ? activePlaylist.name :
+                     activeSection === 'home' ? 'Início' :
+                     activeSection === 'search' || activeSection === 'download' ? 'Buscar' :
+                     activeSection === 'playlists' ? 'Playlists' :
                      activeSection === 'favorites' ? 'Músicas Curtidas' :
-                     activeSection === 'library' ? 'Sua Biblioteca' : 'Configurações'}
+                     activeSection === 'local_files' || activeSection === 'library' ? 'Arquivos Locais' :
+                     activeSection === 'downloads' ? 'Downloads' :
+                     activeSection === 'settings' ? 'Configurações' : 'Início'}
                   </h2>
                 </div>
               </div>
@@ -4760,12 +4841,13 @@ export default function App() {
                         <div
                           key={`pl-${pl.id}`}
                           onClick={() => {
-                            void playYoutubeTrack({
+                            void openPlaylist({
                               id: pl.id,
-                              title: pl.title,
-                              url: pl.url,
-                              thumbnail: pl.thumbnail,
-                              artist: pl.channel || 'YouTube'
+                              name: pl.title,
+                              ownerUserName: pl.channel || 'YouTube',
+                              picture: pl.thumbnail || '',
+                              provider: 'youtube',
+                              songs: []
                             });
                           }}
                           className="group relative cursor-pointer overflow-hidden rounded-2xl bg-[#14151a] p-3 transition hover:bg-[#1a1b22] border border-white/5"
@@ -5216,68 +5298,8 @@ export default function App() {
                   </div>
                 )}
 
-                {/* 4. MINHAS PLAYLISTS LOCAIS & MONTANHA */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between border-b border-white/5 pb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600/20 text-blue-400">
-                        <Library size={20} />
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-black text-white">Minhas Playlists Locais</h3>
-                        <p className="text-xs text-neutral-400">Criadas e salvas no Montanha Music Lab</p>
-                      </div>
-                    </div>
-                    <span className="text-xs font-semibold text-neutral-400">{localPlaylists.length} playlists</span>
-                  </div>
-
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                    {localPlaylists.map((pl) => (
-                      <div
-                        key={pl.id}
-                        onClick={() => {
-                          setActiveDiscoverPlaylistId(null);
-                          setActivePlaylistId(pl.id);
-                          setActiveSection('library');
-                        }}
-                        className="group relative cursor-pointer overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-4 transition hover:border-blue-500/40 hover:bg-white/[0.06]"
-                      >
-                        <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-black/40 border border-white/5">
-                          {pl.songs?.[0]?.thumbnail ? (
-                            <img src={pl.songs[0].thumbnail} alt={pl.name} className="h-full w-full object-cover transition group-hover:scale-105" />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-blue-600/20 to-black text-blue-400">
-                              <Library size={32} />
-                            </div>
-                          )}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (pl.songs && pl.songs.length > 0) {
-                                void playSong(pl.songs[0]);
-                              } else {
-                                setActivePlaylistId(pl.id);
-                                setActiveSection('library');
-                              }
-                            }}
-                            className="absolute bottom-3 right-3 flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg opacity-0 group-hover:opacity-100 transition active:scale-90"
-                            title="Tocar Playlist"
-                          >
-                            <Play size={18} fill="currentColor" className="ml-0.5" />
-                          </button>
-                        </div>
-                        <div className="mt-3">
-                          <h4 className="truncate font-bold text-sm text-white group-hover:text-blue-400 transition">{pl.name}</h4>
-                          <p className="text-xs text-neutral-400 mt-1">{(pl.songs || []).length} faixas</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
               </div>
-
-            ) : activeSection === 'playlists' && !activePlaylist ? (
+            ) : activeSection === 'playlists' && !isPlaylistDetailView ? (
               <div className="space-y-6 pb-24 select-none">
                 <div className="flex items-center justify-between border-b border-white/5 pb-4">
                   <div>
@@ -5405,9 +5427,78 @@ export default function App() {
                   })}
                 </div>
               )
+            ) : activeSection === 'local_files' ? (
+              <div className="space-y-6 pb-24 select-none">
+                <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                  <div>
+                    <h3 className="text-2xl font-black text-white">Arquivos Locais</h3>
+                    <p className="text-xs text-neutral-400 mt-1">Músicas salvas e disponíveis offline no seu dispositivo</p>
+                  </div>
+                  <span className="text-xs font-semibold text-neutral-400">{songs.length} faixas</span>
+                </div>
+
+                {songs.length === 0 ? (
+                  <div className="flex h-64 flex-col items-center justify-center text-center text-gray-500">
+                    <Folder size={48} className="mb-3 opacity-30 text-blue-400" />
+                    <p className="text-lg font-bold text-gray-200">Nenhum arquivo local ainda</p>
+                    <p className="mt-1 text-xs text-gray-500 max-w-sm">
+                      Busque faixas na aba Buscar e clique no botão "+" para salvar na sua biblioteca local.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
+                    {songs.map((song) => (
+                      <div
+                        key={song.id}
+                        onClick={() => void playSong(song)}
+                        className="group relative cursor-pointer overflow-hidden rounded-2xl border border-white/10 bg-[#14151a] p-3 transition hover:border-blue-500/40 hover:bg-[#1a1b22]"
+                      >
+                        <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-black/40 border border-white/5">
+                          {song.thumbnail ? (
+                            <img src={song.thumbnail} alt={song.title} className="h-full w-full object-cover transition group-hover:scale-105" />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-blue-600/20 to-black text-blue-400">
+                              <Music size={32} />
+                            </div>
+                          )}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void playSong(song);
+                            }}
+                            className="absolute bottom-2.5 right-2.5 flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-white shadow-xl opacity-0 group-hover:opacity-100 transition active:scale-90"
+                            title="Tocar Faixa"
+                          >
+                            <Play size={18} fill="currentColor" className="ml-0.5" />
+                          </button>
+                        </div>
+                        <div className="mt-2.5">
+                          <h4 className="truncate font-bold text-xs sm:text-sm text-white group-hover:text-blue-400 transition">{song.title}</h4>
+                          <p className="truncate text-[11px] text-neutral-400 mt-0.5">{song.artist || 'Artista'}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             ) : isPlaylistDetailView ? (
               <div className="overflow-hidden rounded-[34px] border border-white/8 bg-[linear-gradient(180deg,#151515_0%,#111111_28%,#0b0b0b_100%)] shadow-[0_30px_80px_rgba(0,0,0,0.28)]">
-                <div className="bg-[linear-gradient(180deg,rgba(41,121,255,0.16)_0%,rgba(18,18,18,0.86)_78%,#111111_100%)] px-8 pb-8 pt-10">
+                <div className="bg-[linear-gradient(180deg,rgba(41,121,255,0.16)_0%,rgba(18,18,18,0.86)_78%,#111111_100%)] px-8 pb-8 pt-8">
+                  {/* Botão Voltar para a navegação anterior */}
+                  <div className="mb-6">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActivePlaylistId(null);
+                        setActiveDiscoverPlaylistId(null);
+                      }}
+                      className="flex items-center gap-2 rounded-xl bg-white/10 hover:bg-white/20 px-3.5 py-1.5 text-xs font-bold text-white transition active:scale-95 border border-white/10"
+                    >
+                      <ChevronLeft size={16} />
+                      <span>Voltar para {activeSection === 'playlists' ? 'Playlists' : (activeSection as any) === 'search' || (activeSection as any) === 'download' ? 'Buscar' : 'Início'}</span>
+                    </button>
+                  </div>
                   <div className="flex flex-col gap-8 lg:flex-row lg:items-end">
                     <div className="h-52 w-52 overflow-hidden rounded-[28px] bg-[#1b1b1b] shadow-[0_24px_60px_rgba(0,0,0,0.35)]">
                       {activeCollectionCover ? (
