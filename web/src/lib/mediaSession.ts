@@ -90,3 +90,5 @@ export class MediaSessionController {
     }
   }
 }
+
+export const mediaSessionController = MediaSessionController.getInstance();

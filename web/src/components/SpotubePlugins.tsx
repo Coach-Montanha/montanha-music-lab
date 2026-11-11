@@ -55,7 +55,7 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
 }) => {
   const [activeModalTab, setActiveModalTab] = useState<ModalTabId>('plugins');
   const [configuringPlugin, setConfiguringPlugin] = useState<string | null>(null);
-  const [authMethodTab, setAuthMethodTab] = useState<'profile' | 'oauth' | 'cookie' | 'credentials'>('profile');
+  const [authMethodTab, setAuthMethodTab] = useState<'oauth' | 'profile' | 'credentials'>('oauth');
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
 
   // Form states
@@ -69,7 +69,7 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
   const [customInstanceInput, setCustomInstanceInput] = useState('');
   const [audioQualityPref, setAudioQualityPref] = useState('256');
   const [ytAuthTab, setYtAuthTab] = useState<'google' | 'channel' | 'cookie' | 'streaming' | 'free'>('google');
-  const [deezerAuthTab, setDeezerAuthTab] = useState<'profile' | 'arl' | 'quick'>('profile');
+  const [deezerAuthTab, setDeezerAuthTab] = useState<'quick' | 'profile'>('quick');
 
   // General settings
   const [language, setLanguage] = useState(() => localStorage.getItem('montanha-lang') || 'pt-BR');
@@ -113,10 +113,10 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
 
     if (configuringPlugin === 'spotify') {
       token = spDcInput.trim() || passwordInput.trim() || 'spotube_sp_token_valid';
-      username = spotifyProfileInput.trim() || loginInput.trim() || (authMethodTab === 'cookie' ? 'Spotify (sp_dc)' : 'Coach Montanha (Spotify)');
+      username = spotifyProfileInput.trim() || loginInput.trim() || ('Coach Montanha (Spotify)');
     } else if (configuringPlugin === 'deezer') {
       token = arlInput.trim() || passwordInput.trim() || 'deezer_arl_token_valid';
-      username = deezerProfileInput.trim() || loginInput.trim() || (deezerAuthTab === 'arl' ? 'Deezer (HiFi FLAC)' : 'Deezer User');
+      username = deezerProfileInput.trim() || loginInput.trim() || ('Deezer HiFi User');
     } else if (configuringPlugin === 'youtube') {
       token = passwordInput.trim() || customInstanceInput.trim() || 'youtube_session_token_valid';
       username = ytChannelInput.trim() || loginInput.trim() || 'YouTube Music';
@@ -243,7 +243,7 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
     {
       id: 'spotify',
       name: 'Spotify Connect & Playlists',
-      description: 'Sincronização oficial de playlists, músicas curtidas e biblioteca do Spotify (OAuth / sp_dc).',
+      description: 'Sincronização oficial de playlists, músicas curtidas e biblioteca do Spotify via 1-Clique oficial.',
       author: 'Spotify API Core',
       tag: 'Metadados & Playlists',
       provider: 'spotify',
@@ -256,7 +256,7 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
     {
       id: 'deezer',
       name: 'Deezer Premium HiFi Stream',
-      description: 'Catálogo oficial Deezer, playlists e áudio sem perdas (FLAC) via token ARL.',
+      description: 'Catálogo oficial Deezer, playlists e áudio de alta fidelidade sem necessidade de cookies manuais.',
       author: 'Deezer Core',
       tag: 'HiFi Streaming',
       provider: 'deezer',
@@ -322,9 +322,7 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
             <div className="mt-4 space-y-4">
               <div className="flex rounded-2xl bg-white/[0.04] p-1 border border-white/5">
                 {[
-                  { id: 'profile', label: 'Perfil / Playlists' },
-                  { id: 'cookie', label: 'Cookie sp_dc (Spotube)' },
-                  { id: 'oauth', label: 'Login Web / Demo' }
+                  { id: 'oauth', label: 'Login Direto Spotify' }, { id: 'profile', label: 'Perfil / Link Público' }
                 ].map((tab) => (
                   <button
                     key={tab.id}
@@ -367,28 +365,7 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
                 </div>
               )}
 
-              {authMethodTab === 'cookie' && (
-                <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 space-y-3">
-                  <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-sky-200">
-                    <p className="font-bold">Como obter o cookie sp_dc no Spotify (Padrão Spotube):</p>
-                    <ol className="list-decimal pl-4 mt-1 space-y-1 text-[11px] text-sky-300/90">
-                      <li>Abra <strong>open.spotify.com</strong> no navegador e faça login.</li>
-                      <li>Pressione <strong>F12</strong> (Inspecionar) e vá em <strong>Aplicativo &gt; Cookies</strong>.</li>
-                      <li>Copie o valor do cookie <strong>sp_dc</strong> e cole abaixo.</li>
-                    </ol>
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-gray-300">Valor do Cookie sp_dc</label>
-                    <input
-                      type="password"
-                      value={spDcInput}
-                      onChange={(e) => setSpDcInput(e.target.value)}
-                      placeholder="AQ... (Cole seu sp_dc aqui)"
-                      className="mt-1 h-11 w-full rounded-xl border border-white/10 bg-white/5 px-3 text-xs text-white placeholder-gray-500 outline-none focus:border-[#1db954]"
-                    />
-                  </div>
-                </div>
-              )}
+              
 
               {authMethodTab === 'oauth' && (
                 <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 space-y-3">
@@ -560,23 +537,7 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
                 </div>
               )}
 
-              {ytAuthTab === 'cookie' && (
-                <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 space-y-3">
-                  <p className="text-xs text-gray-300 leading-relaxed">
-                    Para sincronizar sua lista de "Músicas com Gostei" e playlists privadas, cole o cookie de sessão do YouTube (SAPISID ou HSID).
-                  </p>
-                  <div>
-                    <label className="text-xs font-semibold text-gray-300">Cookie de Sessão do YouTube (SAPISID)</label>
-                    <input
-                      type="password"
-                      value={passwordInput}
-                      onChange={(e) => setPasswordInput(e.target.value)}
-                      placeholder="Cole o cookie SAPISID ou cookies exportados do youtube.com"
-                      className="mt-1 h-11 w-full rounded-xl border border-white/10 bg-white/5 px-3 text-xs text-white placeholder-gray-500 outline-none focus:border-red-500"
-                    />
-                  </div>
-                </div>
-              )}
+              
 
               {ytAuthTab === 'streaming' && (
                 <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 space-y-3">
@@ -612,9 +573,7 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
             <div className="mt-4 space-y-4">
               <div className="flex rounded-2xl bg-white/[0.04] p-1 border border-white/5">
                 {[
-                  { id: 'profile', label: 'Perfil / Playlists' },
-                  { id: 'arl', label: 'Token ARL (FLAC)' },
-                  { id: 'quick', label: 'Login Rápido' }
+                  { id: 'quick', label: 'Login Direto Deezer' }, { id: 'profile', label: 'Perfil / ID Deezer' }
                 ].map((tab) => (
                   <button
                     key={tab.id}
@@ -657,28 +616,7 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
                 </div>
               )}
 
-              {deezerAuthTab === 'arl' && (
-                <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 space-y-3">
-                  <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs text-purple-200">
-                    <p className="font-bold">Como obter o token ARL da Deezer (Spotube Core):</p>
-                    <ol className="list-decimal pl-4 mt-1 space-y-1 text-[11px] text-purple-300/90 leading-relaxed">
-                      <li>Faça login em <strong>deezer.com</strong> pelo navegador.</li>
-                      <li>Pressione <strong>F12</strong> &gt; Aplicativo &gt; Cookies &gt; <strong>deezer.com</strong>.</li>
-                      <li>Copie o valor do cookie <strong>arl</strong> (192 caracteres).</li>
-                    </ol>
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-gray-300">Token ARL do Deezer</label>
-                    <input
-                      type="password"
-                      value={arlInput}
-                      onChange={(e) => setArlInput(e.target.value)}
-                      placeholder="Cole seu token ARL aqui..."
-                      className="mt-1 h-11 w-full rounded-xl border border-white/10 bg-white/5 px-3 text-xs text-white placeholder-gray-500 outline-none focus:border-purple-500"
-                    />
-                  </div>
-                </div>
-              )}
+              
 
               {deezerAuthTab === 'quick' && (
                 <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 space-y-3">

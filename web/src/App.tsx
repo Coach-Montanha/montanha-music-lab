@@ -61,6 +61,7 @@ import type { User as SupabaseUser } from '@supabase/supabase-js';
 import api from './services/api';
 import brandMark from './assets/app.png';
 import { SpotubePlugins } from './components/SpotubePlugins';
+import { mediaSessionController } from './lib/mediaSession';
 import { getStoredPluginAccounts, savePluginAccount, removePluginAccount, type PluginAccountData } from './lib/pluginAccounts';
 
 import type { DesktopOnboardingStep } from './components/DesktopOnboardingOverlay';
@@ -380,7 +381,10 @@ function getOfflineAudioStore() {
 function runWhenIdle(callback: () => void) {
   if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
     const handle = window.requestIdleCallback(callback, { timeout: 1200 });
-    return () => window.cancelIdleCallback(handle);
+    
+  
+
+  return () => window.cancelIdleCallback(handle);
   }
 
   const handle = globalThis.setTimeout(callback, 240);
@@ -1031,6 +1035,53 @@ export default function App() {
   }, [hiddenYoutubeRecentSearches, youtubeRecentSearches]);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // MediaSession API Integration (iOS Lock Screen / Dynamic Island / Android Media Notifications)
+  useEffect(() => {
+    mediaSessionController.setupActionHandlers({
+      onPlay: () => {
+        if (audioRef.current && !isPlaying) {
+          audioRef.current.play().catch(console.error);
+          setIsPlaying(true);
+        }
+      },
+      onPause: () => {
+        if (audioRef.current && isPlaying) {
+          audioRef.current.pause();
+          setIsPlaying(false);
+        }
+      },
+      onNext: () => {
+        void playNext();
+      },
+      onPrevious: () => {
+        void playPrevious();
+      },
+      onSeekTo: (details) => {
+        if (audioRef.current && details.seekTime !== undefined) {
+          audioRef.current.currentTime = details.seekTime;
+          setCurrentTime(details.seekTime);
+        }
+      }
+    });
+  }, [isPlaying]);
+
+  useEffect(() => {
+    if (currentSong) {
+      mediaSessionController.updateMetadata({
+        title: currentSong.title,
+        artist: currentSong.artist || 'Coach Montanha Music Lab',
+        album: (currentSong as any).album || 'Montanha Music Lab',
+        artworkUrl: currentSong.thumbnail || undefined
+      });
+    }
+  }, [currentSong]);
+
+  useEffect(() => {
+    mediaSessionController.updatePlaybackState(isPlaying);
+  }, [isPlaying]);
+  const prebufferAudioRef = useRef<HTMLAudioElement | null>(null);
+  const prebufferedSongIdRef = useRef<string | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
   const playbackModeRef = useRef<PlaybackMode>('audio');
@@ -3144,16 +3195,20 @@ export default function App() {
     let streamUrl = '';
     const searchTarget = `${result.artist || ''} ${result.title}`.trim();
 
-    if (result.previewUrl) {
-      streamUrl = result.previewUrl;
-    } else {
-      try {
-        const streamRes = await fetch(`/api/youtube/stream?id=${encodeURIComponent(result.id || '')}&q=${encodeURIComponent(searchTarget)}`);
-        if (streamRes.ok) {
-          const data = await streamRes.json();
-          if (data?.url) streamUrl = data.url;
+    // Priorizar stream completo do YouTube sem corte de 30 segundos
+    try {
+      const streamRes = await fetch(`/api/youtube/stream?id=${encodeURIComponent(result.id || '')}&q=${encodeURIComponent(searchTarget)}`);
+      if (streamRes.ok) {
+        const data = await streamRes.json();
+        if (data?.url && !data.url.includes('dzcdn.net') && !data.url.includes('preview')) {
+          streamUrl = data.url;
         }
-      } catch {}
+      }
+    } catch {}
+
+    // Se no conseguiu stream esttico direto, verificar se previewUrl no  de 30s antes de usar
+    if (!streamUrl && result.previewUrl && !result.previewUrl.includes('dzcdn.net')) {
+      streamUrl = result.previewUrl;
     }
 
     const songId = result.id ? (result.id.startsWith('yt-') || result.id.startsWith('dz-') ? result.id : `yt-${result.id}`) : `yt-${Date.now()}`;
@@ -3821,6 +3876,31 @@ export default function App() {
   void playlistEditingId;
   void logout;
 
+  
+  const preloadNextTrackStream = async (track: Song) => {
+    try {
+      let streamUrl = track.path;
+      const isRemote = streamUrl && (streamUrl.startsWith('http://') || streamUrl.startsWith('https://')) && !streamUrl.includes('youtube.com/watch') && !streamUrl.includes('dzcdn.net');
+      if (!isRemote) {
+        const cleanId = (track.youtubeUrl || track.id || '').replace(/^yt-/, '').replace(/https?:\/\/(www\.)?youtube\.com\/watch\?v=/, '').split('&')[0];
+        const targetQuery = `${track.artist || ''} ${track.title}`.trim();
+        const res = await fetch(`/api/youtube/stream?id=${encodeURIComponent(cleanId)}&q=${encodeURIComponent(targetQuery)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.url && !data.url.includes('dzcdn.net') && !data.url.includes('preview')) {
+            streamUrl = data.url;
+          }
+        }
+      }
+      if (streamUrl && prebufferAudioRef.current) {
+        prebufferAudioRef.current.src = streamUrl;
+        prebufferAudioRef.current.load();
+      }
+    } catch (e) {
+      console.debug('Prebuffer next track error:', e);
+    }
+  };
+
   const handleMediaTimeUpdate = (element: HTMLMediaElement | null) => {
     if (!element) return;
     const nextTime = element.currentTime || 0;
@@ -3828,6 +3908,23 @@ export default function App() {
     setCurrentTime(nextTime);
     setDuration(nextDuration);
     broadcastSnapshot({ currentTime: nextTime, duration: nextDuration });
+
+    // Pilar 2: Atualização do MediaSession positionState para Lock Screen iOS e Notificação Android
+    mediaSessionController.updatePositionState({
+      duration: nextDuration,
+      position: nextTime,
+      playbackRate: 1
+    });
+
+    // Pilar 1: Gapless Playback & Pré-Buffer Inteligente (8-10s antes do fim)
+    if (nextDuration > 20 && nextTime >= nextDuration - 10) {
+      const currentIndex = queue.findIndex((s) => s.id === currentSong?.id);
+      const nextTrack = currentIndex >= 0 && currentIndex + 1 < queue.length ? queue[currentIndex + 1] : null;
+      if (nextTrack && prebufferedSongIdRef.current !== nextTrack.id) {
+        prebufferedSongIdRef.current = nextTrack.id;
+        void preloadNextTrackStream(nextTrack);
+      }
+    }
   };
 
   const handleMediaLoadedMetadata = (element: HTMLMediaElement | null) => {
@@ -3850,6 +3947,12 @@ export default function App() {
 
   return (
     <div className="h-screen overflow-hidden bg-[#050505] text-white">
+      <audio
+        ref={prebufferAudioRef}
+        id="prebuffer-audio"
+        preload="auto"
+        className="hidden"
+      />
       <audio
         ref={audioRef}
         preload="metadata"
@@ -4175,7 +4278,7 @@ export default function App() {
           </header>
 
           <section className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-8 md:py-8 pb-56 lg:pb-36">
-            {!isPlaylistDetailView ? (
+            {!isPlaylistDetailView && activeSection !== 'download' && activeSection !== 'home' && activeSection !== 'explore' ? (
               <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
                 <h2 className="mb-3 text-2xl md:text-5xl font-black tracking-tight">{heroTitle}</h2>
                 <p className="text-gray-400">{heroDescription}</p>
