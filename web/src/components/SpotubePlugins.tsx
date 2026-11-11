@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   X,
+  ExternalLink,
   Plus,
   Settings2,
   ChevronDown,
@@ -284,7 +285,7 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
   const renderPluginConfigModal = () => {
     if (!configuringPlugin) return null;
 
-    const isConnected = accounts[configuringPlugin]?.connected;
+    const isConnected = Boolean(accounts[configuringPlugin]?.connected && accounts[configuringPlugin]?.username);
 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-xl p-4">
@@ -391,8 +392,16 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
               {authMethodTab === 'oauth' && (
                 <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 space-y-3">
                   <p className="text-xs text-gray-300 leading-relaxed">
-                    Conexão rápida com biblioteca do Spotify Connect sem exigir chaves de API:
+                    Login oficial do Spotify (abre a tela de autenticação segura no navegador):
                   </p>
+                  <button
+                    type="button"
+                    onClick={() => window.open('https://accounts.spotify.com/pt-BR/login', '_blank', 'width=480,height=680')}
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-black border border-emerald-500/40 py-3 text-xs font-bold text-emerald-400 shadow-md hover:bg-emerald-950/30 transition active:scale-98"
+                  >
+                    <ExternalLink size={16} />
+                    <span>🌐 Abrir Tela Oficial de Login Spotify</span>
+                  </button>
                   <button
                     type="button"
                     onClick={() => handleQuickConnect('spotify', 'Coach Montanha (Spotify)')}
@@ -442,6 +451,14 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
 
               {ytAuthTab === 'channel' && (
                 <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 space-y-3">
+                  <button
+                    type="button"
+                    onClick={() => window.open('https://accounts.google.com/signin', '_blank', 'width=500,height=700')}
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-black border border-red-500/40 py-3 text-xs font-bold text-red-300 shadow-md hover:bg-red-950/30 transition active:scale-98"
+                  >
+                    <ExternalLink size={16} />
+                    <span>🌐 Abrir Tela Oficial de Login Google / YouTube</span>
+                  </button>
                   <div>
                     <label className="text-xs font-semibold text-gray-300">Canal do YouTube (@handle ou Link)</label>
                     <input
@@ -589,8 +606,16 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
               {deezerAuthTab === 'quick' && (
                 <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 space-y-3">
                   <p className="text-xs text-gray-300 leading-relaxed">
-                    Ativação imediata do motor Deezer com catálogo HiFi e buscas globais:
+                    Login oficial Deezer (abre tela de autenticação segura no navegador):
                   </p>
+                  <button
+                    type="button"
+                    onClick={() => window.open('https://www.deezer.com/login', '_blank', 'width=500,height=700')}
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-black border border-purple-500/40 py-3 text-xs font-bold text-purple-300 shadow-md hover:bg-purple-950/30 transition active:scale-98"
+                  >
+                    <ExternalLink size={16} />
+                    <span>🌐 Abrir Tela Oficial de Login Deezer</span>
+                  </button>
                   <button
                     type="button"
                     onClick={() => handleQuickConnect('deezer', 'Coach Montanha (Deezer HiFi)')}
@@ -659,7 +684,7 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
                 className="flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-2.5 text-xs font-bold text-white shadow-md hover:bg-blue-500 transition active:scale-98"
               >
                 <Check size={14} />
-                <span>Salvar e Conectar</span>
+                <span>{isConnected ? 'Atualizar Conexão' : 'Conectar Conta'}</span>
               </button>
             </div>
           </div>

@@ -11,7 +11,7 @@ export interface PluginAccountData {
   lastSync?: string;
 }
 
-const STORAGE_KEY = 'montanha_music_lab_plugins_v5';
+const STORAGE_KEY = 'montanha_music_lab_plugins_v7';
 
 export const getStoredPluginAccounts = (): Record<string, PluginAccountData> => {
   try {
