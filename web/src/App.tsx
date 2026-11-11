@@ -961,6 +961,7 @@ export default function App() {
   const [offlineBusyIds, setOfflineBusyIds] = useState<string[]>([]);
   const [isVideoTheaterOpen, setIsVideoTheaterOpen] = useState(false);
   const [isVideoPanelOpen, setIsVideoPanelOpen] = useState(false);
+  const [isExpandedPlayerOpen, setIsExpandedPlayerOpen] = useState(false);
   const [showVideoInMiniPlayer, setShowVideoInMiniPlayer] = useState(false);
   const [backendAvailable, setBackendAvailable] = useState(false);
   const [desktopPreferences, setDesktopPreferences] = useState<DesktopPreferences>({
@@ -4507,7 +4508,7 @@ export default function App() {
 
                 {/* High Density 5-Column Grid (100% fiel à screenshot Spotube .exe media_1794361884091_e506e120.jpg) */}
                 {!isSearchingYoutube && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5 sm:gap-4">
                     {/* Render Playlists when on 'playlists' or 'tudo' */}
                     {(mobileSearchFilter === 'playlists' || mobileSearchFilter === 'tudo') &&
                       youtubePlaylistSearchResults.map((pl) => (
@@ -5553,7 +5554,7 @@ export default function App() {
                 </p>
               </div>
             ) : viewMode === 'grid' ? (
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2.5 sm:gap-4">
                 <AnimatePresence>
                   {filteredSongs.map((song, index) => {
                     const active = currentSong?.id === song.id;
@@ -5574,8 +5575,8 @@ export default function App() {
                         }`}
                       >
                         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/[0.04] via-transparent to-transparent opacity-0 transition duration-300 group-hover:opacity-100" />
-                        <div className="relative p-4">
-                          <div className="relative aspect-[1.08/1] overflow-hidden rounded-[24px] bg-[#1b1b1b]">
+                        <div className="relative p-2.5 sm:p-3">
+                          <div className="relative aspect-square overflow-hidden rounded-2xl bg-[#1b1b1b]">
                             {song.thumbnail ? (
                               <img
                                 src={song.thumbnail}
@@ -5613,17 +5614,17 @@ export default function App() {
                                 e.stopPropagation();
                                 void playSong(song);
                               }}
-                              className="absolute bottom-4 right-4 flex h-14 w-14 items-center justify-center rounded-full bg-green-500 text-black shadow-[0_18px_40px_rgba(34,197,94,0.35)]"
+                              className="absolute bottom-2.5 right-2.5 flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-green-500 text-black shadow-lg"
                             >
                               {active && isPlaying ? <Pause size={18} /> : <Play size={18} fill="currentColor" />}
                             </motion.button>
                           </div>
 
                           <div className="pt-5">
-                            <p className="truncate text-[18px] font-black leading-tight tracking-[-0.02em] text-white">
+                            <p className="truncate text-xs sm:text-sm font-bold leading-tight text-white">
                               {getDisplayTitle(song)}
                             </p>
-                            <p className="mt-2 truncate text-sm text-gray-300">
+                            <p className="mt-1 truncate text-[11px] sm:text-xs text-gray-400">
                               {getDisplayArtist(song) || 'Artista desconhecido'}
                             </p>
 
@@ -6179,7 +6180,20 @@ export default function App() {
       {/* MOBILE FLOATING MINI-PLAYER (100% FIEL AO SPOTUBE MOBILE - media_1794327948332_460fbb68.jpg) */}
       <div className={`fixed bottom-[74px] left-3 right-3 z-30 rounded-2xl border border-slate-200/90 bg-white/95 px-3 py-2 shadow-lg backdrop-blur-md flex items-center justify-between gap-2.5 text-slate-800 lg:hidden ${isVideoTheaterOpen ? 'hidden' : ''}`}>
         {/* Progress bar line at top */}
-        <div className="absolute top-0 left-3 right-3 h-[2px] bg-slate-100 overflow-hidden rounded-t-2xl">
+        <div onClick={(e) => {
+          e.stopPropagation();
+          const rect = e.currentTarget.getBoundingClientRect();
+          const clickX = e.clientX - rect.left;
+          const pct = Math.max(0, Math.min(1, clickX / rect.width));
+          if (duration > 0) {
+            const seekTime = pct * duration;
+            setCurrentTime(seekTime);
+            if (audioRef.current) audioRef.current.currentTime = seekTime;
+            if (window.ytPlayer && typeof window.ytPlayer.seekTo === 'function') {
+              window.ytPlayer.seekTo(seekTime, true);
+            }
+          }
+        }} className="absolute top-0 left-3 right-3 h-[4px] bg-slate-200 cursor-pointer overflow-hidden rounded-t-2xl">
           <div
             className="h-full bg-blue-600 transition-all duration-200"
             style={{ width: `${duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0}%` }}
@@ -6187,7 +6201,7 @@ export default function App() {
         </div>
 
         {/* Thumbnail & Title */}
-        <div className="flex min-w-0 flex-1 items-center gap-2.5">
+        <div onClick={() => setIsExpandedPlayerOpen(true)} className="flex min-w-0 flex-1 items-center gap-2.5 cursor-pointer">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-slate-100 border border-slate-200">
             {currentSong?.thumbnail ? (
               <img src={currentSong.thumbnail} alt={currentSong.title} className="h-full w-full object-cover" />
@@ -6316,7 +6330,7 @@ export default function App() {
       {/* DESKTOP FOOTER PLAYER (100% FIEL AO SPOTUBE DESKTOP - media_1794180377520_de4cf9d4.jpg) */}
       <footer className={`hidden lg:flex fixed bottom-0 left-72 right-0 h-24 items-center justify-between gap-5 border-t border-white/10 bg-[#0c0e14]/95 px-6 backdrop-blur-2xl z-30 select-none ${isVideoTheaterOpen ? 'hidden' : ''}`}>
         {/* Left: Track Info & Like */}
-        <div className="flex min-w-0 w-1/4 items-center gap-4">
+        <div onClick={() => setIsExpandedPlayerOpen(true)} className="flex min-w-0 w-1/4 items-center gap-4 cursor-pointer group" title="Clique para expandir o player">
           <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-[#141722] border border-white/5">
             {currentSong?.thumbnail ? (
               <img src={currentSong.thumbnail} alt={currentSong.title} className="h-full w-full object-cover" />
