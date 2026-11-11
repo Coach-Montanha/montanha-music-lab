@@ -1987,35 +1987,39 @@ export default function App() {
 
   const freeYoutubeTracks: Song[] = useMemo(() => [
     {
-      id: 'yt-free-1',
+      id: 'yt-E0ozmU9cJDg',
       title: 'Heavy Metal Titan 2026: 90 Minutes of Fire & Guitar Power',
       artist: 'Heavy Metal Titan',
       thumbnail: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&q=80',
       source: 'youtube',
+      youtubeUrl: 'https://www.youtube.com/watch?v=E0ozmU9cJDg',
       hasAudio: true
     },
     {
-      id: 'yt-free-2',
+      id: 'yt-pAgnJDJN4VA',
       title: 'Back In Black (Remastered Audio)',
       artist: 'AC/DC',
       thumbnail: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=500&q=80',
       source: 'youtube',
+      youtubeUrl: 'https://www.youtube.com/watch?v=pAgnJDJN4VA',
       hasAudio: true
     },
     {
-      id: 'yt-free-3',
+      id: 'yt-Zi_XLOBDo_Y',
       title: 'Billie Jean (High Fidelity Audio)',
       artist: 'Michael Jackson',
       thumbnail: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&q=80',
       source: 'youtube',
+      youtubeUrl: 'https://www.youtube.com/watch?v=Zi_XLOBDo_Y',
       hasAudio: true
     },
     {
-      id: 'yt-free-4',
-      title: 'Motivação & Treino Hardcore Beats',
+      id: 'yt-fKopy74weus',
+      title: 'Motivação & Treino Hardcore: CrossTraining WOD Beats',
       artist: 'Coach Montanha Gym Power',
-      thumbnail: 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=500&q=80',
+      thumbnail: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=500&q=80',
       source: 'youtube',
+      youtubeUrl: 'https://www.youtube.com/watch?v=fKopy74weus',
       hasAudio: true
     }
   ], []);
@@ -2604,6 +2608,65 @@ export default function App() {
     channel.postMessage({ type: 'PLAYER_STATE', payload: snapshot });
   };
 
+  
+  const playInYouTubePlayer = (rawVideoId: string) => {
+    const clean = rawVideoId.replace(/^yt-/, '').replace(/https?:\/\/(www\.)?youtube\.com\/watch\?v=/, '').split('&')[0];
+    if (!clean) return false;
+
+    if (window.ytPlayer && typeof window.ytPlayer.loadVideoById === 'function') {
+      try {
+        window.ytPlayer.loadVideoById(clean);
+        if (typeof window.ytPlayer.unMute === 'function') window.ytPlayer.unMute();
+        if (typeof window.ytPlayer.setVolume === 'function') window.ytPlayer.setVolume(Math.round(volume * 100));
+        window.ytPlayer.playVideo();
+        setIsPlaying(true);
+        setPlayerNotice('');
+        return true;
+      } catch (e) {
+        console.warn('ytPlayer.loadVideoById error:', e);
+      }
+    }
+
+    if (window.YT && window.YT.Player) {
+      try {
+        window.ytPlayer = new window.YT.Player('yt-hidden-player', {
+          height: '200',
+          width: '200',
+          videoId: clean,
+          playerVars: {
+            autoplay: 1,
+            controls: 0,
+            disablekb: 1,
+            playsinline: 1
+          },
+          events: {
+            onReady: (event: any) => {
+              try {
+                if (typeof event.target.unMute === 'function') event.target.unMute();
+                if (typeof event.target.setVolume === 'function') event.target.setVolume(Math.round(volume * 100));
+                event.target.playVideo();
+                setIsPlaying(true);
+                setPlayerNotice('');
+              } catch {}
+            },
+            onStateChange: (event: any) => {
+              if (event.data === 1) setIsPlaying(true);
+              else if (event.data === 2) setIsPlaying(false);
+              else if (event.data === 0) void playNext();
+            }
+          }
+        });
+        setIsPlaying(true);
+        setPlayerNotice('');
+        return true;
+      } catch (err) {
+        console.error('Failed to init YT player on demand:', err);
+      }
+    }
+
+    return false;
+  };
+
   const executePlaySong = async (
     song: Song,
     options?: {
@@ -2682,25 +2745,15 @@ export default function App() {
           setPlayerNotice('');
         } catch (playErr) {
           console.warn('Audio tag play failed, falling back to YouTube player:', playErr);
-          const cleanYtId = (song.youtubeUrl || song.id || '').replace(/^yt-/, '').replace(/https?:\/\/(www\.)?youtube\.com\/watch\?v=/, '').split('&')[0];
-          if (cleanYtId && window.ytPlayer && typeof window.ytPlayer.loadVideoById === 'function') {
-            window.ytPlayer.loadVideoById(cleanYtId);
-            window.ytPlayer.playVideo();
-            setIsPlaying(true);
-            setPlayerNotice('');
-          } else {
-            throw playErr;
-          }
+          const cleanYtId = (song.youtubeUrl || song.id || '');
+          const played = playInYouTubePlayer(cleanYtId);
+          if (!played) throw playErr;
         }
       } else {
-        const cleanYtId = (song.youtubeUrl || song.id || '').replace(/^yt-/, '').replace(/https?:\/\/(www\.)?youtube\.com\/watch\?v=/, '').split('&')[0];
-        if (cleanYtId && window.ytPlayer && typeof window.ytPlayer.loadVideoById === 'function') {
-          window.ytPlayer.loadVideoById(cleanYtId);
-          window.ytPlayer.playVideo();
-          setIsPlaying(true);
-          setPlayerNotice('');
-        } else {
-          setPlayerNotice('Faixa não disponível para reprodução imediata.');
+        const cleanYtId = (song.youtubeUrl || song.id || '');
+        const played = playInYouTubePlayer(cleanYtId);
+        if (!played) {
+          setPlayerNotice('Iniciando áudio da faixa...');
         }
       }
       return;
@@ -2862,7 +2915,21 @@ export default function App() {
   };
   const playNext = async () => runPlayerCommand({ type: 'NEXT' });
   const playPrevious = async () => runPlayerCommand({ type: 'PREVIOUS' });
-  const togglePlay = async () => runPlayerCommand({ type: 'TOGGLE_PLAY' });
+  const togglePlay = async () => {
+    if (window.ytPlayer && typeof window.ytPlayer.getPlayerState === 'function') {
+      const state = window.ytPlayer.getPlayerState();
+      if (state === 1) {
+        window.ytPlayer.pauseVideo();
+        setIsPlaying(false);
+        return;
+      } else if (state === 2 || state === 5) {
+        window.ytPlayer.playVideo();
+        setIsPlaying(true);
+        return;
+      }
+    }
+    return runPlayerCommand({ type: 'TOGGLE_PLAY' });
+  };
   const showDesktopMiniPlayer = async (mode: 'compact' | 'video' = 'compact') => {
     setIsVideoTheaterOpen(false);
     if (mode === 'video') {
@@ -3188,6 +3255,32 @@ export default function App() {
     } finally {
       setIsSearchingYoutube(false);
     }
+  };
+
+  
+  const handleFullResetAndClear = async () => {
+    if (!window.confirm('Deseja realmente zerar todos os registros, playlists locais e dados do aplicativo? O sistema será reiniciado do zero com segurança.')) {
+      return;
+    }
+    try {
+      localStorage.clear();
+      sessionStorage.clear();
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
+      }
+      if ('indexedDB' in window) {
+        try { indexedDB.deleteDatabase('musfy-offline'); } catch {}
+        try { indexedDB.deleteDatabase('localforage'); } catch {}
+      }
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        for (const reg of regs) await reg.unregister();
+      }
+    } catch (e) {
+      console.warn('Erro ao limpar caches:', e);
+    }
+    window.location.href = window.location.pathname;
   };
 
   const playYoutubeTrack = async (result: YoutubeSearchResult) => {
@@ -4206,6 +4299,19 @@ export default function App() {
                   {supabaseUser ? 'Supabase Realtime Ativo' : 'Entrar com Supabase'}
                 </p>
               </div>
+            </button>
+          </div>
+        
+          {/* Botão de Reset Completo / Zerar Registro */}
+          <div className="p-4 border-t border-white/5">
+            <button
+              type="button"
+              onClick={handleFullResetAndClear}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-400 hover:bg-red-500/20 transition active:scale-98"
+              title="Limpar todos os caches, contas e começar do zero"
+            >
+              <RotateCcw size={14} />
+              <span>Zerar Dados & Reiniciar</span>
             </button>
           </div>
         </aside>
