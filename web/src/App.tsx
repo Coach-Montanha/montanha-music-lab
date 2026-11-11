@@ -961,6 +961,7 @@ export default function App() {
   });
   const [isAuthInitialized, setIsAuthInitialized] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [homeYoutubeSearchInput, setHomeYoutubeSearchInput] = useState('');
   const [sidebarLibraryExpanded, setSidebarLibraryExpanded] = useState(true);
   const [sidebarDeviceExpanded, setSidebarDeviceExpanded] = useState(true);
   const [sidebarConnectExpanded, setSidebarConnectExpanded] = useState(true);
@@ -1882,6 +1883,42 @@ export default function App() {
     playlists.filter(p => p.provider === 'deezer' || p.id.startsWith('dz-pl-')), 
     [playlists]
   );
+
+  const freeYoutubeTracks: Song[] = useMemo(() => [
+    {
+      id: 'yt-free-1',
+      title: 'Heavy Metal Titan 2026: 90 Minutes of Fire & Guitar Power',
+      artist: 'Heavy Metal Titan',
+      thumbnail: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&q=80',
+      source: 'youtube',
+      hasAudio: true
+    },
+    {
+      id: 'yt-free-2',
+      title: 'Back In Black (Remastered Audio)',
+      artist: 'AC/DC',
+      thumbnail: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=500&q=80',
+      source: 'youtube',
+      hasAudio: true
+    },
+    {
+      id: 'yt-free-3',
+      title: 'Billie Jean (High Fidelity Audio)',
+      artist: 'Michael Jackson',
+      thumbnail: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&q=80',
+      source: 'youtube',
+      hasAudio: true
+    },
+    {
+      id: 'yt-free-4',
+      title: 'Motivação & Treino Hardcore Beats',
+      artist: 'Coach Montanha Gym Power',
+      thumbnail: 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=500&q=80',
+      source: 'youtube',
+      hasAudio: true
+    }
+  ], []);
+
   const localPlaylists = useMemo(() => 
     playlists.filter(p => (!p.provider || p.provider === 'local') && !p.id.startsWith('dz-pl-') && !p.id.startsWith('sync-') && !p.id.startsWith('sp-') && !p.id.startsWith('yt-pl-')), 
     [playlists]
@@ -4834,7 +4871,366 @@ export default function App() {
                 </div>
               </>
             ) : activeSection === 'home' && !activePlaylist ? (
-              <div className="space-y-10 pb-20 select-none">
+              <div className="space-y-8 pb-24 select-none">
+                {/* 🍱 APPLE BENTO GRID HERO DASHBOARD (Skill: apple-bento-grid & apple-design) */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  
+                  {/* BENTO 1: YOUTUBE MUSIC ACESSO LIVRE (2 Colunas - Destaque Principal) */}
+                  <div className="md:col-span-2 rounded-[32px] border border-white/10 bg-[#121318] p-6 shadow-2xl relative overflow-hidden flex flex-col justify-between">
+                    <div className="pointer-events-none absolute -top-24 -left-24 h-48 w-48 rounded-full bg-red-600/15 blur-3xl" />
+                    
+                    <div>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-red-500 to-rose-700 text-white shadow-[0_4px_20px_rgba(220,38,38,0.4)]">
+                            <Play size={24} fill="currentColor" className="ml-0.5" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-xl font-extrabold tracking-tight text-white">YouTube Music</h3>
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                                Acesso Livre • Sem Login
+                              </span>
+                            </div>
+                            <p className="text-xs text-neutral-400 mt-0.5">
+                              Busque, selecione e toque qualquer música, álbum ou set do YouTube diretamente no player.
+                            </p>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setActiveSection('download')}
+                          className="flex items-center gap-2 rounded-2xl bg-white/10 hover:bg-white/15 px-4 py-2 text-xs font-bold text-white transition active:scale-95 border border-white/10 self-start sm:self-auto"
+                        >
+                          <Search size={14} />
+                          <span>Busca Completa</span>
+                        </button>
+                      </div>
+
+                      {/* Input de Busca com fonte >= 16px para prevenir auto-zoom no iOS Safari */}
+                      <div className="relative mt-4">
+                        <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400" />
+                        <input
+                          type="text"
+                          value={homeYoutubeSearchInput}
+                          onChange={(e) => setHomeYoutubeSearchInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && homeYoutubeSearchInput.trim()) {
+                              setYoutubeSearchQuery(homeYoutubeSearchInput.trim());
+                              setActiveSection('download');
+                              void searchYoutubeInsideApp(homeYoutubeSearchInput.trim());
+                            }
+                          }}
+                          placeholder="Digite artista, msica, rock, metal, treino para ouvir agora..."
+                          className="h-12 w-full rounded-2xl border border-white/10 bg-white/[0.04] pl-12 pr-28 text-[16px] text-white placeholder-neutral-500 outline-none focus:border-red-500/50 focus:bg-white/[0.08] transition"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (homeYoutubeSearchInput.trim()) {
+                              setYoutubeSearchQuery(homeYoutubeSearchInput.trim());
+                              setActiveSection('download');
+                              void searchYoutubeInsideApp(homeYoutubeSearchInput.trim());
+                            }
+                          }}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl bg-red-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-red-500 transition active:scale-95"
+                        >
+                          Ouvir J
+                        </button>
+                      </div>
+
+                      {/* Chips de Treino & WOD */}
+                      <div className="flex flex-wrap items-center gap-2 mt-3">
+                        <span className="text-[11px] font-semibold text-neutral-400">Gneros de Treino:</span>
+                        {[
+                          'Heavy Metal Titan 2026',
+                          'AC/DC Rock Clssico',
+                          'Msica para Treino Pesado',
+                          'CrossTraining WOD Beats',
+                          'Synthwave Retro 80s',
+                          'Michael Jackson Greatest'
+                        ].map((tag) => (
+                          <button
+                            key={tag}
+                            type="button"
+                            onClick={() => {
+                              setHomeYoutubeSearchInput(tag);
+                              setYoutubeSearchQuery(tag);
+                              setActiveSection('download');
+                              void searchYoutubeInsideApp(tag);
+                            }}
+                            className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs text-neutral-300 hover:border-red-500/40 hover:bg-red-500/10 hover:text-white transition active:scale-95"
+                          >
+                            {tag}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Faixas em Alta no YouTube (Play direto) */}
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mt-4 pt-3 border-t border-white/5">
+                      {freeYoutubeTracks.map((track) => (
+                        <div
+                          key={track.id}
+                          onClick={() => void playSong(track)}
+                          className="group relative cursor-pointer overflow-hidden rounded-2xl border border-white/5 bg-white/[0.02] p-2.5 transition hover:border-red-500/30 hover:bg-white/[0.05]"
+                        >
+                          <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black/60 border border-white/5">
+                            <img
+                              src={track.thumbnail || ''}
+                              alt={track.title}
+                              className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                            />
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void playSong(track);
+                              }}
+                              className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white shadow-lg opacity-0 group-hover:opacity-100 transition active:scale-90"
+                              title="Tocar Agora"
+                            >
+                              <Play size={14} fill="currentColor" className="ml-0.5" />
+                            </button>
+                          </div>
+                          <div className="mt-2">
+                            <h5 className="truncate text-xs font-bold text-white group-hover:text-red-400 transition">
+                              {track.title}
+                            </h5>
+                            <div className="flex items-center justify-between mt-0.5 text-[10px] text-neutral-400">
+                              <span className="truncate">{track.artist}</span>
+                              <span className="shrink-0 text-red-400 font-semibold">YouTube</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* BENTO 2: SPOTUBE CORE ENGINE STATUS (1 Coluna) */}
+                  <div className="rounded-[32px] border border-white/10 bg-[#121318] p-6 shadow-2xl relative overflow-hidden flex flex-col justify-between">
+                    <div className="pointer-events-none absolute -top-16 -right-16 h-36 w-36 rounded-full bg-blue-600/15 blur-2xl" />
+
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs uppercase tracking-wider text-neutral-400 font-bold">Motor de udio</span>
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/15 text-blue-400 border border-blue-500/30">
+                          Spotube Core
+                        </span>
+                      </div>
+
+                      <div className="my-5">
+                        <div className="text-4xl font-black tracking-tight text-white flex items-baseline gap-2">
+                          14769 <span className="text-xs font-normal text-neutral-400">porta local</span>
+                        </div>
+                        <p className="text-xs text-neutral-400 mt-1">
+                          Servidor Ktor integrado com streaming OPUS sem latncia.
+                        </p>
+                      </div>
+
+                      <div className="space-y-2.5 text-xs text-neutral-300">
+                        <div className="flex items-center justify-between rounded-xl bg-white/[0.03] p-2.5 border border-white/5">
+                          <span className="text-neutral-400">Status Local:</span>
+                          <span className="font-bold text-emerald-400 flex items-center gap-1.5">
+                            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                            Online (Porta 14769)
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between rounded-xl bg-white/[0.03] p-2.5 border border-white/5">
+                          <span className="text-neutral-400">Codec de Streaming:</span>
+                          <span className="font-bold text-white">OPUS 256kbps</span>
+                        </div>
+                        <div className="flex items-center justify-between rounded-xl bg-white/[0.03] p-2.5 border border-white/5">
+                          <span className="text-neutral-400">Modo no Celular:</span>
+                          <span className="font-bold text-sky-400">WebAudio PWA</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsPluginsModalOpen(true)}
+                      className="mt-5 w-full rounded-2xl bg-white/[0.06] hover:bg-white/[0.1] border border-white/10 py-3 text-xs font-bold text-white transition active:scale-98 flex items-center justify-center gap-2"
+                    >
+                      <Settings2 size={14} />
+                      <span>Configurar Plugins &amp; Contas</span>
+                    </button>
+                  </div>
+
+                  {/* BENTO 3: PLAYLISTS DE TREINO DOS ALUNOS (1 Coluna) */}
+                  <div className="rounded-[32px] border border-white/10 bg-[#121318] p-6 shadow-2xl relative overflow-hidden flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs uppercase tracking-wider text-neutral-400 font-bold">Coach Montanha</span>
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                          Treino &amp; LPO
+                        </span>
+                      </div>
+
+                      <h4 className="text-base font-bold text-white mt-2">Playlists dos Alunos</h4>
+                      <p className="text-xs text-neutral-400 mt-0.5">Msica de alta energia para WODs e PRs de carga.</p>
+
+                      <div className="space-y-2 mt-4">
+                        {[
+                          { title: 'WOD Insano  Fora Bruta', desc: 'Batidas aceleradas para cross e funcional', tracks: 18, color: 'from-amber-500/20' },
+                          { title: 'LPO & Heavy PR Focus', desc: 'Heavy Metal calibrado para Snatch e C&J', tracks: 24, color: 'from-red-500/20' },
+                          { title: 'Cardio & Esteira 160 BPM', desc: 'Ritmo constante para mobilizao lipdica', tracks: 32, color: 'from-blue-500/20' }
+                        ].map((pl, i) => (
+                          <div
+                            key={i}
+                            onClick={() => {
+                              setHomeYoutubeSearchInput(pl.title);
+                              setYoutubeSearchQuery(pl.title);
+                              setActiveSection('download');
+                              void searchYoutubeInsideApp(pl.title);
+                            }}
+                            className="group flex items-center justify-between p-3 rounded-2xl border border-white/5 bg-white/[0.02] hover:bg-white/[0.06] hover:border-amber-500/30 transition cursor-pointer"
+                          >
+                            <div className="min-w-0 pr-2">
+                              <h5 className="text-xs font-bold text-white truncate group-hover:text-amber-300 transition">{pl.title}</h5>
+                              <p className="text-[10px] text-neutral-400 truncate">{pl.desc}</p>
+                            </div>
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/5 text-neutral-300 group-hover:bg-amber-500 group-hover:text-black transition">
+                              <Play size={14} fill="currentColor" className="ml-0.5" />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-xs text-neutral-400">
+                      <span>3 Colees Disponveis</span>
+                      <span className="text-amber-400 font-semibold">1-Toque Toca Tudo</span>
+                    </div>
+                  </div>
+
+                  {/* BENTO 4: CONEXO DE CONTAS PESSOAIS (2 Colunas) */}
+                  <div className="md:col-span-2 rounded-[32px] border border-white/10 bg-[#121318] p-6 shadow-2xl relative overflow-hidden flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs uppercase tracking-wider text-neutral-400 font-bold">Sincronizao Pessoal</span>
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/15 text-purple-300 border border-purple-500/30">
+                          Opcional
+                        </span>
+                      </div>
+
+                      <h4 className="text-lg font-bold text-white mt-2">Conecte Suas Contas Oficiais</h4>
+                      <p className="text-xs text-neutral-400 mt-0.5">
+                        Faa login nas suas contas para carregar suas playlists pessoais no app.
+                        Se preferir no logar, o YouTube aberto continua disponvel normalmente!
+                      </p>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
+                        {/* Spotify Card */}
+                        <div
+                          onClick={() => {
+                                                        setIsPluginsModalOpen(true);
+                          }}
+                          className={`p-4 rounded-2xl border transition cursor-pointer flex flex-col justify-between ${
+                            pluginAccounts.spotify?.connected
+                              ? 'border-[#1db954]/50 bg-[#1db954]/10'
+                              : 'border-white/10 bg-white/[0.02] hover:border-[#1db954]/40 hover:bg-white/[0.05]'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#1db954]/20 text-[#1db954]">
+                              <Music2 size={18} />
+                            </div>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                              pluginAccounts.spotify?.connected
+                                ? 'bg-[#1db954]/20 text-[#1db954] border-[#1db954]/40'
+                                : 'bg-white/5 text-neutral-400 border-white/10'
+                            }`}>
+                              {pluginAccounts.spotify?.connected ? 'Conectado' : 'Conectar'}
+                            </span>
+                          </div>
+                          <div className="mt-3">
+                            <h5 className="text-xs font-bold text-white">Spotify</h5>
+                            <p className="text-[10px] text-neutral-400 mt-0.5">
+                              {pluginAccounts.spotify?.connected ? pluginAccounts.spotify.username || 'Ativo' : 'Playlists pessoais'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* YouTube Music / Google Card */}
+                        <div
+                          onClick={() => {
+                                                        setIsPluginsModalOpen(true);
+                          }}
+                          className={`p-4 rounded-2xl border transition cursor-pointer flex flex-col justify-between ${
+                            pluginAccounts.youtube?.connected
+                              ? 'border-red-500/50 bg-red-500/10'
+                              : 'border-white/10 bg-white/[0.02] hover:border-red-500/40 hover:bg-white/[0.05]'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-red-600/20 text-red-500">
+                              <Play size={18} fill="currentColor" />
+                            </div>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                              pluginAccounts.youtube?.connected
+                                ? 'bg-red-500/20 text-red-400 border-red-500/40'
+                                : 'bg-white/5 text-neutral-400 border-white/10'
+                            }`}>
+                              {pluginAccounts.youtube?.connected ? 'Conectado' : 'Conectar'}
+                            </span>
+                          </div>
+                          <div className="mt-3">
+                            <h5 className="text-xs font-bold text-white">Conta Google</h5>
+                            <p className="text-[10px] text-neutral-400 mt-0.5">
+                              {pluginAccounts.youtube?.connected ? pluginAccounts.youtube.username || 'Ativo' : 'YouTube Music'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Deezer HiFi Card */}
+                        <div
+                          onClick={() => {
+                                                        setIsPluginsModalOpen(true);
+                          }}
+                          className={`p-4 rounded-2xl border transition cursor-pointer flex flex-col justify-between ${
+                            pluginAccounts.deezer?.connected
+                              ? 'border-purple-500/50 bg-purple-500/10'
+                              : 'border-white/10 bg-white/[0.02] hover:border-purple-500/40 hover:bg-white/[0.05]'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-600/20 text-purple-400">
+                              <Radio size={18} />
+                            </div>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                              pluginAccounts.deezer?.connected
+                                ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
+                                : 'bg-white/5 text-neutral-400 border-white/10'
+                            }`}>
+                              {pluginAccounts.deezer?.connected ? 'Conectado' : 'Conectar'}
+                            </span>
+                          </div>
+                          <div className="mt-3">
+                            <h5 className="text-xs font-bold text-white">Deezer HiFi</h5>
+                            <p className="text-[10px] text-neutral-400 mt-0.5">
+                              {pluginAccounts.deezer?.connected ? pluginAccounts.deezer.username || 'Ativo' : 'Qualidade FLAC'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-xs text-neutral-400">
+                      <span>Sem login = YouTube Aberto continua 100% livre</span>
+                      <button
+                        type="button"
+                        onClick={() => setIsPluginsModalOpen(true)}
+                        className="text-sky-400 hover:text-sky-300 font-semibold"
+                      >
+                        Gerenciar Contas &rarr;
+                      </button>
+                    </div>
+                  </div>
+
+                </div>
+
                 {/* 1. SPOTIFY PLAYLISTS ROW (Aparece SOMENTE com conexao Spotify ativa) */}
                 {pluginAccounts.spotify?.connected && spotifyPlaylists.length > 0 && (
                   <div className="space-y-4">
@@ -4850,12 +5246,12 @@ export default function App() {
                               Conectado
                             </span>
                           </h3>
-                          <p className="text-xs text-gray-400">
-                            Sincronizado via Spotify Connect ({pluginAccounts.spotify.username || 'Ativo'})
+                          <p className="text-xs text-neutral-400">
+                            Sincronizado via Spotify ({pluginAccounts.spotify.username || 'Ativo'})
                           </p>
                         </div>
                       </div>
-                      <span className="text-xs font-semibold text-gray-400">
+                      <span className="text-xs font-semibold text-neutral-400">
                         {spotifyPlaylists.length} playlists
                       </span>
                     </div>
@@ -4898,7 +5294,7 @@ export default function App() {
                           </div>
                           <div className="mt-3">
                             <h4 className="truncate font-bold text-sm text-white group-hover:text-[#1db954] transition">{pl.name}</h4>
-                            <div className="flex items-center justify-between text-xs text-gray-400 mt-1">
+                            <div className="flex items-center justify-between text-xs text-neutral-400 mt-1">
                               <span>{(pl.songs || []).length} faixas</span>
                               <span className="text-[#1db954] text-[11px] font-semibold">Spotify</span>
                             </div>
@@ -4924,12 +5320,12 @@ export default function App() {
                               Conectado
                             </span>
                           </h3>
-                          <p className="text-xs text-gray-400">
+                          <p className="text-xs text-neutral-400">
                             Sincronizado via YouTube ({pluginAccounts.youtube.username || 'Ativo'})
                           </p>
                         </div>
                       </div>
-                      <span className="text-xs font-semibold text-gray-400">
+                      <span className="text-xs font-semibold text-neutral-400">
                         {youtubePlaylists.length} playlists
                       </span>
                     </div>
@@ -4972,7 +5368,7 @@ export default function App() {
                           </div>
                           <div className="mt-3">
                             <h4 className="truncate font-bold text-sm text-white group-hover:text-red-400 transition">{pl.name}</h4>
-                            <div className="flex items-center justify-between text-xs text-gray-400 mt-1">
+                            <div className="flex items-center justify-between text-xs text-neutral-400 mt-1">
                               <span>{(pl.songs || []).length} faixas</span>
                               <span className="text-red-400 text-[11px] font-semibold">YouTube</span>
                             </div>
@@ -4998,12 +5394,12 @@ export default function App() {
                               Conectado
                             </span>
                           </h3>
-                          <p className="text-xs text-gray-400">
+                          <p className="text-xs text-neutral-400">
                             Sincronizado via Deezer HiFi ({pluginAccounts.deezer.username || 'Ativo'})
                           </p>
                         </div>
                       </div>
-                      <span className="text-xs font-semibold text-gray-400">
+                      <span className="text-xs font-semibold text-neutral-400">
                         {deezerPlaylists.length} playlists
                       </span>
                     </div>
@@ -5046,7 +5442,7 @@ export default function App() {
                           </div>
                           <div className="mt-3">
                             <h4 className="truncate font-bold text-sm text-white group-hover:text-purple-400 transition">{pl.name}</h4>
-                            <div className="flex items-center justify-between text-xs text-gray-400 mt-1">
+                            <div className="flex items-center justify-between text-xs text-neutral-400 mt-1">
                               <span>{(pl.songs || []).length} faixas</span>
                               <span className="text-purple-400 text-[11px] font-semibold">Deezer HiFi</span>
                             </div>
@@ -5066,10 +5462,10 @@ export default function App() {
                       </div>
                       <div>
                         <h3 className="text-lg font-black text-white">Minhas Playlists Locais</h3>
-                        <p className="text-xs text-gray-400">Criadas e salvas no Montanha Music Lab</p>
+                        <p className="text-xs text-neutral-400">Criadas e salvas no Montanha Music Lab</p>
                       </div>
                     </div>
-                    <span className="text-xs font-semibold text-gray-400">{localPlaylists.length} playlists</span>
+                    <span className="text-xs font-semibold text-neutral-400">{localPlaylists.length} playlists</span>
                   </div>
 
                   <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -5110,35 +5506,14 @@ export default function App() {
                         </div>
                         <div className="mt-3">
                           <h4 className="truncate font-bold text-sm text-white group-hover:text-blue-400 transition">{pl.name}</h4>
-                          <p className="text-xs text-gray-400 mt-1">{(pl.songs || []).length} faixas</p>
+                          <p className="text-xs text-neutral-400 mt-1">{(pl.songs || []).length} faixas</p>
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
-
-                {/* Banner de Conexao se nenhuma conta conectada */}
-                {!pluginAccounts.spotify?.connected && !pluginAccounts.youtube?.connected && !pluginAccounts.deezer?.connected && (
-                  <div className="rounded-3xl border border-white/10 bg-gradient-to-r from-blue-950/40 via-purple-950/30 to-black p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div>
-                      <h4 className="text-base font-bold text-white flex items-center gap-2">
-                        <Sparkles size={18} className="text-blue-400" />
-                        <span>Conecte suas contas do Spotify, Deezer ou YouTube</span>
-                      </h4>
-                      <p className="text-xs text-gray-400 mt-1">
-                        Sincronize suas playlists reais para dar play, like e baixar direto no Montanha Music Lab.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setIsPluginsModalOpen(true)}
-                      className="shrink-0 rounded-2xl bg-gradient-to-r from-blue-600 to-sky-500 px-5 py-2.5 text-xs font-bold text-white shadow-lg hover:brightness-110 transition active:scale-95"
-                    >
-                      Gerenciar Contas &amp; Plugins
-                    </button>
-                  </div>
-                )}
               </div>
+
             ) : activeSection === 'explore' && !activeDiscoverPlaylist ? (
               explorePlaylists.length === 0 ? (
                 <div className="flex h-[50vh] flex-col items-center justify-center text-center text-gray-500">

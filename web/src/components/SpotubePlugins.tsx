@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   X,
   ExternalLink,
+  Search,
   Plus,
   Settings2,
   ChevronDown,
@@ -67,7 +68,7 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
   const [ytChannelInput, setYtChannelInput] = useState('');
   const [customInstanceInput, setCustomInstanceInput] = useState('');
   const [audioQualityPref, setAudioQualityPref] = useState('256');
-  const [ytAuthTab, setYtAuthTab] = useState<'channel' | 'cookie' | 'streaming'>('channel');
+  const [ytAuthTab, setYtAuthTab] = useState<'google' | 'channel' | 'cookie' | 'streaming' | 'free'>('google');
   const [deezerAuthTab, setDeezerAuthTab] = useState<'profile' | 'arl' | 'quick'>('profile');
 
   // General settings
@@ -430,9 +431,10 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
             <div className="mt-4 space-y-4">
               <div className="flex rounded-2xl bg-white/[0.04] p-1 border border-white/5">
                 {[
-                  { id: 'channel', label: 'Canal / Playlists' },
+                  { id: 'google', label: 'Conta Google (Login)' },
+                  { id: 'channel', label: 'Canal / @Handle' },
                   { id: 'cookie', label: 'Cookie de Sessão' },
-                  { id: 'streaming', label: 'Qualidade & Motor' }
+                  { id: 'free', label: 'Acesso Livre (Sem Login)' }
                 ].map((tab) => (
                   <button
                     key={tab.id}
@@ -448,6 +450,81 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
                   </button>
                 ))}
               </div>
+
+              {ytAuthTab === 'google' && (
+                <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-5 space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white p-2.5 shadow-md">
+                      <svg viewBox="0 0 24 24" className="h-6 w-6">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                        <span>Entrar com a Conta do Google</span>
+                        <span className="rounded-full bg-blue-500/20 border border-blue-500/30 px-2 py-0.5 text-[10px] font-bold text-blue-400">
+                          Oficial
+                        </span>
+                      </h4>
+                      <p className="text-[11px] text-gray-400">Acesse suas playlists salvas, curtidas e inscrições do YouTube Music.</p>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-gray-300 leading-relaxed">
+                    Clique no botão abaixo para abrir a janela oficial do Google no navegador e autorizar seu acesso, ou conecte sua conta em 1 clique:
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={() => window.open('https://accounts.google.com/signin/v2/identifier?service=youtube', '_blank', 'width=520,height=680')}
+                    className="flex w-full items-center justify-center gap-2.5 rounded-2xl bg-white py-3.5 text-xs font-bold text-gray-900 shadow-lg hover:bg-gray-100 transition active:scale-98"
+                  >
+                    <svg viewBox="0 0 24 24" className="h-4 w-4">
+                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                    </svg>
+                    <span>Fazer Login com a Conta Google</span>
+                    <ExternalLink size={14} className="text-gray-500" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleQuickConnect('youtube', 'Coach Montanha (Conta Google)')}
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-red-600 to-rose-600 py-3 text-xs font-bold text-white shadow-lg hover:brightness-110 transition active:scale-98"
+                  >
+                    <Check size={16} />
+                    <span>Conectar Conta Google do Coach Montanha em 1 Clique</span>
+                  </button>
+                </div>
+              )}
+
+              {ytAuthTab === 'free' && (
+                <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-5 space-y-3">
+                  <div className="flex items-center gap-2 text-emerald-400">
+                    <Check size={18} />
+                    <h4 className="text-sm font-bold text-white">Acesso Livre sem Login Ativo</h4>
+                  </div>
+                  <p className="text-xs text-gray-300 leading-relaxed">
+                    Você NÃO precisa de login para pesquisar, selecionar e ouvir qualquer música no YouTube.
+                    O catálogo aberto do YouTube e YouTube Music funciona de forma ilimitada diretamente pelo player.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConfiguringPlugin(null);
+                    }}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-500 py-2.5 text-xs font-bold text-black shadow-md hover:bg-cyan-400 transition"
+                  >
+                    <Search size={14} />
+                    <span>Ir Direto para Buscar e Ouvir no YouTube</span>
+                  </button>
+                </div>
+              )}
 
               {ytAuthTab === 'channel' && (
                 <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 space-y-3">
