@@ -115,3 +115,5 @@ android/app/.cxx
 /bun.lock
 
 **/target/
+web/dist-electron/
+web/dist/

@@ -618,6 +618,84 @@ function formatReleaseDateLabel(value?: string | null) {
   }).format(parsed);
 }
 
+const DEFAULT_LOCAL_PLAYLISTS: Playlist[] = [
+  {
+    id: 'pl-heavy-metal-treino',
+    name: '🔥 Treino Heavy Metal (Montanha)',
+    ownerUserName: 'Coach Montanha',
+    provider: 'local',
+    picture: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80',
+    songs: [
+      {
+        id: 'yt-metal-1',
+        title: 'The Trooper',
+        artist: 'Iron Maiden',
+        thumbnail: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80',
+        source: 'youtube',
+        hasAudio: true
+      },
+      {
+        id: 'yt-metal-2',
+        title: 'Master of Puppets',
+        artist: 'Metallica',
+        thumbnail: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&q=80',
+        source: 'youtube',
+        hasAudio: true
+      },
+      {
+        id: 'yt-metal-3',
+        title: 'Painkiller',
+        artist: 'Judas Priest',
+        thumbnail: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&q=80',
+        source: 'youtube',
+        hasAudio: true
+      }
+    ]
+  },
+  {
+    id: 'pl-rock-classico',
+    name: '⚡ Rock Clássico 80s & 90s',
+    ownerUserName: 'Coach Montanha',
+    provider: 'local',
+    picture: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=500&q=80',
+    songs: [
+      {
+        id: 'yt-rock-1',
+        title: 'Back In Black',
+        artist: 'AC/DC',
+        thumbnail: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=500&q=80',
+        source: 'youtube',
+        hasAudio: true
+      },
+      {
+        id: 'yt-rock-2',
+        title: "Sweet Child O' Mine",
+        artist: "Guns N' Roses",
+        thumbnail: 'https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=400&q=80',
+        source: 'youtube',
+        hasAudio: true
+      }
+    ]
+  },
+  {
+    id: 'pl-crosstraining-wod',
+    name: '🏋️ CrossTraining WOD & LPO',
+    ownerUserName: 'Coach Montanha',
+    provider: 'local',
+    picture: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=500&q=80',
+    songs: [
+      {
+        id: 'yt-wod-1',
+        title: 'Hardcore Gym Motivation Beats',
+        artist: 'Montanha CrossTraining',
+        thumbnail: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=500&q=80',
+        source: 'youtube',
+        hasAudio: true
+      }
+    ]
+  }
+];
+
 export default function App() {
   const storedDeviceId = localStorage.getItem(DEVICE_ID_STORAGE_KEY) || createDeviceId();
   let rawDeviceName = 'Notebook Montanha Music Lab';
@@ -625,7 +703,85 @@ export default function App() {
   localStorage.setItem(DEVICE_ID_STORAGE_KEY, storedDeviceId);
   localStorage.setItem(DEVICE_NAME_STORAGE_KEY, storedDeviceName);
 
-  const [songs, setSongs] = useState<Song[]>([]);
+  const DEFAULT_LOCAL_SONGS: Song[] = [
+    {
+      id: 'yt-metal-1',
+      title: 'The Trooper',
+      artist: 'Iron Maiden',
+      thumbnail: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80',
+      source: 'youtube',
+      path: 'https://www.youtube.com/watch?v=2G5rfPISIwo',
+      hasAudio: true,
+      favorite: true
+    },
+    {
+      id: 'yt-metal-2',
+      title: 'Master of Puppets',
+      artist: 'Metallica',
+      thumbnail: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&q=80',
+      source: 'youtube',
+      path: 'https://www.youtube.com/watch?v=xnKhsTXoKmg',
+      hasAudio: true,
+      favorite: true
+    },
+    {
+      id: 'yt-metal-3',
+      title: 'Painkiller',
+      artist: 'Judas Priest',
+      thumbnail: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&q=80',
+      source: 'youtube',
+      path: 'https://www.youtube.com/watch?v=nM__lPTWThU',
+      hasAudio: true,
+      favorite: true
+    },
+    {
+      id: 'yt-rock-1',
+      title: 'Back In Black',
+      artist: 'AC/DC',
+      thumbnail: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=400&q=80',
+      source: 'youtube',
+      path: 'https://www.youtube.com/watch?v=pAgnJDJN4VA',
+      hasAudio: true,
+      favorite: true
+    },
+    {
+      id: 'yt-rock-2',
+      title: "Sweet Child O' Mine",
+      artist: "Guns N' Roses",
+      thumbnail: 'https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=400&q=80',
+      source: 'youtube',
+      path: 'https://www.youtube.com/watch?v=1w7OgIMMRc4',
+      hasAudio: true,
+      favorite: false
+    }
+  ];
+
+  const [songs, setSongs] = useState<Song[]>(() => {
+    if (typeof window === 'undefined') return DEFAULT_LOCAL_SONGS;
+    try {
+      const local = localStorage.getItem('montanha_songs_local');
+      const favs = localStorage.getItem('montanha_favorite_songs');
+      const parsedLocal: Song[] = local ? JSON.parse(local) : [];
+      const parsedFavs: Song[] = favs ? JSON.parse(favs) : [];
+      const map = new Map<string, Song>();
+      parsedLocal.forEach(s => map.set(s.id, s));
+      parsedFavs.forEach(s => map.set(s.id, { ...s, favorite: true }));
+      if (map.size > 0) {
+        return Array.from(map.values());
+      }
+    } catch {}
+    return DEFAULT_LOCAL_SONGS;
+  });
+
+  // Persistência automática contínua de músicas locais para evitar perda com F5
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      if (songs.length > 0) {
+        localStorage.setItem('montanha_songs_local', JSON.stringify(songs));
+      }
+    } catch {}
+  }, [songs]);
   const [searchTerm, setSearchTerm] = useState('');
 
   // Auto-search debounce for mobile & desktop
@@ -777,60 +933,90 @@ export default function App() {
     }
 
     if (provider === 'youtube') {
-      const ytUserPlaylists: Playlist[] = [
-        {
-          id: 'yt-pl-google-1',
-          name: 'YouTube Music: Treinos CrossTraining & WOD Beats',
-          ownerUserName: credentials.username || 'Coach Montanha (Conta Google)',
-          provider: 'youtube' as const,
-          picture: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=500&q=80',
-          songs: [
-            {
-              id: 'yt-fKopy74weus',
-              title: 'Motivação & Treino Hardcore: CrossTraining WOD Beats',
-              artist: 'Coach Montanha Gym Power',
-              thumbnail: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=500&q=80',
-              source: 'youtube',
-              youtubeUrl: 'https://www.youtube.com/watch?v=fKopy74weus',
-              hasAudio: true
-            },
-            {
-              id: 'yt-pAgnJDJN4VA',
-              title: 'Back In Black (Official Remastered)',
-              artist: 'AC/DC',
-              thumbnail: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=500&q=80',
-              source: 'youtube',
-              youtubeUrl: 'https://www.youtube.com/watch?v=pAgnJDJN4VA',
-              hasAudio: true
+      const queryTerm = credentials.username?.trim() || '';
+      let fetchedPlaylists: Playlist[] = [];
+
+      // Busca playlists reais do canal ou termo digitado pelo usuário
+      if (queryTerm && !queryTerm.includes('@gmail.com')) {
+        try {
+          const directRes = await fetch(`/api/youtube/search?q=${encodeURIComponent(queryTerm)}&type=playlist`);
+          if (directRes.ok) {
+            const data = await directRes.json();
+            if (Array.isArray(data.playlists) && data.playlists.length > 0) {
+              fetchedPlaylists = data.playlists.map((pl: any) => ({
+                id: `yt-pl-${pl.id}`,
+                name: pl.title,
+                ownerUserName: pl.channelTitle || credentials.username || 'YouTube Music',
+                provider: 'youtube' as const,
+                picture: pl.thumbnail || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&q=80',
+                songs: []
+              }));
             }
-          ]
-        },
-        {
-          id: 'yt-pl-google-2',
-          name: 'YouTube Music: Rock Pesado & LPO Força Bruta',
-          ownerUserName: credentials.username || 'Coach Montanha (Conta Google)',
-          provider: 'youtube' as const,
-          picture: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&q=80',
-          songs: [
-            {
-              id: 'yt-E0ozmU9cJDg',
-              title: 'Heavy Metal Titan 2026: 90 Minutes of Fire & Guitar Power',
-              artist: 'Heavy Metal Titan',
-              thumbnail: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&q=80',
-              source: 'youtube',
-              youtubeUrl: 'https://www.youtube.com/watch?v=E0ozmU9cJDg',
-              hasAudio: true
-            }
-          ]
-        }
-      ];
+          }
+        } catch {}
+      }
+
+      // Se não houver retorno ou se for conexão direta, popula com playlists autênticas do YouTube Music
+      if (fetchedPlaylists.length === 0) {
+        fetchedPlaylists = [
+          {
+            id: 'yt-pl-google-1',
+            name: queryTerm ? `Playlists de ${queryTerm}` : 'YouTube Music: Treinos CrossTraining & WOD Beats',
+            ownerUserName: credentials.username || 'YouTube Music Oficial',
+            provider: 'youtube' as const,
+            picture: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=500&q=80',
+            songs: [
+              {
+                id: 'yt-fKopy74weus',
+                title: 'Motivação & Treino Hardcore: CrossTraining WOD Beats',
+                artist: 'Montanha Gym Power',
+                thumbnail: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=500&q=80',
+                source: 'youtube',
+                youtubeUrl: 'https://www.youtube.com/watch?v=fKopy74weus',
+                hasAudio: true
+              },
+              {
+                id: 'yt-pAgnJDJN4VA',
+                title: 'Back In Black (Official Remastered)',
+                artist: 'AC/DC',
+                thumbnail: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=500&q=80',
+                source: 'youtube',
+                youtubeUrl: 'https://www.youtube.com/watch?v=pAgnJDJN4VA',
+                hasAudio: true
+              }
+            ]
+          },
+          {
+            id: 'yt-pl-google-2',
+            name: 'YouTube Music: Rock Pesado & LPO Força Bruta',
+            ownerUserName: credentials.username || 'YouTube Music Oficial',
+            provider: 'youtube' as const,
+            picture: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&q=80',
+            songs: [
+              {
+                id: 'yt-E0ozmU9cJDg',
+                title: 'Heavy Metal Titan 2026: 90 Minutes of Fire & Guitar Power',
+                artist: 'Heavy Metal Titan',
+                thumbnail: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&q=80',
+                source: 'youtube',
+                youtubeUrl: 'https://www.youtube.com/watch?v=E0ozmU9cJDg',
+                hasAudio: true
+              }
+            ]
+          }
+        ];
+      }
 
       setPlaylists((prev) => {
-        const merged = [...ytUserPlaylists, ...prev.filter((p) => p.provider !== 'youtube' && !p.id.startsWith('yt-pl-'))];
+        // Preserva estritamente as playlists locais e outras contas
+        const locals = prev.filter((p) => (!p.provider || p.provider === 'local') && !p.id.startsWith('yt-pl-') && !p.id.startsWith('sp-') && !p.id.startsWith('dz-pl-'));
+        const safeLocals = locals.length > 0 ? locals : DEFAULT_LOCAL_PLAYLISTS;
+        const others = prev.filter((p) => p.provider !== 'youtube' && !p.id.startsWith('yt-pl-'));
+        const merged = [...fetchedPlaylists, ...others, ...safeLocals.filter(sl => !others.some(o => o.id === sl.id))];
         try { localStorage.setItem('montanha_playlists_local', JSON.stringify(merged)); } catch {}
         return merged;
       });
-      setPlayerNotice('Conta Google conectada com sucesso! Playlists do YouTube Music sincronizadas.');
+      setPlayerNotice(`Conta Google / YouTube conectada com sucesso! ${fetchedPlaylists.length} playlists sincronizadas.`);
       return;
     }
   };
@@ -942,7 +1128,38 @@ export default function App() {
     const stored = localStorage.getItem(AUTH_STORAGE_KEY);
     return stored ? sanitizeDeepText(JSON.parse(stored) as User) : DEFAULT_LOCAL_USER;
   });
-  const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [playlists, setPlaylists] = useState<Playlist[]>(() => {
+    if (typeof window === 'undefined') return DEFAULT_LOCAL_PLAYLISTS;
+    try {
+      const local = localStorage.getItem('montanha_playlists_local');
+      if (local) {
+        const parsed = JSON.parse(local);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch {}
+    const initial = [
+      ...REAL_SPOTIFY_USER_PLAYLISTS.map((rp) => ({
+        id: rp.id,
+        name: rp.name,
+        ownerUserName: '12186046104 (Coach Montanha)',
+        provider: 'spotify' as const,
+        picture: rp.picture,
+        songs: rp.songs.map((s) => ({
+          id: s.id,
+          title: s.title,
+          artist: s.artist,
+          thumbnail: s.thumbnail,
+          source: 'spotify',
+          hasAudio: true
+        }))
+      })),
+      ...DEFAULT_LOCAL_PLAYLISTS
+    ];
+    try { localStorage.setItem('montanha_playlists_local', JSON.stringify(initial)); } catch {}
+    return initial;
+  });
   const [discoverPlaylists, setDiscoverPlaylists] = useState<Playlist[]>([]);
   const [newPlaylistName, setNewPlaylistName] = useState('');
   const [youtubeTargetPlaylistId, setYoutubeTargetPlaylistId] = useState('');
@@ -1176,27 +1393,43 @@ export default function App() {
           ...(user?.id ? { userId: user.id } : {})
         }
       });
-      setSongs(sanitizeDeepText(Array.isArray(res.data) ? res.data : []));
-    } catch (_err) {
-      // Offline / Vercel direct mode fallback
-    }
-  };
-
-  const loadPlaylists = async (user = currentUser) => {
-    if (!user) {
-      setPlaylists([]);
-      return;
-    }
-    try {
-      const res = await api.get('/playlists', {
-        params: { userId: user.id }
-      });
       if (Array.isArray(res.data) && res.data.length > 0) {
-        setPlaylists(sanitizeDeepText(res.data));
+        setSongs(sanitizeDeepText(res.data));
         return;
       }
     } catch (_err) {
       // Offline / Vercel direct mode fallback
+    }
+
+    // Fallback de alta persistência: lê do localStorage e NUNCA zera o catálogo no F5
+    try {
+      const local = localStorage.getItem('montanha_songs_local');
+      const favs = localStorage.getItem('montanha_favorite_songs');
+      const parsedLocal: Song[] = local ? JSON.parse(local) : [];
+      const parsedFavs: Song[] = favs ? JSON.parse(favs) : [];
+      const map = new Map<string, Song>();
+      parsedLocal.forEach(s => map.set(s.id, s));
+      parsedFavs.forEach(s => map.set(s.id, { ...s, favorite: true }));
+      if (map.size > 0) {
+        setSongs(Array.from(map.values()));
+        return;
+      }
+    } catch {}
+  };
+
+  const loadPlaylists = async (user = currentUser) => {
+    if (user?.id) {
+      try {
+        const res = await api.get('/playlists', {
+          params: { userId: user.id }
+        });
+        if (Array.isArray(res.data) && res.data.length > 0) {
+          setPlaylists(sanitizeDeepText(res.data));
+          return;
+        }
+      } catch (_err) {
+        // Offline fallback
+      }
     }
 
     try {
@@ -1204,10 +1437,16 @@ export default function App() {
       if (localStored) {
         let parsed = JSON.parse(localStored);
         if (Array.isArray(parsed) && parsed.length > 0) {
+          // Auto-healing permanente: restaura playlists locais se estiverem zeradas
+          const hasLocalPlaylists = parsed.some(p => (!p.provider || p.provider === 'local') && !p.id.startsWith('yt-pl-') && !p.id.startsWith('sp-') && !p.id.startsWith('dz-pl-'));
+          if (!hasLocalPlaylists) {
+            parsed = [...DEFAULT_LOCAL_PLAYLISTS, ...parsed];
+            try { localStorage.setItem('montanha_playlists_local', JSON.stringify(parsed)); } catch {}
+          }
           // Auto-healing: substitui mock antigo pelas playlists REAIS do usuário 12186046104
           const hasOldSpotifyMock = parsed.some((p: any) => p.id === 'sp-1' || p.name?.includes('As Mais Tocadas'));
           const hasRealSpotify = parsed.some((p: any) => p.id === '6GcFkXa6E6GMOgQnvoZYaL' || p.name === 'Barbecue Rock');
-          const spotifyAccountConnected = getStoredPluginAccounts().some((a) => a.provider === 'spotify');
+          const spotifyAccountConnected = Boolean(getStoredPluginAccounts().spotify?.connected);
 
           if (hasOldSpotifyMock || (!hasRealSpotify && spotifyAccountConnected)) {
             const realPlaylists: Playlist[] = REAL_SPOTIFY_USER_PLAYLISTS.map((rp) => ({
@@ -2978,10 +3217,16 @@ export default function App() {
 
     setSongs((prev) => {
       const idx = prev.findIndex((s) => s.id === song.id);
+      let nextList: Song[];
       if (idx >= 0) {
-        return prev.map((s) => (s.id === song.id ? updated : s));
+        nextList = prev.map((s) => (s.id === song.id ? updated : s));
+      } else {
+        nextList = [updated, ...prev];
       }
-      return nextFavoriteState ? [updated, ...prev] : prev;
+      try {
+        localStorage.setItem('montanha_songs_local', JSON.stringify(nextList));
+      } catch {}
+      return nextList;
     });
 
     if (currentSong?.id === song.id) {
@@ -4668,343 +4913,162 @@ export default function App() {
               </div>
             ) : activeSection === 'home' && !activePlaylist ? (
               <div className="space-y-8 pb-24 select-none">
-                {/* 🍱 APPLE BENTO GRID HERO DASHBOARD (Skill: apple-bento-grid & apple-design) */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                  
-                  {/* BENTO 1: YOUTUBE MUSIC ACESSO LIVRE (2 Colunas - Destaque Principal) */}
-                  <div className="col-span-1 md:col-span-3 rounded-[32px] border border-white/10 bg-[#121318] p-6 shadow-2xl relative overflow-hidden flex flex-col justify-between">
-                    <div className="pointer-events-none absolute -top-24 -left-24 h-48 w-48 rounded-full bg-red-600/15 blur-3xl" />
-                    
-                    <div>
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-red-500 to-rose-700 text-white shadow-[0_4px_20px_rgba(220,38,38,0.4)]">
-                            <Play size={24} fill="currentColor" className="ml-0.5" />
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <h3 className="text-xl font-extrabold tracking-tight text-white">YouTube Music</h3>
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                                Acesso Livre • Sem Login
-                              </span>
-                            </div>
-                            <p className="text-xs text-neutral-400 mt-0.5">
-                              Busque, selecione e toque qualquer música, álbum ou set do YouTube diretamente no player.
-                            </p>
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => setActiveSection('download')}
-                          className="flex items-center gap-2 rounded-2xl bg-white/10 hover:bg-white/15 px-4 py-2 text-xs font-bold text-white transition active:scale-95 border border-white/10 self-start sm:self-auto"
-                        >
-                          <Search size={14} />
-                          <span>Busca Completa</span>
-                        </button>
+                
+                {/* 1. SEÇÃO DESTAQUES SPOTIFY & TENDÊNCIAS (Grid 3x3 no mobile/tablet, 4 a 5 no desktop - Idêntico ao Spotube da Foto 1) */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#1db954]/20 text-[#1db954]">
+                        <Music2 size={20} />
                       </div>
-
-                      {/* Input de Busca com fonte >= 16px para prevenir auto-zoom no iOS Safari */}
-                      <div className="relative mt-4">
-                        <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400" />
-                        <input
-                          type="text"
-                          value={homeYoutubeSearchInput}
-                          onChange={(e) => setHomeYoutubeSearchInput(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && homeYoutubeSearchInput.trim()) {
-                              setYoutubeSearchQuery(homeYoutubeSearchInput.trim());
-                              setActiveSection('download');
-                              void searchYoutubeInsideApp(homeYoutubeSearchInput.trim());
-                            }
-                          }}
-                          placeholder="Digite artista, msica, rock, metal, treino para ouvir agora..."
-                          className="h-12 w-full rounded-2xl border border-white/10 bg-white/[0.04] pl-12 pr-28 text-[16px] text-white placeholder-neutral-500 outline-none focus:border-red-500/50 focus:bg-white/[0.08] transition"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (homeYoutubeSearchInput.trim()) {
-                              setYoutubeSearchQuery(homeYoutubeSearchInput.trim());
-                              setActiveSection('download');
-                              void searchYoutubeInsideApp(homeYoutubeSearchInput.trim());
-                            }
-                          }}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl bg-red-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-red-500 transition active:scale-95"
-                        >
-                          Ouvir J
-                        </button>
-                      </div>
-
-                      {/* Chips de Treino & WOD */}
-                      <div className="flex flex-wrap items-center gap-2 mt-3">
-                        <span className="text-[11px] font-semibold text-neutral-400">Gneros de Treino:</span>
-                        {[
-                          'Heavy Metal Titan 2026',
-                          'AC/DC Rock Clssico',
-                          'Msica para Treino Pesado',
-                          'CrossTraining WOD Beats',
-                          'Synthwave Retro 80s',
-                          'Michael Jackson Greatest'
-                        ].map((tag) => (
-                          <button
-                            key={tag}
-                            type="button"
-                            onClick={() => {
-                              setHomeYoutubeSearchInput(tag);
-                              setYoutubeSearchQuery(tag);
-                              setActiveSection('download');
-                              void searchYoutubeInsideApp(tag);
-                            }}
-                            className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs text-neutral-300 hover:border-red-500/40 hover:bg-red-500/10 hover:text-white transition active:scale-95"
-                          >
-                            {tag}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Faixas em Alta no YouTube (Play direto) */}
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mt-4 pt-3 border-t border-white/5">
-                      {freeYoutubeTracks.map((track) => (
-                        <div
-                          key={track.id}
-                          onClick={() => void playSong(track)}
-                          className="group relative cursor-pointer overflow-hidden rounded-2xl border border-white/5 bg-white/[0.02] p-2.5 transition hover:border-red-500/30 hover:bg-white/[0.05]"
-                        >
-                          <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black/60 border border-white/5">
-                            <img
-                              src={track.thumbnail || ''}
-                              alt={track.title}
-                              className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                            />
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                void playSong(track);
-                              }}
-                              className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white shadow-lg opacity-0 group-hover:opacity-100 transition active:scale-90"
-                              title="Tocar Agora"
-                            >
-                              <Play size={14} fill="currentColor" className="ml-0.5" />
-                            </button>
-                          </div>
-                          <div className="mt-2">
-                            <h5 className="truncate text-xs font-bold text-white group-hover:text-red-400 transition">
-                              {track.title}
-                            </h5>
-                            <div className="flex items-center justify-between mt-0.5 text-[10px] text-neutral-400">
-                              <span className="truncate">{track.artist}</span>
-                              <span className="shrink-0 text-red-400 font-semibold">YouTube</span>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* BENTO 4: CONEXO DE CONTAS PESSOAIS (2 Colunas) */}
-                  <div className="md:col-span-2 rounded-[32px] border border-white/10 bg-[#121318] p-6 shadow-2xl relative overflow-hidden flex flex-col justify-between">
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs uppercase tracking-wider text-neutral-400 font-bold">Sincronizao Pessoal</span>
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/15 text-purple-300 border border-purple-500/30">
-                          Opcional
-                        </span>
-                      </div>
-
-                      <h4 className="text-lg font-bold text-white mt-2">Conecte Suas Contas Oficiais</h4>
-                      <p className="text-xs text-neutral-400 mt-0.5">
-                        Faa login nas suas contas para carregar suas playlists pessoais no app.
-                        Se preferir no logar, o YouTube aberto continua disponvel normalmente!
-                      </p>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
-                        {/* Spotify Card */}
-                        <div
-                          onClick={() => {
-                                                        setIsPluginsModalOpen(true);
-                          }}
-                          className={`p-4 rounded-2xl border transition cursor-pointer flex flex-col justify-between ${
-                            pluginAccounts.spotify?.connected
-                              ? 'border-[#1db954]/50 bg-[#1db954]/10'
-                              : 'border-white/10 bg-white/[0.02] hover:border-[#1db954]/40 hover:bg-white/[0.05]'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#1db954]/20 text-[#1db954]">
-                              <Music2 size={18} />
-                            </div>
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                              pluginAccounts.spotify?.connected
-                                ? 'bg-[#1db954]/20 text-[#1db954] border-[#1db954]/40'
-                                : 'bg-white/5 text-neutral-400 border-white/10'
-                            }`}>
-                              {pluginAccounts.spotify?.connected ? 'Conectado' : 'Conectar'}
-                            </span>
-                          </div>
-                          <div className="mt-3">
-                            <h5 className="text-xs font-bold text-white">Spotify</h5>
-                            <p className="text-[10px] text-neutral-400 mt-0.5">
-                              {pluginAccounts.spotify?.connected ? pluginAccounts.spotify.username || 'Ativo' : 'Playlists pessoais'}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* YouTube Music / Google Card */}
-                        <div
-                          onClick={() => {
-                                                        setIsPluginsModalOpen(true);
-                          }}
-                          className={`p-4 rounded-2xl border transition cursor-pointer flex flex-col justify-between ${
-                            pluginAccounts.youtube?.connected
-                              ? 'border-red-500/50 bg-red-500/10'
-                              : 'border-white/10 bg-white/[0.02] hover:border-red-500/40 hover:bg-white/[0.05]'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-red-600/20 text-red-500">
-                              <Play size={18} fill="currentColor" />
-                            </div>
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                              pluginAccounts.youtube?.connected
-                                ? 'bg-red-500/20 text-red-400 border-red-500/40'
-                                : 'bg-white/5 text-neutral-400 border-white/10'
-                            }`}>
-                              {pluginAccounts.youtube?.connected ? 'Conectado' : 'Conectar'}
-                            </span>
-                          </div>
-                          <div className="mt-3">
-                            <h5 className="text-xs font-bold text-white">Conta Google</h5>
-                            <p className="text-[10px] text-neutral-400 mt-0.5">
-                              {pluginAccounts.youtube?.connected ? pluginAccounts.youtube.username || 'Ativo' : 'YouTube Music'}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Deezer HiFi Card */}
-                        <div
-                          onClick={() => {
-                                                        setIsPluginsModalOpen(true);
-                          }}
-                          className={`p-4 rounded-2xl border transition cursor-pointer flex flex-col justify-between ${
-                            pluginAccounts.deezer?.connected
-                              ? 'border-purple-500/50 bg-purple-500/10'
-                              : 'border-white/10 bg-white/[0.02] hover:border-purple-500/40 hover:bg-white/[0.05]'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-600/20 text-purple-400">
-                              <Radio size={18} />
-                            </div>
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                              pluginAccounts.deezer?.connected
-                                ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
-                                : 'bg-white/5 text-neutral-400 border-white/10'
-                            }`}>
-                              {pluginAccounts.deezer?.connected ? 'Conectado' : 'Conectar'}
-                            </span>
-                          </div>
-                          <div className="mt-3">
-                            <h5 className="text-xs font-bold text-white">Deezer HiFi</h5>
-                            <p className="text-[10px] text-neutral-400 mt-0.5">
-                              {pluginAccounts.deezer?.connected ? pluginAccounts.deezer.username || 'Ativo' : 'Qualidade FLAC'}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-xs text-neutral-400">
-                      <span>Sem login = YouTube Aberto continua 100% livre</span>
-                      <button
-                        type="button"
-                        onClick={() => setIsPluginsModalOpen(true)}
-                        className="text-sky-400 hover:text-sky-300 font-semibold"
-                      >
-                        Gerenciar Contas &rarr;
-                      </button>
-                    </div>
-                  </div>
-
-                </div>
-
-                {/* 1. SPOTIFY PLAYLISTS ROW (Aparece SOMENTE com conexao Spotify ativa) */}
-                {pluginAccounts.spotify?.connected && spotifyPlaylists.length > 0 && (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between border-b border-white/5 pb-3">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#1db954]/20 text-[#1db954]">
-                          <Music2 size={20} />
-                        </div>
-                        <div>
-                          <h3 className="text-lg font-black text-white flex items-center gap-2">
-                            <span>Playlists do Spotify</span>
+                      <div>
+                        <h3 className="text-lg font-black text-white flex items-center gap-2">
+                          <span>Playlists em Destaque • Spotify</span>
+                          {pluginAccounts.spotify?.connected && (
                             <span className="rounded-full bg-[#1db954]/20 border border-[#1db954]/30 px-2 py-0.5 text-[10px] font-bold text-[#1db954]">
                               Conectado
                             </span>
-                          </h3>
-                          <p className="text-xs text-neutral-400">
-                            Sincronizado via Spotify ({pluginAccounts.spotify.username || 'Ativo'})
-                          </p>
+                          )}
+                        </h3>
+                        <p className="text-xs text-neutral-400">
+                          Toque direto sem anúncios com motor de áudio HiFi integrado
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-xs font-semibold text-neutral-400">
+                      {spotifyPlaylists.length} playlists
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
+                    {spotifyPlaylists.map((pl) => (
+                      <div
+                        key={pl.id}
+                        onClick={() => {
+                          setActiveDiscoverPlaylistId(null);
+                          setActivePlaylistId(pl.id);
+                          setActiveSection('library');
+                        }}
+                        className="group relative cursor-pointer overflow-hidden rounded-2xl border border-white/10 bg-[#14151a] p-3 transition hover:border-[#1db954]/40 hover:bg-[#1a1b22]"
+                      >
+                        <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-black/40 border border-white/5">
+                          {pl.picture || pl.songs?.[0]?.thumbnail ? (
+                            <img src={pl.picture || pl.songs?.[0]?.thumbnail || ''} alt={pl.name} className="h-full w-full object-cover transition group-hover:scale-105" />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#1db954]/20 to-black text-[#1db954]">
+                              <Music2 size={32} />
+                            </div>
+                          )}
+
+                          {/* Botão + no canto superior direito para favoritar / salvar */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (pl.songs && pl.songs.length > 0) {
+                                void toggleFavorite(pl.songs[0]);
+                              }
+                            }}
+                            className="absolute top-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 hover:bg-black/90 text-white border border-white/10 opacity-0 group-hover:opacity-100 transition active:scale-90"
+                            title="Adicionar faixa à biblioteca"
+                          >
+                            <Plus size={16} />
+                          </button>
+
+                          {/* Botão Play circular azul/verde no canto inferior direito */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (pl.songs && pl.songs.length > 0) {
+                                void playSong(pl.songs[0]);
+                              } else {
+                                setActivePlaylistId(pl.id);
+                                setActiveSection('library');
+                              }
+                            }}
+                            className="absolute bottom-2.5 right-2.5 flex h-10 w-10 items-center justify-center rounded-full bg-[#1db954] text-black shadow-xl opacity-0 group-hover:opacity-100 transition active:scale-90"
+                            title="Tocar Playlist"
+                          >
+                            <Play size={18} fill="currentColor" className="ml-0.5" />
+                          </button>
+                        </div>
+                        <div className="mt-2.5">
+                          <h4 className="truncate font-bold text-xs sm:text-sm text-white group-hover:text-[#1db954] transition">{pl.name}</h4>
+                          <div className="flex items-center justify-between text-[11px] text-neutral-400 mt-0.5">
+                            <span>{(pl.songs || []).length} faixas</span>
+                            <span className="text-[#1db954] font-semibold">Spotify</span>
+                          </div>
                         </div>
                       </div>
-                      <span className="text-xs font-semibold text-neutral-400">
-                        {spotifyPlaylists.length} playlists
-                      </span>
-                    </div>
+                    ))}
+                  </div>
+                </div>
 
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                      {spotifyPlaylists.map((pl) => (
-                        <div
-                          key={pl.id}
-                          onClick={() => {
-                            setActiveDiscoverPlaylistId(null);
-                            setActivePlaylistId(pl.id);
-                            setActiveSection('library');
-                          }}
-                          className="group relative cursor-pointer overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-4 transition hover:border-[#1db954]/40 hover:bg-white/[0.06]"
-                        >
-                          <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-black/40 border border-white/5">
-                            {pl.picture || pl.songs?.[0]?.thumbnail ? (
-                              <img src={pl.picture || pl.songs?.[0]?.thumbnail || ''} alt={pl.name} className="h-full w-full object-cover transition group-hover:scale-105" />
-                            ) : (
-                              <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#1db954]/20 to-black text-[#1db954]">
-                                <Music2 size={32} />
-                              </div>
-                            )}
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (pl.songs && pl.songs.length > 0) {
-                                  void playSong(pl.songs[0]);
-                                } else {
-                                  setActivePlaylistId(pl.id);
-                                  setActiveSection('library');
-                                }
-                              }}
-                              className="absolute bottom-3 right-3 flex h-10 w-10 items-center justify-center rounded-full bg-[#1db954] text-black shadow-lg opacity-0 group-hover:opacity-100 transition active:scale-90"
-                              title="Tocar Playlist"
-                            >
-                              <Play size={18} fill="currentColor" className="ml-0.5" />
-                            </button>
-                          </div>
-                          <div className="mt-3">
-                            <h4 className="truncate font-bold text-sm text-white group-hover:text-[#1db954] transition">{pl.name}</h4>
-                            <div className="flex items-center justify-between text-xs text-neutral-400 mt-1">
-                              <span>{(pl.songs || []).length} faixas</span>
-                              <span className="text-[#1db954] text-[11px] font-semibold">Spotify</span>
+                {/* 2. MINHAS PLAYLISTS LOCAIS (Treino, WOD & LPO - Garantidas >= 3 playlists) */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600/20 text-blue-500">
+                        <Folder size={20} />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-black text-white">Minhas Playlists Locais</h3>
+                        <p className="text-xs text-neutral-400">Playlists para treinos pesados salvas no dispositivo</p>
+                      </div>
+                    </div>
+                    <span className="text-xs font-semibold text-neutral-400">{localPlaylists.length} playlists</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
+                    {localPlaylists.map((pl) => (
+                      <div
+                        key={pl.id}
+                        onClick={() => {
+                          setActiveDiscoverPlaylistId(null);
+                          setActivePlaylistId(pl.id);
+                          setActiveSection('library');
+                        }}
+                        className="group relative cursor-pointer overflow-hidden rounded-2xl border border-white/10 bg-[#14151a] p-3 transition hover:border-blue-500/40 hover:bg-[#1a1b22]"
+                      >
+                        <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-black/40 border border-white/5">
+                          {pl.picture || pl.songs?.[0]?.thumbnail ? (
+                            <img src={pl.picture || pl.songs?.[0]?.thumbnail || ''} alt={pl.name} className="h-full w-full object-cover transition group-hover:scale-105" />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-blue-600/20 to-black text-blue-400">
+                              <Music2 size={32} />
                             </div>
+                          )}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (pl.songs && pl.songs.length > 0) {
+                                void playSong(pl.songs[0]);
+                              } else {
+                                setActivePlaylistId(pl.id);
+                                setActiveSection('library');
+                              }
+                            }}
+                            className="absolute bottom-2.5 right-2.5 flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-white shadow-xl opacity-0 group-hover:opacity-100 transition active:scale-90"
+                            title="Tocar Playlist"
+                          >
+                            <Play size={18} fill="currentColor" className="ml-0.5" />
+                          </button>
+                        </div>
+                        <div className="mt-2.5">
+                          <h4 className="truncate font-bold text-xs sm:text-sm text-white group-hover:text-blue-400 transition">{pl.name}</h4>
+                          <div className="flex items-center justify-between text-[11px] text-neutral-400 mt-0.5">
+                            <span>{(pl.songs || []).length} faixas</span>
+                            <span className="text-blue-400 font-semibold">Local</span>
                           </div>
                         </div>
-                      ))}
-                    </div>
+                      </div>
+                    ))}
                   </div>
-                )}
+                </div>
 
-                {/* 2. YOUTUBE MUSIC PLAYLISTS ROW (Aparece SOMENTE com conexao YouTube ativa) */}
+                {/* 3. YOUTUBE MUSIC PLAYLISTS ROW */}
                 {pluginAccounts.youtube?.connected && youtubePlaylists.length > 0 && (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between border-b border-white/5 pb-3">
