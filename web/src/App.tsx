@@ -930,7 +930,7 @@ export default function App() {
         try { localStorage.setItem('montanha_playlists_local', JSON.stringify(merged)); } catch {}
         return merged;
       });
-      setPlayerNotice('Playlists reais do Spotify sincronizadas: Barbecue Rock e My Workout!');
+      setPlayerNotice(`${realPlaylists.length} playlists oficiais sincronizadas da sua conta Spotify!`);
       return;
     }
 
@@ -939,7 +939,7 @@ export default function App() {
       let fetchedPlaylists: Playlist[] = [];
 
       // Busca playlists reais do canal ou termo digitado pelo usuário
-      if (queryTerm && !queryTerm.includes('@gmail.com')) {
+      if (queryTerm && !queryTerm.includes('@gmail.com') && !queryTerm.includes('@')) {
         try {
           const directRes = await fetch(`/api/youtube/search?q=${encodeURIComponent(queryTerm)}&type=playlist`);
           if (directRes.ok) {
@@ -2404,16 +2404,17 @@ export default function App() {
   }, [discoverPlaylists, searchTerm]);
 
   const filteredSongs = useMemo(() => {
-    let base = songs;
-
     if (activePlaylist) {
-      base = activePlaylist.songs || [];
-    } else if (activeDiscoverPlaylist) {
-      base = activeDiscoverPlaylist.songs || [];
-    } else if (activeSection === 'favorites') {
+      return activePlaylist.songs || [];
+    }
+    if (activeDiscoverPlaylist) {
+      return activeDiscoverPlaylist.songs || [];
+    }
+    let base = songs;
+    if (activeSection === 'favorites') {
       base = songs.filter((song) => Boolean(song.favorite));
     }
-
+    if (!searchTerm.trim()) return base;
     return base.filter((song) => getSongSearchText(song).includes(searchTerm.toLowerCase()));
   }, [songs, searchTerm, activeSection, activePlaylist, activeDiscoverPlaylist]);
 
@@ -2431,8 +2432,12 @@ export default function App() {
       ? 'Início'
       : activeSection === 'explore'
         ? 'Explorar'
-        : activeSection === 'download'
-          ? 'Baixar do YouTube'
+        : activeSection === 'search' || activeSection === 'download'
+          ? 'Buscar'
+        : activeSection === 'downloads'
+          ? 'Downloads'
+        : activeSection === 'playlists'
+          ? 'Playlists'
         : activeSection === 'favorites'
           ? 'Favoritas'
           : activeSection === 'settings'
@@ -4736,7 +4741,7 @@ export default function App() {
           </header>
 
           <section className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-8 md:py-8 pb-56 lg:pb-36">
-            {!isPlaylistDetailView && activeSection !== 'download' && activeSection !== 'home' && activeSection !== 'explore' ? (
+            {!isPlaylistDetailView && activeSection !== 'search' && activeSection !== 'download' && activeSection !== 'home' && activeSection !== 'explore' ? (
               <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
                 <h2 className="mb-3 text-2xl md:text-5xl font-black tracking-tight">{heroTitle}</h2>
                 <p className="text-gray-400">{heroDescription}</p>
@@ -4744,7 +4749,223 @@ export default function App() {
             ) : null}
 
             {/* Mobile Settings View: Spotube Plugins Manager (media_1794328024209_c4089668.jpg) */}
-            {activeSection === 'settings' ? (
+            {isPlaylistDetailView ? (
+<div className="overflow-hidden rounded-[34px] border border-white/8 bg-[linear-gradient(180deg,#151515_0%,#111111_28%,#0b0b0b_100%)] shadow-[0_30px_80px_rgba(0,0,0,0.28)]">
+                <div className="bg-[linear-gradient(180deg,rgba(41,121,255,0.16)_0%,rgba(18,18,18,0.86)_78%,#111111_100%)] px-8 pb-8 pt-8">
+                  {/* Botão Voltar para a navegação anterior */}
+                  <div className="mb-6">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActivePlaylistId(null);
+                        setActiveDiscoverPlaylistId(null);
+                      }}
+                      className="flex items-center gap-2 rounded-xl bg-white/10 hover:bg-white/20 px-3.5 py-1.5 text-xs font-bold text-white transition active:scale-95 border border-white/10"
+                    >
+                      <ChevronLeft size={16} />
+                      <span>Voltar para {activeSection === 'playlists' ? 'Playlists' : (activeSection as any) === 'search' || (activeSection as any) === 'download' ? 'Buscar' : 'Início'}</span>
+                    </button>
+                  </div>
+                  <div className="flex flex-col gap-8 lg:flex-row lg:items-end">
+                    <div className="h-52 w-52 overflow-hidden rounded-[28px] bg-[#1b1b1b] shadow-[0_24px_60px_rgba(0,0,0,0.35)]">
+                      {activeCollectionCover ? (
+                        <img src={activeCollectionCover} alt={activeCollection?.name} className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-gray-600">
+                          <Library size={64} />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-semibold uppercase tracking-[0.28em] text-gray-300">
+                        {activePlaylist ? 'Sua playlist' : `Playlist de ${activeDiscoverPlaylist?.ownerUserName || 'outro usuario'}`}
+                      </p>
+                      <h2 className="mt-4 text-5xl font-black tracking-[-0.04em] text-white md:text-7xl">{heroTitle}</h2>
+                      <p className="mt-4 max-w-3xl text-sm text-gray-300">{heroDescription}</p>
+                      <div className="mt-5 flex flex-wrap items-center gap-3 text-sm text-gray-400">
+                        <span className="font-semibold text-white">{filteredSongs.length} faixas</span>
+                        {activePlaylist ? (
+                          <span>Organizada por {currentUser?.nome || 'voce'}</span>
+                        ) : (
+                          <span>Publicada por {activeDiscoverPlaylist?.ownerUserName || 'outro usuario'}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t border-white/6 bg-[linear-gradient(180deg,#111111_0%,#0b0b0b_100%)] px-8 py-6">
+                  <div className="flex flex-wrap items-center gap-4">
+                    <button
+                      onClick={() => {
+                        if (filteredSongs[0]) void playSong(filteredSongs[0]);
+                      }}
+                      className="flex h-14 w-14 items-center justify-center rounded-full bg-green-500 text-black shadow-[0_18px_38px_rgba(34,197,94,0.28)]"
+                    >
+                      <Play size={22} fill="currentColor" />
+                    </button>
+
+                    {activePlaylist ? (
+                      <button
+                        onClick={() => setViewMode('list')}
+                        className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-gray-200 hover:bg-white/[0.08]"
+                      >
+                        Modo lista
+                      </button>
+                    ) : null}
+
+                    <button
+                      onClick={() => setShowActivityPanel((prev) => !prev)}
+                      className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-gray-200 hover:bg-white/[0.08]"
+                    >
+                      {showActivityPanel ? 'Ocultar atividade' : 'Ver atividade'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="px-8 pb-8">
+                  <div className="grid grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)_180px] items-center gap-4 border-b border-white/6 px-4 py-4 text-xs uppercase tracking-[0.2em] text-gray-500">
+                    <span>Titulo</span>
+                    <span>Origem</span>
+                    <span className="text-right">Acoes</span>
+                  </div>
+
+                  <div className="divide-y divide-white/5">
+                    {filteredSongs.map((song) => {
+                      const active = currentSong?.id === song.id;
+
+                      return (
+                        <button
+                          key={song.id}
+                          onClick={() => void playSong(song)}
+                          className={`grid w-full grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)_180px] items-center gap-4 px-4 py-4 text-left transition ${
+                            active ? 'bg-white/[0.06]' : 'hover:bg-white/[0.04]'
+                          }`}
+                        >
+                          <div className="flex min-w-0 items-center gap-4">
+                            <div className="h-14 w-14 overflow-hidden rounded-2xl bg-[#1b1b1b]">
+                              {song.thumbnail ? (
+                                <img src={song.thumbnail} alt={song.title} className="h-full w-full object-cover" />
+                              ) : (
+                                <div className="flex h-full w-full items-center justify-center text-gray-600">
+                                  <Music size={20} />
+                                </div>
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <p className={`truncate text-base font-semibold ${active ? 'text-white' : 'text-gray-100'}`}>
+                                {getDisplayTitle(song)}
+                              </p>
+                              <p className="mt-1 truncate text-sm text-gray-400">
+                                {getDisplayArtist(song) || 'Artista desconhecido'}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="min-w-0">
+                            <p className="truncate text-sm text-gray-300">{getSongSourceLabel(song)}</p>
+                            <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
+                              {song.hasVideo ? (
+                                <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-2.5 py-1 text-cyan-200">
+                                  Video
+                                </span>
+                              ) : null}
+                              {offlineSongIds.includes(song.id) ? (
+                                <span className="rounded-full border border-green-400/20 bg-green-400/10 px-2.5 py-1 text-green-200">
+                                  Offline
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-end gap-2">
+                            {canDeleteSongFromPlatform(song) ? (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void removeSongFromPlatform(song);
+                                }}
+                                className="flex h-10 w-10 items-center justify-center rounded-full text-red-400 hover:bg-red-500/10 hover:text-red-200"
+                                title="Remover da plataforma"
+                              >
+                                <Trash2 size={17} />
+                              </button>
+                            ) : null}
+                            {activePlaylist ? (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void removeSongFromActivePlaylist(song);
+                                }}
+                                className="flex h-10 w-10 items-center justify-center rounded-full text-red-300 hover:bg-red-500/10 hover:text-red-100"
+                                title="Remover da playlist"
+                              >
+                                <Trash2 size={17} />
+                              </button>
+                            ) : null}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                offlineSongIds.includes(song.id) ? void removeSongOffline(song) : void saveSongOffline(song);
+                              }}
+                              className={`flex h-10 w-10 items-center justify-center rounded-full hover:bg-white/5 ${
+                                offlineSongIds.includes(song.id) ? 'text-green-400' : 'text-gray-400 hover:text-white'
+                              }`}
+                              title={offlineSongIds.includes(song.id) ? 'Remover offline' : 'Salvar offline'}
+                            >
+                              {offlineBusyIds.includes(song.id) ? (
+                                <LoaderCircle size={17} className="animate-spin" />
+                              ) : offlineSongIds.includes(song.id) ? (
+                                <Check size={17} />
+                              ) : (
+                                <HardDriveDownload size={17} />
+                              )}
+                            </button>
+                            {song.hasVideo ? (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setShowVideoInMiniPlayer(false);
+                                  setIsVideoPanelOpen(true);
+                                  void playSongWithMode(song, 'video');
+                                }}
+                                className="flex h-10 w-10 items-center justify-center rounded-full text-cyan-300 hover:bg-cyan-500/10 hover:text-cyan-100"
+                                title="Assistir video"
+                              >
+                                <Video size={17} />
+                              </button>
+                            ) : null}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openPlaylistPicker(song);
+                              }}
+                              className="flex h-10 w-10 items-center justify-center rounded-full text-gray-400 hover:bg-white/5 hover:text-white"
+                              title="Escolher playlist"
+                            >
+                              <Plus size={17} />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void toggleFavorite(song);
+                              }}
+                              className={`flex h-10 w-10 items-center justify-center rounded-full hover:bg-white/5 ${
+                                song.favorite ? 'text-green-400' : 'text-gray-400 hover:text-white'
+                              }`}
+                              title="Favoritar"
+                            >
+                              <Heart size={17} fill={song.favorite ? 'currentColor' : 'none'} />
+                            </button>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            ) : activeSection === 'settings' ? (
               <>
                 <div className="lg:hidden">
                   <SpotubePlugins
@@ -4887,12 +5108,13 @@ export default function App() {
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                void playYoutubeTrack({
+                                void playPlaylistDirectly({
                                   id: pl.id,
-                                  title: pl.title,
-                                  url: pl.url,
-                                  thumbnail: pl.thumbnail,
-                                  artist: pl.channel || 'YouTube'
+                                  name: pl.title,
+                                  ownerUserName: pl.channel || 'YouTube',
+                                  picture: pl.thumbnail || '',
+                                  provider: 'youtube',
+                                  songs: []
                                 });
                               }}
                               className="absolute bottom-2 right-2 flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 hover:bg-blue-500 text-white shadow-xl transition active:scale-90"
@@ -5481,222 +5703,6 @@ export default function App() {
                     ))}
                   </div>
                 )}
-              </div>
-            ) : isPlaylistDetailView ? (
-              <div className="overflow-hidden rounded-[34px] border border-white/8 bg-[linear-gradient(180deg,#151515_0%,#111111_28%,#0b0b0b_100%)] shadow-[0_30px_80px_rgba(0,0,0,0.28)]">
-                <div className="bg-[linear-gradient(180deg,rgba(41,121,255,0.16)_0%,rgba(18,18,18,0.86)_78%,#111111_100%)] px-8 pb-8 pt-8">
-                  {/* Botão Voltar para a navegação anterior */}
-                  <div className="mb-6">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActivePlaylistId(null);
-                        setActiveDiscoverPlaylistId(null);
-                      }}
-                      className="flex items-center gap-2 rounded-xl bg-white/10 hover:bg-white/20 px-3.5 py-1.5 text-xs font-bold text-white transition active:scale-95 border border-white/10"
-                    >
-                      <ChevronLeft size={16} />
-                      <span>Voltar para {activeSection === 'playlists' ? 'Playlists' : (activeSection as any) === 'search' || (activeSection as any) === 'download' ? 'Buscar' : 'Início'}</span>
-                    </button>
-                  </div>
-                  <div className="flex flex-col gap-8 lg:flex-row lg:items-end">
-                    <div className="h-52 w-52 overflow-hidden rounded-[28px] bg-[#1b1b1b] shadow-[0_24px_60px_rgba(0,0,0,0.35)]">
-                      {activeCollectionCover ? (
-                        <img src={activeCollectionCover} alt={activeCollection?.name} className="h-full w-full object-cover" />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center text-gray-600">
-                          <Library size={64} />
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-semibold uppercase tracking-[0.28em] text-gray-300">
-                        {activePlaylist ? 'Sua playlist' : `Playlist de ${activeDiscoverPlaylist?.ownerUserName || 'outro usuario'}`}
-                      </p>
-                      <h2 className="mt-4 text-5xl font-black tracking-[-0.04em] text-white md:text-7xl">{heroTitle}</h2>
-                      <p className="mt-4 max-w-3xl text-sm text-gray-300">{heroDescription}</p>
-                      <div className="mt-5 flex flex-wrap items-center gap-3 text-sm text-gray-400">
-                        <span className="font-semibold text-white">{filteredSongs.length} faixas</span>
-                        {activePlaylist ? (
-                          <span>Organizada por {currentUser?.nome || 'voce'}</span>
-                        ) : (
-                          <span>Publicada por {activeDiscoverPlaylist?.ownerUserName || 'outro usuario'}</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="border-t border-white/6 bg-[linear-gradient(180deg,#111111_0%,#0b0b0b_100%)] px-8 py-6">
-                  <div className="flex flex-wrap items-center gap-4">
-                    <button
-                      onClick={() => {
-                        if (filteredSongs[0]) void playSong(filteredSongs[0]);
-                      }}
-                      className="flex h-14 w-14 items-center justify-center rounded-full bg-green-500 text-black shadow-[0_18px_38px_rgba(34,197,94,0.28)]"
-                    >
-                      <Play size={22} fill="currentColor" />
-                    </button>
-
-                    {activePlaylist ? (
-                      <button
-                        onClick={() => setViewMode('list')}
-                        className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-gray-200 hover:bg-white/[0.08]"
-                      >
-                        Modo lista
-                      </button>
-                    ) : null}
-
-                    <button
-                      onClick={() => setShowActivityPanel((prev) => !prev)}
-                      className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-gray-200 hover:bg-white/[0.08]"
-                    >
-                      {showActivityPanel ? 'Ocultar atividade' : 'Ver atividade'}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="px-8 pb-8">
-                  <div className="grid grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)_180px] items-center gap-4 border-b border-white/6 px-4 py-4 text-xs uppercase tracking-[0.2em] text-gray-500">
-                    <span>Titulo</span>
-                    <span>Origem</span>
-                    <span className="text-right">Acoes</span>
-                  </div>
-
-                  <div className="divide-y divide-white/5">
-                    {filteredSongs.map((song) => {
-                      const active = currentSong?.id === song.id;
-
-                      return (
-                        <button
-                          key={song.id}
-                          onClick={() => void playSong(song)}
-                          className={`grid w-full grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)_180px] items-center gap-4 px-4 py-4 text-left transition ${
-                            active ? 'bg-white/[0.06]' : 'hover:bg-white/[0.04]'
-                          }`}
-                        >
-                          <div className="flex min-w-0 items-center gap-4">
-                            <div className="h-14 w-14 overflow-hidden rounded-2xl bg-[#1b1b1b]">
-                              {song.thumbnail ? (
-                                <img src={song.thumbnail} alt={song.title} className="h-full w-full object-cover" />
-                              ) : (
-                                <div className="flex h-full w-full items-center justify-center text-gray-600">
-                                  <Music size={20} />
-                                </div>
-                              )}
-                            </div>
-                            <div className="min-w-0">
-                              <p className={`truncate text-base font-semibold ${active ? 'text-white' : 'text-gray-100'}`}>
-                                {getDisplayTitle(song)}
-                              </p>
-                              <p className="mt-1 truncate text-sm text-gray-400">
-                                {getDisplayArtist(song) || 'Artista desconhecido'}
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="min-w-0">
-                            <p className="truncate text-sm text-gray-300">{getSongSourceLabel(song)}</p>
-                            <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
-                              {song.hasVideo ? (
-                                <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-2.5 py-1 text-cyan-200">
-                                  Video
-                                </span>
-                              ) : null}
-                              {offlineSongIds.includes(song.id) ? (
-                                <span className="rounded-full border border-green-400/20 bg-green-400/10 px-2.5 py-1 text-green-200">
-                                  Offline
-                                </span>
-                              ) : null}
-                            </div>
-                          </div>
-
-                          <div className="flex items-center justify-end gap-2">
-                            {canDeleteSongFromPlatform(song) ? (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  void removeSongFromPlatform(song);
-                                }}
-                                className="flex h-10 w-10 items-center justify-center rounded-full text-red-400 hover:bg-red-500/10 hover:text-red-200"
-                                title="Remover da plataforma"
-                              >
-                                <Trash2 size={17} />
-                              </button>
-                            ) : null}
-                            {activePlaylist ? (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  void removeSongFromActivePlaylist(song);
-                                }}
-                                className="flex h-10 w-10 items-center justify-center rounded-full text-red-300 hover:bg-red-500/10 hover:text-red-100"
-                                title="Remover da playlist"
-                              >
-                                <Trash2 size={17} />
-                              </button>
-                            ) : null}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                offlineSongIds.includes(song.id) ? void removeSongOffline(song) : void saveSongOffline(song);
-                              }}
-                              className={`flex h-10 w-10 items-center justify-center rounded-full hover:bg-white/5 ${
-                                offlineSongIds.includes(song.id) ? 'text-green-400' : 'text-gray-400 hover:text-white'
-                              }`}
-                              title={offlineSongIds.includes(song.id) ? 'Remover offline' : 'Salvar offline'}
-                            >
-                              {offlineBusyIds.includes(song.id) ? (
-                                <LoaderCircle size={17} className="animate-spin" />
-                              ) : offlineSongIds.includes(song.id) ? (
-                                <Check size={17} />
-                              ) : (
-                                <HardDriveDownload size={17} />
-                              )}
-                            </button>
-                            {song.hasVideo ? (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setShowVideoInMiniPlayer(false);
-                                  setIsVideoPanelOpen(true);
-                                  void playSongWithMode(song, 'video');
-                                }}
-                                className="flex h-10 w-10 items-center justify-center rounded-full text-cyan-300 hover:bg-cyan-500/10 hover:text-cyan-100"
-                                title="Assistir video"
-                              >
-                                <Video size={17} />
-                              </button>
-                            ) : null}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openPlaylistPicker(song);
-                              }}
-                              className="flex h-10 w-10 items-center justify-center rounded-full text-gray-400 hover:bg-white/5 hover:text-white"
-                              title="Escolher playlist"
-                            >
-                              <Plus size={17} />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                void toggleFavorite(song);
-                              }}
-                              className={`flex h-10 w-10 items-center justify-center rounded-full hover:bg-white/5 ${
-                                song.favorite ? 'text-green-400' : 'text-gray-400 hover:text-white'
-                              }`}
-                              title="Favoritar"
-                            >
-                              <Heart size={17} fill={song.favorite ? 'currentColor' : 'none'} />
-                            </button>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
               </div>
             ) : filteredSongs.length === 0 ? (
               <div className="flex h-[50vh] flex-col items-center justify-center text-center text-gray-500">
