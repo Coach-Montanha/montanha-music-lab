@@ -363,18 +363,16 @@ export default function App() {
       }
       setIsPlaying(false);
     } else {
-      // Se não há áudio carregado ou se o src for nulo, dispara playSong diretamente
-      if (!audioRef.current?.src || audioRef.current.src === '' || audioRef.current.src === window.location.href) {
-        if (currentSong) {
-          playSong(currentSong);
+      // Se houver YouTube Player ativo, despausa o vídeo completo
+      if (window.ytPlayer && typeof window.ytPlayer.playVideo === 'function') {
+        try {
+          window.ytPlayer.playVideo();
+          setIsPlaying(true);
           return;
-        }
+        } catch {}
       }
       if (audioRef.current && audioRef.current.src) {
-        audioRef.current.play().then(() => {
-          setIsPlaying(true);
-        }).catch((err) => {
-          console.warn('Erro ao despausar áudio, recarregando stream:', err);
+        audioRef.current.play().then(() => setIsPlaying(true)).catch(() => {
           if (currentSong) playSong(currentSong);
         });
       } else if (currentSong) {
@@ -385,13 +383,15 @@ export default function App() {
 
   const handleSeek = (newTime: number) => {
     setCurrentTime(newTime);
-    if (audioRef.current) audioRef.current.currentTime = newTime;
+    if (audioRef.current && audioRef.current.src) {
+      audioRef.current.currentTime = newTime;
+    }
     if (window.ytPlayer && typeof window.ytPlayer.seekTo === 'function') {
       try { window.ytPlayer.seekTo(newTime, true); } catch {}
     }
   };
 
-  // Reprodução Cirúrgica (IndexedDB Offline -> Apple Music AAC -> YouTube Player)
+  // Motor Padrão AbleMusic (YouTube Music Stream Completo 100% da Duração)
   const playSong = async (song: Song, newQueue?: Song[]) => {
     setCurrentSong(song);
     setCurrentTime(0);
@@ -417,75 +417,86 @@ export default function App() {
       }
     }
 
-    // 2. TENTA ÁUDIO NATIVO DIRETO SE JÁ FOR VÁLIDO E NÃO FOR DEEZER (Evita erro 403 da Akamai)
-    if (song.audioUrl && !song.audioUrl.includes('dzcdn.net') && audioRef.current) {
-      try {
-        if (window.ytPlayer && typeof window.ytPlayer.pauseVideo === 'function') {
-          window.ytPlayer.pauseVideo();
-        }
-        audioRef.current.src = song.audioUrl;
-        audioRef.current.volume = isMuted ? 0 : volume;
-        await audioRef.current.play();
-        return;
-      } catch (err) {
-        console.warn('Fallback stream:', err);
-      }
-    }
-
-    // 3. BUSCA STREAM DIRETA VIA APPLE MUSIC / ITUNES API (100% livre de CORS e sem 403)
-    try {
-      const itunesQuery = `${song.name} ${song.artist}`;
-      const itunesResp = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(itunesQuery)}&media=music&entity=song&limit=1`);
-      if (itunesResp.ok) {
-        const itunesData = await itunesResp.json();
-        const item = itunesData?.results?.[0];
-        if (item?.previewUrl && audioRef.current) {
-          song.audioUrl = item.previewUrl;
-          if (item.artworkUrl100 && (!song.thumbnail || song.thumbnail.includes('unsplash'))) {
-            song.thumbnail = item.artworkUrl100.replace('100x100bb', '600x600bb');
-          }
-          if (window.ytPlayer && typeof window.ytPlayer.pauseVideo === 'function') {
-            window.ytPlayer.pauseVideo();
-          }
-          audioRef.current.src = item.previewUrl;
-          audioRef.current.volume = isMuted ? 0 : volume;
-          await audioRef.current.play();
-          return;
-        }
-      }
-    } catch (e) {
-      console.warn('Apple Music API Stream search error:', e);
-    }
-
-    // 4. REPRODUÇÃO VIA YOUTUBE IFRAME PLAYER
+    // 2. MOTOR YOUTUBE MUSIC (OPÇÃO 1): ÁUDIO INTEGRAL DE 3 A 6+ MINUTOS
     let ytId = song.youtubeId;
     if (!ytId) {
       try {
-        const piped = await fetch(`https://api.piped.private.coffee/search?q=${encodeURIComponent(`${song.name} ${song.artist}`)}&filter=music_songs`);
+        const query = `${song.name} ${song.artist}`;
+        const piped = await fetch(`https://api.piped.private.coffee/search?q=${encodeURIComponent(query)}&filter=music_songs`, { signal: AbortSignal.timeout(3000) });
         if (piped.ok) {
           const pData = await piped.json();
-          const first = pData.items?.[0];
+          const first = pData.items?.find((i: any) => i.type === 'stream');
           if (first?.url) ytId = first.url.replace('/watch?v=', '').split('&')[0];
         }
       } catch {}
+
+      if (!ytId) {
+        try {
+          const inv = await fetch(`https://inv.bp.projectsegfau.lt/api/v1/search?q=${encodeURIComponent(`${song.name} ${song.artist}`)}&type=video`, { signal: AbortSignal.timeout(3000) });
+          if (inv.ok) {
+            const d = await inv.json();
+            if (d[0]?.videoId) ytId = d[0].videoId;
+          }
+        } catch {}
+      }
     }
 
     if (!ytId) ytId = '_1xXYeNrW9k';
+    song.youtubeId = ytId;
 
+    // Pausa qualquer áudio local anterior para não sobrepor
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.removeAttribute('src');
     }
 
+    // Reproduz áudio completo via YouTube Music Engine
     if (window.ytPlayer && typeof window.ytPlayer.loadVideoById === 'function') {
       try {
         window.ytPlayer.loadVideoById({ videoId: ytId, startSeconds: 0 });
         if (typeof window.ytPlayer.unMute === 'function' && !isMuted) window.ytPlayer.unMute();
         if (typeof window.ytPlayer.setVolume === 'function') window.ytPlayer.setVolume(Math.round(volume * 100));
         window.ytPlayer.playVideo();
+        setIsPlaying(true);
+        return;
       } catch (e) {
         console.warn('YouTube Load Error:', e);
       }
+    }
+
+    // Inicialização dinâmica caso o player ainda esteja carregando
+    if (window.YT && window.YT.Player) {
+      try {
+        window.ytPlayer = new window.YT.Player('able-yt-player', {
+          height: '1',
+          width: '1',
+          videoId: ytId,
+          playerVars: { autoplay: 1, controls: 0, disablekb: 1, fs: 0, rel: 0, playsinline: 1, origin: window.location.origin },
+          events: {
+            onReady: (e: any) => {
+              try {
+                e.target.setVolume(Math.round(volume * 100));
+                if (!isMuted) e.target.unMute();
+                e.target.playVideo();
+              } catch {}
+            },
+            onStateChange: (e: any) => {
+              if (e.data === 1) setIsPlaying(true);
+              else if (e.data === 2) setIsPlaying(false);
+              else if (e.data === 0) handleNextSong();
+            }
+          }
+        });
+        setIsPlaying(true);
+        return;
+      } catch {}
+    }
+
+    // Fallback de emergência (caso o YouTube esteja totalmente bloqueado pela rede do usuário)
+    if (song.audioUrl && audioRef.current) {
+      audioRef.current.src = song.audioUrl;
+      audioRef.current.volume = isMuted ? 0 : volume;
+      await audioRef.current.play().catch(console.warn);
     }
   };
 
