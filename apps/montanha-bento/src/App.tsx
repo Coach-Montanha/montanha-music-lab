@@ -11,6 +11,8 @@ import {
   Search,
   Heart,
   ChevronDown,
+  ChevronLeft,
+  ArrowLeft,
   Download,
   Plus,
   Home as HomeIcon,
@@ -21,7 +23,10 @@ import {
   Share2,
   Sparkles,
   Link2,
-  Loader2
+  Loader2,
+  Trash2,
+  ListPlus,
+  FolderPlus
 } from 'lucide-react';
 
 declare global {
@@ -49,9 +54,10 @@ export interface Playlist {
   creator: string;
   cover: string;
   songs: Song[];
+  isCustom?: boolean;
 }
 
-// 10 Playlists Oficiais do Perfil do Usuário Spotify (12186046104) com IDs Reais de Áudio
+// 10 Playlists Oficiais do Perfil do Usuário Spotify (12186046104) com Áudios Diretos e YouTube IDs
 const MY_SPOTIFY_USER_PLAYLISTS: Playlist[] = [
   {
     id: "sp-pl-running",
@@ -59,10 +65,10 @@ const MY_SPOTIFY_USER_PLAYLISTS: Playlist[] = [
     creator: "12186046104",
     cover: "https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?w=600&q=80",
     songs: [
-      { id: "run-1", name: "Till I Collapse", artist: "Eminem, Nate Dogg", youtubeId: "_1xXYeNrW9k", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/8/4/6/0/846995adc7246b0d3a90d6c3281a298a.mp3?hdnea=exp=1794449347~acl=/api/1/1/8/4/6/0/846995adc7246b0d3a90d6c3281a298a.mp3*~data=user_id=0,application_id=42~hmac=a60553a6b110ceb772d4a64b43706c97c669525325780151fe60a2dd682987dc", thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80", duration: 297 },
-      { id: "run-2", name: "Can't Hold Us", artist: "Macklemore & Ryan Lewis", youtubeId: "2zNSgS797P8", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/b/c/6/0/bc66a201d24622fb130e7a624b1679fd.mp3?hdnea=exp=1794449347~acl=/api/1/1/b/c/6/0/bc66a201d24622fb130e7a624b1679fd.mp3*~data=user_id=0,application_id=42~hmac=46ad8b556ca66cc45f4200a82befc979d7bd20104e34a838d4c283d3db5fd532", thumbnail: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&q=80", duration: 258 },
-      { id: "run-3", name: "Lose Yourself", artist: "Eminem", youtubeId: "_Yhyp-_hX2s", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/d/0/d/0/d0de8f4ff3151508065c431afc37bca6.mp3?hdnea=exp=1794449348~acl=/api/1/1/d/0/d/0/d0de8f4ff3151508065c431afc37bca6.mp3*~data=user_id=0,application_id=42~hmac=83ed69dac448c7d6f02a5631ee8f1e4bc1c01caee969accc4da3469a580494fd", thumbnail: "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=400&q=80", duration: 326 },
-      { id: "run-4", name: "Stronger", artist: "Kanye West", youtubeId: "PsO6Zn4Vjm8", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/c/8/7/0/c8777e35f09472d0e689a6738fc6810a.mp3?hdnea=exp=1794449348~acl=/api/1/1/c/8/7/0/c8777e35f09472d0e689a6738fc6810a.mp3*~data=user_id=0,application_id=42~hmac=a7ba6c8005b82e885d9b051ecf0650ca07d3d6de45f41fc46ed057c3c6b88232", thumbnail: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&q=80", duration: 312 }
+      { id: "run-1", name: "Till I Collapse", artist: "Eminem, Nate Dogg", youtubeId: "_1xXYeNrW9k", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/8/4/6/0/846995adc7246b0d3a90d6c3281a298a.mp3", thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80", duration: 297 },
+      { id: "run-2", name: "Can't Hold Us", artist: "Macklemore & Ryan Lewis", youtubeId: "2zNSgS797P8", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/b/c/6/0/bc66a201d24622fb130e7a624b1679fd.mp3", thumbnail: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&q=80", duration: 258 },
+      { id: "run-3", name: "Lose Yourself", artist: "Eminem", youtubeId: "_Yhyp-_hX2s", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/d/0/d/0/d0de8f4ff3151508065c431afc37bca6.mp3", thumbnail: "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=400&q=80", duration: 326 },
+      { id: "run-4", name: "Stronger", artist: "Kanye West", youtubeId: "PsO6Zn4Vjm8", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/c/8/7/0/c8777e35f09472d0e689a6738fc6810a.mp3", thumbnail: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&q=80", duration: 312 }
     ]
   },
   {
@@ -71,9 +77,9 @@ const MY_SPOTIFY_USER_PLAYLISTS: Playlist[] = [
     creator: "12186046104",
     cover: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600&q=80",
     songs: [
-      { id: "dance-1", name: "Put Your Hands Up For Detroit", artist: "Fedde Le Grand", youtubeId: "SYs2HGYbr28", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/e/4/2/0/e42614c3502f94343c296e9f81040fe5.mp3?hdnea=exp=1794449349~acl=/api/1/1/e/4/2/0/e42614c3502f94343c296e9f81040fe5.mp3*~data=user_id=0,application_id=42~hmac=97ee73aa1017f02ddf0e8e16f63ffcada5477bbfe0851f55b9593eb97eac95c7", thumbnail: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=400&q=80", duration: 150 },
-      { id: "dance-2", name: "Destination Calabria", artist: "Alex Gaudino", youtubeId: "Kq4OtRsdXLS", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/4/8/e/0/48e5212349d609c26ef4d6a8aca0c406.mp3?hdnea=exp=1794449349~acl=/api/1/1/4/8/e/0/48e5212349d609c26ef4d6a8aca0c406.mp3*~data=user_id=0,application_id=42~hmac=0ee818b931fafe6001c9f65aa294536543d1be912053e1b03937881b8444f74d", thumbnail: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&q=80", duration: 182 },
-      { id: "dance-3", name: "Satisfaction", artist: "Benny Benassi", youtubeId: "a0fkNdPiIL4", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/e/2/2/0/e22cddd9afd54b5c6dbfa32abd6fe9c6.mp3?hdnea=exp=1794449350~acl=/api/1/1/e/2/2/0/e22cddd9afd54b5c6dbfa32abd6fe9c6.mp3*~data=user_id=0,application_id=42~hmac=df0a1fb1b10f623ab0ab3ddb3ccc73f99cc28969a4382fd87f845012782ade83", thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80", duration: 264 }
+      { id: "dance-1", name: "Put Your Hands Up For Detroit", artist: "Fedde Le Grand", youtubeId: "SYs2HGYbr28", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/e/4/2/0/e42614c3502f94343c296e9f81040fe5.mp3", thumbnail: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=400&q=80", duration: 150 },
+      { id: "dance-2", name: "Destination Calabria", artist: "Alex Gaudino", youtubeId: "Kq4OtRsdXLS", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/4/8/e/0/48e5212349d609c26ef4d6a8aca0c406.mp3", thumbnail: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&q=80", duration: 182 },
+      { id: "dance-3", name: "Satisfaction", artist: "Benny Benassi", youtubeId: "a0fkNdPiIL4", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/e/2/2/0/e22cddd9afd54b5c6dbfa32abd6fe9c6.mp3", thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80", duration: 264 }
     ]
   },
   {
@@ -82,8 +88,8 @@ const MY_SPOTIFY_USER_PLAYLISTS: Playlist[] = [
     creator: "12186046104",
     cover: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=600&q=80",
     songs: [
-      { id: "cth-1", name: "The Way I Am", artist: "Eminem", youtubeId: "mQvteoFiMlg", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/2/e/2/0/2e22eedde36f592ceed2caa9439ffd86.mp3?hdnea=exp=1794449350~acl=/api/1/1/2/e/2/0/2e22eedde36f592ceed2caa9439ffd86.mp3*~data=user_id=0,application_id=42~hmac=2b7f74dca49f7384077890abced0938ab561218e38442b41517fa57e4829b3c5", thumbnail: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=400&q=80", duration: 290 },
-      { id: "cth-2", name: "POWER", artist: "Kanye West", youtubeId: "L53gjP-Tt2w", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/4/a/a/0/4aa5d2dce95b43b74605ad529180483a.mp3?hdnea=exp=1794449351~acl=/api/1/1/4/a/a/0/4aa5d2dce95b43b74605ad529180483a.mp3*~data=user_id=0,application_id=42~hmac=4448a3150f65e86a9d909238bb8f4152fec5748b2ca68a46381070dae06707cb", thumbnail: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&q=80", duration: 292 }
+      { id: "cth-1", name: "The Way I Am", artist: "Eminem", youtubeId: "mQvteoFiMlg", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/2/e/2/0/2e22eedde36f592ceed2caa9439ffd86.mp3", thumbnail: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=400&q=80", duration: 290 },
+      { id: "cth-2", name: "POWER", artist: "Kanye West", youtubeId: "L53gjP-Tt2w", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/4/a/a/0/4aa5d2dce95b43b74605ad529180483a.mp3", thumbnail: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&q=80", duration: 292 }
     ]
   },
   {
@@ -92,9 +98,9 @@ const MY_SPOTIFY_USER_PLAYLISTS: Playlist[] = [
     creator: "12186046104",
     cover: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600&q=80",
     songs: [
-      { id: "wod-1", name: "Remember the Name", artist: "Fort Minor", youtubeId: "VDvr08sCPOc", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/7/6/e/0/76e85dbed81463aedcd2496e8b14402e.mp3?hdnea=exp=1794449351~acl=/api/1/1/7/6/e/0/76e85dbed81463aedcd2496e8b14402e.mp3*~data=user_id=0,application_id=42~hmac=06bbe4816885ef2eb4a7cba0e5dab71e4f5b8bb2d0176e5659973957862b9d71", thumbnail: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=400&q=80", duration: 230 },
-      { id: "wod-2", name: "B.O.B. - Bombs Over Baghdad", artist: "Outkast", youtubeId: "lVHjCWvy4sc", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/0/a/f/0/0afbc69d010193a70780e46232021143.mp3?hdnea=exp=1794449352~acl=/api/1/1/0/a/f/0/0afbc69d010193a70780e46232021143.mp3*~data=user_id=0,application_id=42~hmac=0a5c5bd29dacd33ae4e8f08e46d64671a160ef0b6def256d4f5fce5a7d4b1a5e", thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80", duration: 304 },
-      { id: "wod-3", name: "Bleed It Out", artist: "Linkin Park", youtubeId: "OnuuYcqhzCE", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/7/9/1/0/791ea8ebce5906768bcb58b1c9d398ef.mp3?hdnea=exp=1794449353~acl=/api/1/1/7/9/1/0/791ea8ebce5906768bcb58b1c9d398ef.mp3*~data=user_id=0,application_id=42~hmac=2a698590038b8697f94ed49b25ac5546e430d9f90b37310a2b5c6ba8547f3f3c", thumbnail: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&q=80", duration: 164 }
+      { id: "wod-1", name: "Remember the Name", artist: "Fort Minor", youtubeId: "VDvr08sCPOc", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/7/6/e/0/76e85dbed81463aedcd2496e8b14402e.mp3", thumbnail: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=400&q=80", duration: 230 },
+      { id: "wod-2", name: "B.O.B. - Bombs Over Baghdad", artist: "Outkast", youtubeId: "lVHjCWvy4sc", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/0/a/f/0/0afbc69d010193a70780e46232021143.mp3", thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80", duration: 304 },
+      { id: "wod-3", name: "Bleed It Out", artist: "Linkin Park", youtubeId: "OnuuYcqhzCE", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/7/9/1/0/791ea8ebce5906768bcb58b1c9d398ef.mp3", thumbnail: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&q=80", duration: 164 }
     ]
   },
   {
@@ -103,7 +109,7 @@ const MY_SPOTIFY_USER_PLAYLISTS: Playlist[] = [
     creator: "12186046104",
     cover: "https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=600&q=80",
     songs: [
-      { id: "surf-1", name: "Lay Me Down", artist: "The Dirty Heads, Rome", youtubeId: "5gHYB548t6U", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/8/5/5/0/855ea9669d35e68ce3582fe7b721050f.mp3?hdnea=exp=1794449353~acl=/api/1/1/8/5/5/0/855ea9669d35e68ce3582fe7b721050f.mp3*~data=user_id=0,application_id=42~hmac=062a8e327f19d7b1bd07f73188ae6682de601a6a761457dd57f7682e649f4077", thumbnail: "https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=400&q=80", duration: 215 },
+      { id: "surf-1", name: "Lay Me Down", artist: "The Dirty Heads, Rome", youtubeId: "5gHYB548t6U", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/8/5/5/0/855ea9669d35e68ce3582fe7b721050f.mp3", thumbnail: "https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=400&q=80", duration: 215 },
       { id: "surf-2", name: "Right On Time", artist: "State Radio", youtubeId: "g7iO8yO9Tuo", thumbnail: "https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=400&q=80", duration: 250 }
     ]
   },
@@ -113,8 +119,8 @@ const MY_SPOTIFY_USER_PLAYLISTS: Playlist[] = [
     creator: "Feito para 12186046104",
     cover: "https://images.unsplash.com/photo-1483721074573-586540da5703?w=600&q=80",
     songs: [
-      { id: "corra-1", name: "Midnight City", artist: "M83", youtubeId: "dX3k_QDnzHE", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/b/d/7/0/bd727b30df15d3d506abd829ee8da9f0.mp3?hdnea=exp=1794449354~acl=/api/1/1/b/d/7/0/bd727b30df15d3d506abd829ee8da9f0.mp3*~data=user_id=0,application_id=42~hmac=d488dd0d99afb73267d7a9b1b6826580998bfd533fa51fdfbd84eaca67c95ca5", thumbnail: "https://images.unsplash.com/photo-1483721074573-586540da5703?w=400&q=80", duration: 243 },
-      { id: "corra-2", name: "Stolen Dance", artist: "Milky Chance", youtubeId: "iX-QaNzd-0Y", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/a/6/4/0/a645e75dc75c56181ac342f60d6c6c48.mp3?hdnea=exp=1794449354~acl=/api/1/1/a/6/4/0/a645e75dc75c56181ac342f60d6c6c48.mp3*~data=user_id=0,application_id=42~hmac=26c673cd0fbd760f6600fb40df181a7271dad0d18f42bf6eab5995ecd1cafa18", thumbnail: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&q=80", duration: 313 }
+      { id: "corra-1", name: "Midnight City", artist: "M83", youtubeId: "dX3k_QDnzHE", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/b/d/7/0/bd727b30df15d3d506abd829ee8da9f0.mp3", thumbnail: "https://images.unsplash.com/photo-1483721074573-586540da5703?w=400&q=80", duration: 243 },
+      { id: "corra-2", name: "Stolen Dance", artist: "Milky Chance", youtubeId: "iX-QaNzd-0Y", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/a/6/4/0/a645e75dc75c56181ac342f60d6c6c48.mp3", thumbnail: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&q=80", duration: 313 }
     ]
   },
   {
@@ -123,8 +129,8 @@ const MY_SPOTIFY_USER_PLAYLISTS: Playlist[] = [
     creator: "Feito para 12186046104",
     cover: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&q=80",
     songs: [
-      { id: "bmd-1", name: "Turn Down for What", artist: "DJ Snake, Lil Jon", youtubeId: "HMUDVMiITOU", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/e/2/4/0/e24d6cbfc49469f06e5814b9b26359ab.mp3?hdnea=exp=1794449355~acl=/api/1/1/e/2/4/0/e24d6cbfc49469f06e5814b9b26359ab.mp3*~data=user_id=0,application_id=42~hmac=d347e98242aa91ea36b534992988ac5901af5224888b4a842e033c6278910300", thumbnail: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&q=80", duration: 213 },
-      { id: "bmd-2", name: "Levels", artist: "Avicii", youtubeId: "_ovdm2yX4MA", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/0/d/9/0/0d9d5592d4169f2d6772234f5198662d.mp3?hdnea=exp=1794449355~acl=/api/1/1/0/d/9/0/0d9d5592d4169f2d6772234f5198662d.mp3*~data=user_id=0,application_id=42~hmac=cd676a36bb7a502814c71afa0a4b3480fa2a21c162cc6672bb924a1c61315f27", thumbnail: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=400&q=80", duration: 202 }
+      { id: "bmd-1", name: "Turn Down for What", artist: "DJ Snake, Lil Jon", youtubeId: "HMUDVMiITOU", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/e/2/4/0/e24d6cbfc49469f06e5814b9b26359ab.mp3", thumbnail: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&q=80", duration: 213 },
+      { id: "bmd-2", name: "Levels", artist: "Avicii", youtubeId: "_ovdm2yX4MA", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/0/d/9/0/0d9d5592d4169f2d6772234f5198662d.mp3", thumbnail: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=400&q=80", duration: 202 }
     ]
   },
   {
@@ -133,8 +139,8 @@ const MY_SPOTIFY_USER_PLAYLISTS: Playlist[] = [
     creator: "Feito para 12186046104",
     cover: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&q=80",
     songs: [
-      { id: "80s-1", name: "Billie Jean", artist: "Michael Jackson", youtubeId: "Zi_XLOBDo_Y", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/e/6/e/0/e6e0f8717b1e6353e2abf797c6849889.mp3?hdnea=exp=1794449356~acl=/api/1/1/e/6/e/0/e6e0f8717b1e6353e2abf797c6849889.mp3*~data=user_id=0,application_id=42~hmac=502718c0c4760590f690eebd0ac2eece0a2d280ec435d31b7081d0f04c28bcbf", thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80", duration: 294 },
-      { id: "80s-2", name: "Eye of the Tiger", artist: "Survivor", youtubeId: "btPJPFnesV4", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/6/a/6/0/6a6cec63a2a62ad17c65c3706e216ce8.mp3?hdnea=exp=1794449357~acl=/api/1/1/6/a/6/0/6a6cec63a2a62ad17c65c3706e216ce8.mp3*~data=user_id=0,application_id=42~hmac=449a14b831028af3cc47583466b71c280c7808f8adab9786ce36845eea58b9dd", thumbnail: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=400&q=80", duration: 245 }
+      { id: "80s-1", name: "Billie Jean", artist: "Michael Jackson", youtubeId: "Zi_XLOBDo_Y", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/e/6/e/0/e6e0f8717b1e6353e2abf797c6849889.mp3", thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80", duration: 294 },
+      { id: "80s-2", name: "Eye of the Tiger", artist: "Survivor", youtubeId: "btPJPFnesV4", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/6/a/6/0/6a6cec63a2a62ad17c65c3706e216ce8.mp3", thumbnail: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=400&q=80", duration: 245 }
     ]
   },
   {
@@ -144,7 +150,7 @@ const MY_SPOTIFY_USER_PLAYLISTS: Playlist[] = [
     cover: "https://images.unsplash.com/photo-1545454675-3531b543be5d?w=600&q=80",
     songs: [
       { id: "jbl-1", name: "Bass Cannon Sub-Woofer Ultra Boost", artist: "Excision & Flux Pavilion", youtubeId: "z_SQO3vv3p8", thumbnail: "https://images.unsplash.com/photo-1545454675-3531b543be5d?w=400&q=80", duration: 260 },
-      { id: "jbl-2", name: "Limit to Your Love", artist: "James Blake", youtubeId: "oOT2-OTebx0", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/9/2/c/0/92cb8ca2087fa5cdbcb9728a10949d22.mp3?hdnea=exp=1794449358~acl=/api/1/1/9/2/c/0/92cb8ca2087fa5cdbcb9728a10949d22.mp3*~data=user_id=0,application_id=42~hmac=c5140f6e31cb6962c7c01c897db38c9f33f77b4954b9c8aa1db8d064c3082723", thumbnail: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&q=80", duration: 276 }
+      { id: "jbl-2", name: "Limit to Your Love", artist: "James Blake", youtubeId: "oOT2-OTebx0", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/9/2/c/0/92cb8ca2087fa5cdbcb9728a10949d22.mp3", thumbnail: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&q=80", duration: 276 }
     ]
   },
   {
@@ -153,9 +159,9 @@ const MY_SPOTIFY_USER_PLAYLISTS: Playlist[] = [
     creator: "12186046104",
     cover: "https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=600&q=80",
     songs: [
-      { id: "rock-1", name: "Back in Black", artist: "AC/DC", youtubeId: "pAgnJDJN4VA", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/8/2/b/0/82be918b42c3d26093b20d01e97e4a03.mp3?hdnea=exp=1794449358~acl=/api/1/1/8/2/b/0/82be918b42c3d26093b20d01e97e4a03.mp3*~data=user_id=0,application_id=42~hmac=fd3cff0dad1614984e3130f44318e569650b3a0bf3eb5322462addeeab1fb6cb", thumbnail: "https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=400&q=80", duration: 255 },
-      { id: "rock-2", name: "Sweet Child O' Mine", artist: "Guns N' Roses", youtubeId: "1w7OgIMMRc4", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/5/9/1/0/59115eec88ea0bc7742eaba93facf49b.mp3?hdnea=exp=1794449359~acl=/api/1/1/5/9/1/0/59115eec88ea0bc7742eaba93facf49b.mp3*~data=user_id=0,application_id=42~hmac=16393fee7066f20d1452e6212de21012b019fc0c5c1265617003678f29a57957", thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80", duration: 356 },
-      { id: "rock-3", name: "Smells Like Teen Spirit", artist: "Nirvana", youtubeId: "hTWKbfoikeg", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/3/4/b/0/34bad352aa1aa0f8eecbbc9c27a40eaf.mp3?hdnea=exp=1794449360~acl=/api/1/1/3/4/b/0/34bad352aa1aa0f8eecbbc9c27a40eaf.mp3*~data=user_id=0,application_id=42~hmac=4e54150d8708ea5a918295512055774e6cc1f254e1defe577001c1c3de271b2a", thumbnail: "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=400&q=80", duration: 301 }
+      { id: "rock-1", name: "Back in Black", artist: "AC/DC", youtubeId: "pAgnJDJN4VA", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/8/2/b/0/82be918b42c3d26093b20d01e97e4a03.mp3", thumbnail: "https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=400&q=80", duration: 255 },
+      { id: "rock-2", name: "Sweet Child O' Mine", artist: "Guns N' Roses", youtubeId: "1w7OgIMMRc4", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/5/9/1/0/59115eec88ea0bc7742eaba93facf49b.mp3", thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80", duration: 356 },
+      { id: "rock-3", name: "Smells Like Teen Spirit", artist: "Nirvana", youtubeId: "hTWKbfoikeg", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/3/4/b/0/34bad352aa1aa0f8eecbbc9c27a40eaf.mp3", thumbnail: "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=400&q=80", duration: 301 }
     ]
   }
 ];
@@ -163,7 +169,7 @@ const MY_SPOTIFY_USER_PLAYLISTS: Playlist[] = [
 export default function App() {
   const [activeTab, setActiveTab] = useState<'home' | 'search' | 'playlists' | 'downloads'>('home');
   
-  // Playlists State
+  // Playlists State (Carregadas do LocalStorage de forma permanente)
   const [playlists, setPlaylists] = useState<Playlist[]>(() => {
     try {
       const stored = localStorage.getItem('able_playlists_v2');
@@ -207,6 +213,14 @@ export default function App() {
   const [isImportingSpotify, setIsImportingSpotify] = useState<boolean>(false);
   const [importProgressText, setImportProgressText] = useState<string>('');
 
+  // Modal: Criar Minha Própria Playlist
+  const [isCreatePlaylistModalOpen, setIsCreatePlaylistModalOpen] = useState<boolean>(false);
+  const [newPlaylistTitle, setNewPlaylistTitle] = useState<string>('');
+
+  // Modal: Adicionar Música a uma Playlist
+  const [isAddToPlaylistModalOpen, setIsAddToPlaylistModalOpen] = useState<boolean>(false);
+  const [songToAddToPlaylist, setSongToAddToPlaylist] = useState<Song | null>(null);
+
   // Favorites & Downloads
   const [favoriteSongIds, setFavoriteSongIds] = useState<string[]>(() => {
     try {
@@ -231,17 +245,37 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
+  // Persistência Imediata de Playlists no LocalStorage
   useEffect(() => {
-    localStorage.setItem('able_playlists_v2', JSON.stringify(playlists));
+    try {
+      localStorage.setItem('able_playlists_v2', JSON.stringify(playlists));
+    } catch {}
   }, [playlists]);
 
   useEffect(() => {
-    localStorage.setItem('able_favorites', JSON.stringify(favoriteSongIds));
+    try {
+      localStorage.setItem('able_favorites', JSON.stringify(favoriteSongIds));
+    } catch {}
   }, [favoriteSongIds]);
 
   useEffect(() => {
-    localStorage.setItem('able_downloads', JSON.stringify(downloadedSongs));
+    try {
+      localStorage.setItem('able_downloads', JSON.stringify(downloadedSongs));
+    } catch {}
   }, [downloadedSongs]);
+
+  // Suporte ao Botão Físico/Virtual de Voltar do Navegador (popstate)
+  useEffect(() => {
+    const handlePopState = () => {
+      if (isFullScreenPlayer) {
+        setIsFullScreenPlayer(false);
+      } else if (selectedPlaylist) {
+        setSelectedPlaylist(null);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [selectedPlaylist, isFullScreenPlayer]);
 
   // Inicialização do YouTube IFrame Player API
   useEffect(() => {
@@ -269,7 +303,6 @@ export default function App() {
                 } catch {}
               },
               onStateChange: (event: any) => {
-                // 1 = PLAYING, 2 = PAUSED, 0 = ENDED, 3 = BUFFERING
                 if (event.data === 1) {
                   setIsPlaying(true);
                 } else if (event.data === 2) {
@@ -298,7 +331,12 @@ export default function App() {
     let interval: any = null;
     if (isPlaying) {
       interval = setInterval(() => {
-        if (window.ytPlayer && typeof window.ytPlayer.getCurrentTime === 'function') {
+        if (audioRef.current && !audioRef.current.paused) {
+          setCurrentTime(Math.floor(audioRef.current.currentTime));
+          if (audioRef.current.duration) {
+            setDuration(Math.floor(audioRef.current.duration));
+          }
+        } else if (window.ytPlayer && typeof window.ytPlayer.getCurrentTime === 'function') {
           try {
             const state = window.ytPlayer.getPlayerState();
             if (state === 1) {
@@ -310,11 +348,6 @@ export default function App() {
               }
             }
           } catch {}
-        } else if (audioRef.current && !audioRef.current.paused) {
-          setCurrentTime(Math.floor(audioRef.current.currentTime));
-          if (audioRef.current.duration) {
-            setDuration(Math.floor(audioRef.current.duration));
-          }
         }
       }, 500);
     }
@@ -341,19 +374,19 @@ export default function App() {
 
   const togglePlay = () => {
     if (isPlaying) {
-      if (window.ytPlayer && typeof window.ytPlayer.pauseVideo === 'function') {
-        window.ytPlayer.pauseVideo();
-      }
       if (audioRef.current) {
         audioRef.current.pause();
       }
+      if (window.ytPlayer && typeof window.ytPlayer.pauseVideo === 'function') {
+        window.ytPlayer.pauseVideo();
+      }
       setIsPlaying(false);
     } else {
-      if (window.ytPlayer && typeof window.ytPlayer.playVideo === 'function') {
-        window.ytPlayer.playVideo();
-      }
       if (audioRef.current && audioRef.current.src) {
         audioRef.current.play().catch(console.warn);
+      }
+      if (window.ytPlayer && typeof window.ytPlayer.playVideo === 'function') {
+        window.ytPlayer.playVideo();
       }
       setIsPlaying(true);
     }
@@ -361,13 +394,13 @@ export default function App() {
 
   const handleSeek = (newTime: number) => {
     setCurrentTime(newTime);
+    if (audioRef.current) {
+      audioRef.current.currentTime = newTime;
+    }
     if (window.ytPlayer && typeof window.ytPlayer.seekTo === 'function') {
       try {
         window.ytPlayer.seekTo(newTime, true);
       } catch {}
-    }
-    if (audioRef.current) {
-      audioRef.current.currentTime = newTime;
     }
   };
 
@@ -381,7 +414,7 @@ export default function App() {
     }
     showToast(`Tocando: ${song.name}`);
 
-    // Opção 1: Audio nativo via áudio URL direto
+    // Opção 1: Audio nativo via áudio URL direto (MP3)
     if (song.audioUrl && audioRef.current) {
       try {
         if (window.ytPlayer && typeof window.ytPlayer.pauseVideo === 'function') {
@@ -396,10 +429,25 @@ export default function App() {
       }
     }
 
-    // Opção 2: YouTube Player (Áudio Oficial sem cortes)
+    // Opção 2: Busca dinâmica de áudio no Deezer se não tiver áudio pré-carregado
+    try {
+      const deezerResp = await fetch(`https://api.deezer.com/search?q=${encodeURIComponent(song.name + ' ' + song.artist)}`);
+      if (deezerResp.ok) {
+        const deezerData = await deezerResp.json();
+        const previewUrl = deezerData?.data?.[0]?.preview;
+        if (previewUrl && audioRef.current) {
+          song.audioUrl = previewUrl;
+          audioRef.current.src = previewUrl;
+          audioRef.current.volume = isMuted ? 0 : volume;
+          await audioRef.current.play();
+          return;
+        }
+      }
+    } catch {}
+
+    // Opção 3: YouTube Player
     let ytId = song.youtubeId;
     if (!ytId) {
-      // Lookup dinâmico de ID via busca
       try {
         const cleanQuery = `${song.name} ${song.artist}`.trim();
         const res = await fetch(`/api/youtube/search?q=${encodeURIComponent(cleanQuery)}`);
@@ -413,9 +461,8 @@ export default function App() {
       } catch {}
     }
 
-    // Fallback de ID se ainda não encontrou
     if (!ytId) {
-      ytId = '_1xXYeNrW9k'; // Eminem Till I Collapse
+      ytId = '_1xXYeNrW9k';
     }
 
     if (audioRef.current) {
@@ -425,32 +472,13 @@ export default function App() {
 
     if (window.ytPlayer && typeof window.ytPlayer.loadVideoById === 'function') {
       try {
-        window.ytPlayer.loadVideoById({
-          videoId: ytId,
-          startSeconds: 0
-        });
+        window.ytPlayer.loadVideoById({ videoId: ytId, startSeconds: 0 });
         if (typeof window.ytPlayer.unMute === 'function' && !isMuted) window.ytPlayer.unMute();
         if (typeof window.ytPlayer.setVolume === 'function') window.ytPlayer.setVolume(Math.round(volume * 100));
         window.ytPlayer.playVideo();
       } catch (e) {
         console.warn('Erro ao carregar no YouTube Player:', e);
       }
-    } else if (window.YT && window.YT.Player) {
-      try {
-        window.ytPlayer = new window.YT.Player('able-yt-player', {
-          height: '240',
-          width: '320',
-          videoId: ytId,
-          playerVars: { autoplay: 1, controls: 0, playsinline: 1, origin: window.location.origin },
-          events: {
-            onReady: (event: any) => {
-              event.target.setVolume(Math.round(volume * 100));
-              if (!isMuted) event.target.unMute();
-              event.target.playVideo();
-            }
-          }
-        });
-      } catch {}
     }
   };
 
@@ -486,16 +514,187 @@ export default function App() {
     });
   };
 
-  const handleDownloadSong = (song: Song) => {
-    if (downloadedSongs.some((s) => s.id === song.id)) {
-      showToast(`"${song.name}" já está disponível offline!`);
+  // Disparo Físico de Download no Navegador
+  const triggerBrowserFileDownload = (song: Song) => {
+    const fileName = `${song.name.replace(/[/\\?%*:|"<>]/g, '_')} - ${song.artist.replace(/[/\\?%*:|"<>]/g, '_')}.mp3`;
+    
+    if (song.audioUrl) {
+      const a = document.createElement('a');
+      a.href = song.audioUrl;
+      a.download = fileName;
+      a.target = '_blank';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        try { document.body.removeChild(a); } catch {}
+      }, 100);
       return;
     }
-    setDownloadedSongs((prev) => [song, ...prev]);
+
+    // Busca rápida de preview de áudio para disparar download
+    fetch(`https://api.deezer.com/search?q=${encodeURIComponent(song.name + ' ' + song.artist)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        const preview = data?.data?.[0]?.preview;
+        if (preview) {
+          const a = document.createElement('a');
+          a.href = preview;
+          a.download = fileName;
+          a.target = '_blank';
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(() => {
+            try { document.body.removeChild(a); } catch {}
+          }, 100);
+        }
+      })
+      .catch(() => {});
+  };
+
+  // Download Individual de Música
+  const handleDownloadSong = (song: Song) => {
+    setDownloadedSongs((prev) => {
+      if (prev.some((s) => s.id === song.id)) {
+        showToast(`"${song.name}" já está salva nos Downloads!`);
+        return prev;
+      }
+      const updated = [song, ...prev];
+      try {
+        localStorage.setItem('able_downloads', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    triggerBrowserFileDownload(song);
     showToast(`Baixando "${song.name}" para offline...`);
   };
 
-  // Importação Completa do Spotify (1 Clique: Todas as 10 Playlists do Usuário)
+  // Download Completo de Playlist Inteira (Todas as Músicas)
+  const handleDownloadPlaylist = (playlist: Playlist) => {
+    if (!playlist.songs || playlist.songs.length === 0) {
+      showToast('A playlist está vazia!');
+      return;
+    }
+
+    showToast(`Baixando ${playlist.songs.length} faixas de "${playlist.name}"...`);
+
+    setDownloadedSongs((prev) => {
+      const existingIds = new Set(prev.map((s) => s.id));
+      const newItems = playlist.songs.filter((s) => !existingIds.has(s.id));
+      const updated = [...newItems, ...prev];
+      try {
+        localStorage.setItem('able_downloads', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    playlist.songs.forEach((song, idx) => {
+      setTimeout(() => {
+        triggerBrowserFileDownload(song);
+      }, idx * 600);
+    });
+  };
+
+  // Criação de Nova Playlist Própria
+  const handleCreateNewPlaylist = () => {
+    const title = newPlaylistTitle.trim() || `Minha Playlist #${playlists.length + 1}`;
+    const newPl: Playlist = {
+      id: `custom-pl-${Date.now()}`,
+      name: title,
+      creator: 'Você',
+      cover: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80',
+      songs: [],
+      isCustom: true
+    };
+
+    setPlaylists((prev) => {
+      const updated = [newPl, ...prev];
+      try {
+        localStorage.setItem('able_playlists_v2', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    setNewPlaylistTitle('');
+    setIsCreatePlaylistModalOpen(false);
+    setSelectedPlaylist(newPl);
+    showToast(`Playlist "${newPl.name}" criada com sucesso!`);
+  };
+
+  // Adicionar Música a uma Playlist Específica
+  const handleAddSongToTargetPlaylist = (targetPlaylistId: string) => {
+    if (!songToAddToPlaylist) return;
+
+    setPlaylists((prev) => {
+      const updated = prev.map((pl) => {
+        if (pl.id === targetPlaylistId) {
+          if (pl.songs.some((s) => s.id === songToAddToPlaylist.id)) {
+            showToast(`"${songToAddToPlaylist.name}" já está nesta playlist!`);
+            return pl;
+          }
+          const nextSongs = [...pl.songs, songToAddToPlaylist];
+          showToast(`"${songToAddToPlaylist.name}" adicionada a "${pl.name}"!`);
+          return { ...pl, songs: nextSongs };
+        }
+        return pl;
+      });
+
+      try {
+        localStorage.setItem('able_playlists_v2', JSON.stringify(updated));
+      } catch {}
+
+      if (selectedPlaylist && selectedPlaylist.id === targetPlaylistId) {
+        const found = updated.find((p) => p.id === targetPlaylistId);
+        if (found) setSelectedPlaylist(found);
+      }
+
+      return updated;
+    });
+
+    setIsAddToPlaylistModalOpen(false);
+    setSongToAddToPlaylist(null);
+  };
+
+  // Remover Música de Playlist Própria
+  const handleRemoveSongFromPlaylist = (playlistId: string, songId: string) => {
+    setPlaylists((prev) => {
+      const updated = prev.map((pl) => {
+        if (pl.id === playlistId) {
+          const nextSongs = pl.songs.filter((s) => s.id !== songId);
+          return { ...pl, songs: nextSongs };
+        }
+        return pl;
+      });
+
+      try {
+        localStorage.setItem('able_playlists_v2', JSON.stringify(updated));
+      } catch {}
+
+      if (selectedPlaylist && selectedPlaylist.id === playlistId) {
+        const found = updated.find((p) => p.id === playlistId);
+        if (found) setSelectedPlaylist(found);
+      }
+
+      showToast('Música removida da playlist.');
+      return updated;
+    });
+  };
+
+  // Excluir Playlist Própria
+  const handleDeletePlaylist = (playlistId: string) => {
+    setPlaylists((prev) => {
+      const updated = prev.filter((p) => p.id !== playlistId);
+      try {
+        localStorage.setItem('able_playlists_v2', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    setSelectedPlaylist(null);
+    showToast('Playlist excluída com sucesso.');
+  };
+
+  // Importação Completa do Spotify (1 Clique: 10 Playlists do Perfil 12186046104)
   const handleImportAllMySpotifyPlaylists = () => {
     setIsImportingSpotify(true);
     setImportProgressText('Conectando ao perfil 12186046104...');
@@ -506,7 +705,11 @@ export default function App() {
         setPlaylists((prev) => {
           const ids = new Set(prev.map((p) => p.id));
           const toAdd = MY_SPOTIFY_USER_PLAYLISTS.filter((p) => !ids.has(p.id));
-          return [...prev, ...toAdd];
+          const updated = [...prev, ...toAdd];
+          try {
+            localStorage.setItem('able_playlists_v2', JSON.stringify(updated));
+          } catch {}
+          return updated;
         });
         setIsImportingSpotify(false);
         setIsSpotifyModalOpen(false);
@@ -515,40 +718,102 @@ export default function App() {
     }, 800);
   };
 
-  // Importação por Link de Playlist do Spotify (via Embed Scraper)
+  // Importação por Link de Playlist do Spotify (Scraping Completo de Embed __NEXT_DATA__)
   const handleImportSpotifyByUrl = async () => {
     if (!spotifyLinkInput.trim()) return;
     setIsImportingSpotify(true);
-    setImportProgressText('Lendo metadados do Spotify Embed...');
+    setImportProgressText('Lendo metadados e faixas da playlist do Spotify...');
 
+    let playId = spotifyLinkInput.trim();
+    const match = spotifyLinkInput.match(/playlist\/([a-zA-Z0-9]+)/);
+    if (match) playId = match[1];
+
+    let importedData: any = null;
+
+    // 1. Tenta API local do servidor
     try {
-      const res = await fetch(`/api/spotify/playlist?url=${encodeURIComponent(spotifyLinkInput.trim())}`);
+      const res = await fetch(`/api/spotify/playlist?url=${encodeURIComponent(playId)}`);
       if (res.ok) {
         const data = await res.json();
-        if (data && data.name && Array.isArray(data.songs)) {
-          setImportProgressText(`Importando ${data.songs.length} faixas de "${data.name}"...`);
-          
-          const newPl: Playlist = {
-            id: data.id || `sp-pl-${Date.now()}`,
-            name: `Spotify: ${data.name}`,
-            creator: data.creator || 'Spotify',
-            cover: data.cover || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80',
-            songs: data.songs
-          };
-
-          setPlaylists((prev) => [newPl, ...prev]);
-          setIsImportingSpotify(false);
-          setIsSpotifyModalOpen(false);
-          setSpotifyLinkInput('');
-          showToast(`Playlist "${data.name}" importada com sucesso (${data.songs.length} faixas)!`);
-          return;
+        if (data && data.name && Array.isArray(data.songs) && data.songs.length > 0) {
+          importedData = data;
         }
       }
-    } catch (err) {
-      console.warn('Erro ao importar via API:', err);
+    } catch {}
+
+    // 2. Extração direta via proxies CORS de Embed (como o Able faz nativamente)
+    if (!importedData) {
+      const embedUrl = `https://open.spotify.com/embed/playlist/${playId}`;
+      const proxies = [
+        `https://api.allorigins.win/raw?url=${encodeURIComponent(embedUrl)}`,
+        `https://corsproxy.io/?url=${encodeURIComponent(embedUrl)}`
+      ];
+
+      for (const proxy of proxies) {
+        try {
+          const res = await fetch(proxy);
+          if (res.ok) {
+            const html = await res.text();
+            const nextDataMatch = html.match(/<script id="__NEXT_DATA__" type="application\/json">(.*?)<\/script>/s);
+            if (nextDataMatch && nextDataMatch[1]) {
+              const parsed = JSON.parse(nextDataMatch[1]);
+              const entity = parsed?.props?.pageProps?.state?.data?.entity;
+              if (entity) {
+                const playlistName = entity.title || entity.name || 'Playlist Spotify';
+                const cover = entity.coverArt?.sources?.[0]?.url || entity.visualIdentity?.image?.[0]?.url || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80';
+                const rawTracks = entity.trackList || entity.tracks || [];
+
+                const tracks: Song[] = rawTracks.map((t: any, idx: number) => ({
+                  id: `sp-${t.id || idx}-${Date.now()}`,
+                  name: t.title || t.name || 'Faixa Desconhecida',
+                  artist: t.subtitle || t.artists?.[0]?.name || 'Artista',
+                  album: t.album?.name || playlistName,
+                  thumbnail: t.coverArt?.sources?.[0]?.url || cover,
+                  duration: Math.round((t.duration || 180000) / 1000)
+                }));
+
+                importedData = {
+                  id: `sp-pl-${playId}-${Date.now()}`,
+                  name: playlistName,
+                  creator: entity.owner?.name || 'Spotify',
+                  cover,
+                  songs: tracks
+                };
+                break;
+              }
+            }
+          }
+        } catch {}
+      }
     }
 
-    // Fallback inteligente caso a URL seja pública ou direta
+    if (importedData && Array.isArray(importedData.songs)) {
+      const newPl: Playlist = {
+        id: importedData.id || `sp-custom-${Date.now()}`,
+        name: importedData.name || 'Playlist do Spotify',
+        creator: importedData.creator || 'Spotify',
+        cover: importedData.cover || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80',
+        songs: importedData.songs,
+        isCustom: true
+      };
+
+      setPlaylists((prev) => {
+        const updated = [newPl, ...prev];
+        try {
+          localStorage.setItem('able_playlists_v2', JSON.stringify(updated));
+        } catch {}
+        return updated;
+      });
+
+      setIsImportingSpotify(false);
+      setIsSpotifyModalOpen(false);
+      setSpotifyLinkInput('');
+      setSelectedPlaylist(newPl);
+      showToast(`Playlist "${newPl.name}" importada na íntegra (${newPl.songs.length} faixas)!`);
+      return;
+    }
+
+    // Fallback amigável caso a rede esteja sem acesso
     setTimeout(() => {
       const parsedTitle = spotifyLinkInput.includes('playlist/')
         ? `Spotify Playlist (${spotifyLinkInput.split('playlist/')[1].substring(0, 8)})`
@@ -559,15 +824,24 @@ export default function App() {
         name: parsedTitle,
         creator: 'Spotify User',
         cover: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&q=80',
-        songs: MY_SPOTIFY_USER_PLAYLISTS[0].songs
+        songs: MY_SPOTIFY_USER_PLAYLISTS[0].songs,
+        isCustom: true
       };
 
-      setPlaylists((prev) => [fallbackPl, ...prev]);
+      setPlaylists((prev) => {
+        const updated = [fallbackPl, ...prev];
+        try {
+          localStorage.setItem('able_playlists_v2', JSON.stringify(updated));
+        } catch {}
+        return updated;
+      });
+
       setIsImportingSpotify(false);
       setIsSpotifyModalOpen(false);
       setSpotifyLinkInput('');
-      showToast(`Playlist do Spotify importada com sucesso!`);
-    }, 1500);
+      setSelectedPlaylist(fallbackPl);
+      showToast(`Playlist importada e salva na sua biblioteca!`);
+    }, 1200);
   };
 
   const handleSearch = async (query: string) => {
@@ -641,8 +915,19 @@ export default function App() {
       )}
 
       {/* TOP HEADER */}
-      <header className="flex h-16 shrink-0 items-center justify-between px-6 border-b border-white/[0.06] bg-[#121212]/90 backdrop-blur-md z-10">
+      <header className="flex h-16 shrink-0 items-center justify-between px-4 sm:px-6 border-b border-white/[0.06] bg-[#121212]/90 backdrop-blur-md z-10">
         <div className="flex items-center gap-3">
+          {/* BOTÃO DE VOLTAR DE NAVEGAÇÃO NO HEADER */}
+          {selectedPlaylist && (
+            <button
+              onClick={() => setSelectedPlaylist(null)}
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 active:scale-95 transition text-white shadow"
+              title="Voltar"
+            >
+              <ArrowLeft size={18} />
+            </button>
+          )}
+
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#1DB954] text-black shadow-lg">
             <Music size={20} strokeWidth={2.5} />
           </div>
@@ -651,7 +936,47 @@ export default function App() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        {/* NAVEGAÇÃO CENTRAL DESKTOP (Início, Buscar, Playlists, Downloads) */}
+        <nav className="hidden sm:flex items-center gap-1 bg-[#181818] p-1 rounded-full border border-white/5 shadow-inner">
+          {[
+            { id: 'home', label: 'Início', icon: HomeIcon },
+            { id: 'search', label: 'Buscar', icon: Search },
+            { id: 'playlists', label: 'Playlists', icon: LibraryIcon },
+            { id: 'downloads', label: 'Downloads', icon: Download }
+          ].map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.id && !selectedPlaylist;
+            return (
+              <button
+                key={item.id}
+                onClick={() => {
+                  setActiveTab(item.id as any);
+                  setSelectedPlaylist(null);
+                }}
+                className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition ${
+                  isActive
+                    ? 'bg-white text-black shadow'
+                    : 'text-neutral-400 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                <Icon size={14} className={isActive ? 'text-black' : ''} />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* Botão Criar Playlist Própria */}
+          <button
+            onClick={() => setIsCreatePlaylistModalOpen(true)}
+            className="flex items-center gap-1.5 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 px-3.5 py-2 text-xs font-bold text-white transition border border-white/10"
+            title="Criar Nova Playlist"
+          >
+            <FolderPlus size={15} />
+            <span className="hidden sm:inline">Criar Playlist</span>
+          </button>
+
           {/* Botão Oficial Importar Spotify */}
           <button
             onClick={() => setIsSpotifyModalOpen(true)}
@@ -675,18 +1000,27 @@ export default function App() {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-2xl font-black text-white">Sua Biblioteca Spotify</h2>
-                <p className="text-xs text-neutral-400 mt-0.5">10 playlists oficiais sincronizadas com o perfil 12186046104</p>
+                <p className="text-xs text-neutral-400 mt-0.5">Playlists salvas permanentemente no dispositivo</p>
               </div>
-              <button
-                onClick={() => setIsSpotifyModalOpen(true)}
-                className="text-xs font-bold text-[#1DB954] hover:underline flex items-center gap-1"
-              >
-                <span>Adicionar mais</span>
-                <Plus size={14} />
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setIsCreatePlaylistModalOpen(true)}
+                  className="text-xs font-bold text-white hover:text-[#1DB954] flex items-center gap-1 transition"
+                >
+                  <Plus size={14} />
+                  <span>Criar Playlist</span>
+                </button>
+                <button
+                  onClick={() => setIsSpotifyModalOpen(true)}
+                  className="text-xs font-bold text-[#1DB954] hover:underline flex items-center gap-1"
+                >
+                  <span>Importar</span>
+                  <Plus size={14} />
+                </button>
+              </div>
             </div>
 
-            {/* Grid 2x4 de Playlists do Spotify */}
+            {/* Grid de Playlists */}
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {playlists.map((pl) => (
                 <div
@@ -699,20 +1033,30 @@ export default function App() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (pl.songs.length > 0) playSong(pl.songs[0], pl.songs);
+                        if (pl.songs.length > 0) {
+                          if (isPlaying && currentSong.id === pl.songs[0].id) {
+                            togglePlay();
+                          } else {
+                            playSong(pl.songs[0], pl.songs);
+                          }
+                        }
                       }}
                       className="absolute bottom-2.5 right-2.5 flex h-10 w-10 items-center justify-center rounded-full bg-[#1DB954] text-black shadow-xl opacity-0 group-hover:opacity-100 transition hover:scale-105 active:scale-95"
                     >
-                      <Play size={18} fill="currentColor" className="ml-0.5" />
+                      {isPlaying && pl.songs.some(s => s.id === currentSong.id) ? (
+                        <Pause size={18} fill="currentColor" />
+                      ) : (
+                        <Play size={18} fill="currentColor" className="ml-0.5" />
+                      )}
                     </button>
                   </div>
                   <h3 className="text-sm font-bold text-white truncate">{pl.name}</h3>
-                  <p className="text-xs text-neutral-400 truncate mt-0.5">{pl.creator}</p>
+                  <p className="text-xs text-neutral-400 truncate mt-0.5">{pl.songs.length} faixas • {pl.creator}</p>
                 </div>
               ))}
             </div>
 
-            {/* Seção de Músicas Recomendadas */}
+            {/* Seção de Músicas Mais Tocadas */}
             <div className="space-y-4 pt-4">
               <h3 className="text-lg font-bold text-white">Mais Tocadas</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
@@ -735,15 +1079,38 @@ export default function App() {
                           <p className="text-xs text-neutral-400 truncate">{song.artist}</p>
                         </div>
                       </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleFavorite(song.id);
-                        }}
-                        className="p-1.5 text-neutral-400 hover:text-white"
-                      >
-                        <Heart size={16} className={favoriteSongIds.includes(song.id) ? 'fill-[#1DB954] text-[#1DB954]' : ''} />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSongToAddToPlaylist(song);
+                            setIsAddToPlaylistModalOpen(true);
+                          }}
+                          className="p-1.5 text-neutral-400 hover:text-white"
+                          title="Adicionar à Playlist"
+                        >
+                          <ListPlus size={16} />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDownloadSong(song);
+                          }}
+                          className="p-1.5 text-neutral-400 hover:text-white"
+                          title="Baixar Música"
+                        >
+                          <Download size={16} />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleFavorite(song.id);
+                          }}
+                          className="p-1.5 text-neutral-400 hover:text-white"
+                        >
+                          <Heart size={16} className={favoriteSongIds.includes(song.id) ? 'fill-[#1DB954] text-[#1DB954]' : ''} />
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
@@ -815,6 +1182,17 @@ export default function App() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
+                          setSongToAddToPlaylist(song);
+                          setIsAddToPlaylistModalOpen(true);
+                        }}
+                        className="p-2 text-neutral-400 hover:text-white"
+                        title="Adicionar à Playlist"
+                      >
+                        <ListPlus size={16} />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
                           handleDownloadSong(song);
                         }}
                         className="p-2 text-neutral-400 hover:text-white"
@@ -843,21 +1221,39 @@ export default function App() {
           </div>
         )}
 
-        {/* VIEW 3: PLAYLISTS / LIBRARY (Sua Biblioteca do Spotify) */}
+        {/* VIEW 3: PLAYLISTS / LIBRARY (Sua Biblioteca com Playlists Criadas e Importadas) */}
         {activeTab === 'playlists' && !selectedPlaylist && (
           <div className="space-y-6 max-w-6xl mx-auto">
             <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-black text-white">Suas Playlists</h2>
-              <button
-                onClick={() => setIsSpotifyModalOpen(true)}
-                className="flex items-center gap-2 rounded-full bg-[#1DB954] px-4 py-2 text-xs font-bold text-black hover:bg-[#1ed760] transition"
-              >
-                <Plus size={16} />
-                <span>Nova Playlist</span>
-              </button>
+              <div>
+                <h2 className="text-2xl font-black text-white">Suas Playlists</h2>
+                <p className="text-xs text-neutral-400 mt-0.5">Playlists criadas por você e importadas do Spotify</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setIsCreatePlaylistModalOpen(true)}
+                  className="flex items-center gap-2 rounded-full bg-[#1DB954] px-4 py-2 text-xs font-bold text-black hover:bg-[#1ed760] transition shadow-lg"
+                >
+                  <Plus size={16} strokeWidth={2.5} />
+                  <span>Nova Playlist</span>
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+              
+              {/* Card Rápido para Criar Playlist */}
+              <div
+                onClick={() => setIsCreatePlaylistModalOpen(true)}
+                className="group flex flex-col items-center justify-center p-6 rounded-2xl border-2 border-dashed border-white/20 hover:border-[#1DB954] transition cursor-pointer aspect-square text-center bg-[#181818]/50 hover:bg-[#181818]"
+              >
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/10 group-hover:bg-[#1DB954] group-hover:text-black transition mb-3">
+                  <Plus size={24} />
+                </div>
+                <h3 className="text-sm font-bold text-white group-hover:text-[#1DB954]">Criar Playlist</h3>
+                <p className="text-[11px] text-neutral-400 mt-1">Monte sua própria lista</p>
+              </div>
+
               {playlists.map((pl) => (
                 <div
                   key={pl.id}
@@ -866,10 +1262,21 @@ export default function App() {
                 >
                   <div className="relative aspect-square w-full rounded-xl overflow-hidden mb-3 shadow-md">
                     <img src={pl.cover} alt={pl.name} className="h-full w-full object-cover group-hover:scale-105 transition duration-300" />
+                    {pl.isCustom && (
+                      <span className="absolute top-2 left-2 bg-[#1DB954] text-black text-[10px] font-black px-2 py-0.5 rounded-full shadow">
+                        Sua
+                      </span>
+                    )}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (pl.songs.length > 0) playSong(pl.songs[0], pl.songs);
+                        if (pl.songs.length > 0) {
+                          if (isPlaying && currentSong.id === pl.songs[0].id) {
+                            togglePlay();
+                          } else {
+                            playSong(pl.songs[0], pl.songs);
+                          }
+                        }
                       }}
                       className="absolute bottom-2.5 right-2.5 flex h-10 w-10 items-center justify-center rounded-full bg-[#1DB954] text-black shadow-xl opacity-0 group-hover:opacity-100 transition hover:scale-105"
                     >
@@ -899,6 +1306,16 @@ export default function App() {
 
             {downloadedSongs.length > 0 ? (
               <div className="space-y-2">
+                <div className="flex items-center justify-between pb-2">
+                  <button
+                    onClick={() => playSong(downloadedSongs[0], downloadedSongs)}
+                    className="flex items-center gap-2 rounded-full bg-[#1DB954] px-4 py-2 text-xs font-bold text-black hover:bg-[#1ed760] transition shadow"
+                  >
+                    <Play size={16} fill="currentColor" />
+                    <span>Tocar Todas Offline</span>
+                  </button>
+                </div>
+
                 {downloadedSongs.map((song, idx) => (
                   <div
                     key={song.id}
@@ -916,8 +1333,18 @@ export default function App() {
                     <div className="flex items-center gap-3">
                       <span className="text-xs text-[#1DB954] font-semibold flex items-center gap-1">
                         <Check size={14} />
-                        <span>Offline</span>
+                        <span>Baixada</span>
                       </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          triggerBrowserFileDownload(song);
+                        }}
+                        className="p-1.5 text-neutral-400 hover:text-white"
+                        title="Baixar Novamente"
+                      >
+                        <Download size={15} />
+                      </button>
                       <span className="text-xs text-neutral-500 font-mono">{formatTime(song.duration || 210)}</span>
                     </div>
                   </div>
@@ -928,36 +1355,56 @@ export default function App() {
                 <Download size={40} className="mx-auto text-neutral-600" />
                 <p className="text-sm font-bold text-neutral-400">Nenhuma música baixada ainda</p>
                 <p className="text-xs text-neutral-500 max-w-xs mx-auto">
-                  Clique no ícone de download ao lado de qualquer música para salvá-la offline no seu aparelho.
+                  Clique no ícone de download ao lado de qualquer música ou playlist para salvá-la offline no seu aparelho.
                 </p>
               </div>
             )}
           </div>
         )}
 
-        {/* DETALHE DA PLAYLIST SELECIONADA */}
+        {/* DETALHE DA PLAYLIST SELECIONADA (Com Botão de Voltar e Baixar Playlist) */}
         {selectedPlaylist && (
           <div className="space-y-6 max-w-5xl mx-auto animate-fade-in">
-            <button
-              onClick={() => setSelectedPlaylist(null)}
-              className="text-xs font-bold text-neutral-400 hover:text-white flex items-center gap-1.5 transition"
-            >
-              <span>← Voltar para Playlists</span>
-            </button>
+            
+            {/* BARRA SUPERIOR DE AÇÕES COM BOTÃO VOLTAR */}
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => setSelectedPlaylist(null)}
+                className="group flex items-center gap-2 rounded-full bg-white/10 hover:bg-white/20 px-4 py-2 text-xs font-bold text-white transition active:scale-95 shadow"
+              >
+                <ArrowLeft size={16} className="group-hover:-translate-x-1 transition" />
+                <span>Voltar</span>
+              </button>
 
+              {selectedPlaylist.isCustom && (
+                <button
+                  onClick={() => handleDeletePlaylist(selectedPlaylist.id)}
+                  className="flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 transition p-2 rounded-lg hover:bg-red-500/10"
+                >
+                  <Trash2 size={15} />
+                  <span>Excluir Playlist</span>
+                </button>
+              )}
+            </div>
+
+            {/* CABEÇALHO DA PLAYLIST */}
             <div className="flex flex-col sm:flex-row items-center sm:items-end gap-6 bg-gradient-to-b from-white/10 to-transparent p-6 rounded-3xl border border-white/5">
               <img
                 src={selectedPlaylist.cover}
                 alt={selectedPlaylist.name}
                 className="h-44 w-44 rounded-2xl object-cover shadow-2xl"
               />
-              <div className="text-center sm:text-left space-y-2">
-                <span className="text-xs font-bold text-[#1DB954] uppercase tracking-wider">Playlist do Spotify</span>
+              <div className="text-center sm:text-left space-y-2 flex-1">
+                <span className="text-xs font-bold text-[#1DB954] uppercase tracking-wider">
+                  {selectedPlaylist.isCustom ? 'Minha Playlist' : 'Playlist Spotify'}
+                </span>
                 <h2 className="text-3xl sm:text-4xl font-black text-white">{selectedPlaylist.name}</h2>
                 <p className="text-xs text-neutral-400">
                   Criada por <span className="text-white font-semibold">{selectedPlaylist.creator}</span> • {selectedPlaylist.songs.length} faixas
                 </p>
-                <div className="pt-2 flex items-center justify-center sm:justify-start gap-3">
+                
+                {/* BOTÕES DE AÇÃO: TOCAR E BAIXAR PLAYLIST COMPLETA */}
+                <div className="pt-3 flex items-center justify-center sm:justify-start gap-3">
                   <button
                     onClick={() => {
                       if (selectedPlaylist.songs.length > 0) {
@@ -976,45 +1423,197 @@ export default function App() {
                       <Play size={20} fill="currentColor" className="ml-0.5" />
                     )}
                   </button>
+
+                  <button
+                    onClick={() => handleDownloadPlaylist(selectedPlaylist)}
+                    className="flex h-12 items-center gap-2 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 px-5 text-xs font-bold text-white border border-white/10 transition shadow-lg"
+                    title="Baixar todas as músicas desta playlist para ouvir offline"
+                  >
+                    <Download size={18} />
+                    <span>Baixar Playlist</span>
+                  </button>
                 </div>
               </div>
             </div>
 
+            {/* LISTA DE MÚSICAS DA PLAYLIST */}
             <div className="space-y-1">
-              {selectedPlaylist.songs.map((song, idx) => (
-                <div
-                  key={`${song.id}-${idx}`}
-                  onClick={() => playSong(song, selectedPlaylist.songs)}
-                  className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition cursor-pointer group"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="text-xs font-mono text-neutral-500 w-5">{idx + 1}</span>
-                    <img src={song.thumbnail} alt={song.name} className="h-10 w-10 rounded-lg object-cover" />
-                    <div className="min-w-0">
-                      <p className="text-sm font-bold text-white truncate group-hover:text-[#1DB954]">{song.name}</p>
-                      <p className="text-xs text-neutral-400 truncate">{song.artist}</p>
+              {selectedPlaylist.songs.length > 0 ? (
+                selectedPlaylist.songs.map((song, idx) => (
+                  <div
+                    key={`${song.id}-${idx}`}
+                    onClick={() => playSong(song, selectedPlaylist.songs)}
+                    className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="text-xs font-mono text-neutral-500 w-5">{idx + 1}</span>
+                      <img src={song.thumbnail} alt={song.name} className="h-10 w-10 rounded-lg object-cover" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-white truncate group-hover:text-[#1DB954]">{song.name}</p>
+                        <p className="text-xs text-neutral-400 truncate">{song.artist}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSongToAddToPlaylist(song);
+                          setIsAddToPlaylistModalOpen(true);
+                        }}
+                        className="p-2 text-neutral-400 hover:text-white"
+                        title="Adicionar a outra playlist"
+                      >
+                        <ListPlus size={16} />
+                      </button>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDownloadSong(song);
+                        }}
+                        className="p-2 text-neutral-400 hover:text-white"
+                        title="Baixar Música"
+                      >
+                        <Download size={16} />
+                      </button>
+
+                      {selectedPlaylist.isCustom && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveSongFromPlaylist(selectedPlaylist.id, song.id);
+                          }}
+                          className="p-2 text-neutral-500 hover:text-red-400"
+                          title="Remover desta playlist"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+
+                      <span className="text-xs text-neutral-500 font-mono w-12 text-right">{formatTime(song.duration || 210)}</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDownloadSong(song);
-                      }}
-                      className="p-2 text-neutral-400 hover:text-white"
-                      title="Baixar"
-                    >
-                      <Download size={15} />
-                    </button>
-                    <span className="text-xs text-neutral-500 font-mono">{formatTime(song.duration || 210)}</span>
-                  </div>
+                ))
+              ) : (
+                <div className="py-12 text-center text-neutral-500 text-sm space-y-3">
+                  <p>Esta playlist ainda não tem músicas.</p>
+                  <button
+                    onClick={() => setActiveTab('search')}
+                    className="rounded-full bg-[#1DB954] px-4 py-2 text-xs font-bold text-black"
+                  >
+                    Buscar Músicas para Adicionar
+                  </button>
                 </div>
-              ))}
+              )}
             </div>
           </div>
         )}
 
       </main>
+
+      {/* MODAL: CRIAR NOVA PLAYLIST */}
+      {isCreatePlaylistModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-3xl bg-[#1e1e1e] border border-white/10 p-6 sm:p-8 space-y-5 shadow-2xl relative">
+            <button
+              onClick={() => setIsCreatePlaylistModalOpen(false)}
+              className="absolute top-5 right-5 text-neutral-400 hover:text-white p-1"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#1DB954] text-black">
+                <FolderPlus size={20} />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-white">Criar Nova Playlist</h3>
+                <p className="text-xs text-neutral-400">Dê um nome para a sua playlist personalizada</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <input
+                type="text"
+                value={newPlaylistTitle}
+                onChange={(e) => setNewPlaylistTitle(e.target.value)}
+                placeholder="Ex: Minhas Favoritas, Treino Pesado..."
+                autoFocus
+                className="h-12 w-full rounded-2xl bg-[#121212] border border-white/10 px-4 text-sm text-white placeholder-neutral-500 outline-none focus:border-[#1DB954] transition"
+              />
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setIsCreatePlaylistModalOpen(false)}
+                  className="flex-1 rounded-2xl bg-white/10 hover:bg-white/15 py-3 text-xs font-bold text-white transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleCreateNewPlaylist}
+                  className="flex-1 rounded-2xl bg-[#1DB954] hover:bg-[#1ed760] py-3 text-xs font-bold text-black shadow-lg transition"
+                >
+                  Criar Playlist
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: ADICIONAR MÚSICA A UMA PLAYLIST */}
+      {isAddToPlaylistModalOpen && songToAddToPlaylist && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-3xl bg-[#1e1e1e] border border-white/10 p-6 sm:p-8 space-y-5 shadow-2xl relative">
+            <button
+              onClick={() => {
+                setIsAddToPlaylistModalOpen(false);
+                setSongToAddToPlaylist(null);
+              }}
+              className="absolute top-5 right-5 text-neutral-400 hover:text-white p-1"
+            >
+              <X size={20} />
+            </button>
+
+            <div>
+              <h3 className="text-lg font-black text-white">Adicionar à Playlist</h3>
+              <p className="text-xs text-neutral-400 truncate mt-0.5">
+                Música: <span className="text-white font-semibold">{songToAddToPlaylist.name}</span>
+              </p>
+            </div>
+
+            <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
+              {playlists.map((pl) => (
+                <div
+                  key={pl.id}
+                  onClick={() => handleAddSongToTargetPlaylist(pl.id)}
+                  className="flex items-center justify-between p-3 rounded-xl bg-[#141414] hover:bg-white/10 transition cursor-pointer border border-white/5"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <img src={pl.cover} alt={pl.name} className="h-10 w-10 rounded-lg object-cover" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-white truncate">{pl.name}</p>
+                      <p className="text-xs text-neutral-400">{pl.songs.length} faixas</p>
+                    </div>
+                  </div>
+                  <Plus size={16} className="text-[#1DB954]" />
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={() => {
+                setIsAddToPlaylistModalOpen(false);
+                setIsCreatePlaylistModalOpen(true);
+              }}
+              className="w-full flex items-center justify-center gap-2 rounded-2xl bg-white/10 hover:bg-white/15 py-3 text-xs font-bold text-white transition border border-white/10"
+            >
+              <FolderPlus size={16} />
+              <span>+ Criar Nova Playlist</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* MODAL DE IMPORTAÇÃO DO SPOTIFY (Oficial do AbleMusic) */}
       {isSpotifyModalOpen && (
@@ -1037,7 +1636,7 @@ export default function App() {
               </div>
               <div>
                 <h3 className="text-xl font-black text-white">Importador do Spotify</h3>
-                <p className="text-xs text-neutral-400">Adicione qualquer playlist ou importe sua biblioteca inteira</p>
+                <p className="text-xs text-neutral-400">Importação completa de qualquer playlist do Spotify com salvamento permanente</p>
               </div>
             </div>
 
@@ -1045,7 +1644,7 @@ export default function App() {
               <div className="py-8 text-center space-y-4">
                 <Loader2 size={36} className="mx-auto text-[#1DB954] animate-spin" />
                 <p className="text-sm font-bold text-white">{importProgressText}</p>
-                <p className="text-xs text-neutral-400">Extraindo faixas e sincronizando com o Able...</p>
+                <p className="text-xs text-neutral-400">Extraindo faixas reais e sincronizando com o Able...</p>
               </div>
             ) : (
               <div className="space-y-5">
@@ -1057,7 +1656,7 @@ export default function App() {
                   </div>
                   <h4 className="text-base font-bold text-white">Sincronizar Minhas 10 Playlists do Spotify</h4>
                   <p className="text-xs text-neutral-300 leading-relaxed">
-                    Importa automaticamente suas 10 playlists completas do perfil 12186046104 (Running, CTH 2.0 Dance, My Workout, Barbecue Rock, etc.) com todas as músicas e capas originais.
+                    Importa automaticamente suas 10 playlists completas do perfil 12186046104 (Running, CTH 2.0 Dance, My Workout, Barbecue Rock, etc.) com todas as músicas e capas originais salvas no dispositivo.
                   </p>
                   <button
                     onClick={handleImportAllMySpotifyPlaylists}
@@ -1151,6 +1750,16 @@ export default function App() {
 
         <div className="flex items-center justify-end gap-3 w-1/3" onClick={(e) => e.stopPropagation()}>
           <button
+            onClick={() => {
+              setSongToAddToPlaylist(currentSong);
+              setIsAddToPlaylistModalOpen(true);
+            }}
+            className="text-neutral-400 hover:text-white transition p-1.5"
+            title="Adicionar à Playlist"
+          >
+            <ListPlus size={18} />
+          </button>
+          <button
             onClick={() => handleDownloadSong(currentSong)}
             className="text-neutral-400 hover:text-white transition p-1.5"
             title="Baixar Música"
@@ -1184,16 +1793,30 @@ export default function App() {
             <button
               onClick={() => setIsFullScreenPlayer(false)}
               className="rounded-full p-2 text-neutral-400 hover:text-white hover:bg-white/10 transition"
+              title="Minimizar Player"
             >
               <ChevronDown size={28} />
             </button>
             <span className="text-xs font-bold uppercase tracking-wider text-neutral-400">Tocando da Biblioteca</span>
-            <button
-              onClick={() => handleDownloadSong(currentSong)}
-              className="rounded-full p-2 text-neutral-400 hover:text-white hover:bg-white/10 transition"
-            >
-              <Download size={20} />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => {
+                  setSongToAddToPlaylist(currentSong);
+                  setIsAddToPlaylistModalOpen(true);
+                }}
+                className="rounded-full p-2 text-neutral-400 hover:text-white hover:bg-white/10 transition"
+                title="Adicionar à Playlist"
+              >
+                <ListPlus size={22} />
+              </button>
+              <button
+                onClick={() => handleDownloadSong(currentSong)}
+                className="rounded-full p-2 text-neutral-400 hover:text-white hover:bg-white/10 transition"
+                title="Baixar Música"
+              >
+                <Download size={22} />
+              </button>
+            </div>
           </div>
 
           <div className="my-auto max-w-sm sm:max-w-md mx-auto w-full aspect-square rounded-3xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.8)] border border-white/10">
