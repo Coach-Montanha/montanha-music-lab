@@ -24,6 +24,14 @@ import {
   Loader2
 } from 'lucide-react';
 
+declare global {
+  interface Window {
+    YT: any;
+    onYouTubeIframeAPIReady: () => void;
+    ytPlayer: any;
+  }
+}
+
 export interface Song {
   id: string;
   name: string;
@@ -31,6 +39,8 @@ export interface Song {
   album?: string;
   thumbnail: string;
   duration?: number;
+  youtubeId?: string;
+  audioUrl?: string;
 }
 
 export interface Playlist {
@@ -41,7 +51,7 @@ export interface Playlist {
   songs: Song[];
 }
 
-// 10 Playlists Oficiais do Perfil do Usuário Spotify (12186046104)
+// 10 Playlists Oficiais do Perfil do Usuário Spotify (12186046104) com IDs Reais de Áudio
 const MY_SPOTIFY_USER_PLAYLISTS: Playlist[] = [
   {
     id: "sp-pl-running",
@@ -49,10 +59,10 @@ const MY_SPOTIFY_USER_PLAYLISTS: Playlist[] = [
     creator: "12186046104",
     cover: "https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?w=600&q=80",
     songs: [
-      { id: "run-1", name: "Till I Collapse", artist: "Eminem, Nate Dogg", thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80", duration: 297 },
-      { id: "run-2", name: "Can't Hold Us", artist: "Macklemore & Ryan Lewis", thumbnail: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&q=80", duration: 258 },
-      { id: "run-3", name: "Lose Yourself", artist: "Eminem", thumbnail: "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=400&q=80", duration: 326 },
-      { id: "run-4", name: "Stronger", artist: "Kanye West", thumbnail: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&q=80", duration: 312 }
+      { id: "run-1", name: "Till I Collapse", artist: "Eminem, Nate Dogg", youtubeId: "_1xXYeNrW9k", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/8/4/6/0/846995adc7246b0d3a90d6c3281a298a.mp3?hdnea=exp=1794449347~acl=/api/1/1/8/4/6/0/846995adc7246b0d3a90d6c3281a298a.mp3*~data=user_id=0,application_id=42~hmac=a60553a6b110ceb772d4a64b43706c97c669525325780151fe60a2dd682987dc", thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80", duration: 297 },
+      { id: "run-2", name: "Can't Hold Us", artist: "Macklemore & Ryan Lewis", youtubeId: "2zNSgS797P8", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/b/c/6/0/bc66a201d24622fb130e7a624b1679fd.mp3?hdnea=exp=1794449347~acl=/api/1/1/b/c/6/0/bc66a201d24622fb130e7a624b1679fd.mp3*~data=user_id=0,application_id=42~hmac=46ad8b556ca66cc45f4200a82befc979d7bd20104e34a838d4c283d3db5fd532", thumbnail: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&q=80", duration: 258 },
+      { id: "run-3", name: "Lose Yourself", artist: "Eminem", youtubeId: "_Yhyp-_hX2s", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/d/0/d/0/d0de8f4ff3151508065c431afc37bca6.mp3?hdnea=exp=1794449348~acl=/api/1/1/d/0/d/0/d0de8f4ff3151508065c431afc37bca6.mp3*~data=user_id=0,application_id=42~hmac=83ed69dac448c7d6f02a5631ee8f1e4bc1c01caee969accc4da3469a580494fd", thumbnail: "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=400&q=80", duration: 326 },
+      { id: "run-4", name: "Stronger", artist: "Kanye West", youtubeId: "PsO6Zn4Vjm8", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/c/8/7/0/c8777e35f09472d0e689a6738fc6810a.mp3?hdnea=exp=1794449348~acl=/api/1/1/c/8/7/0/c8777e35f09472d0e689a6738fc6810a.mp3*~data=user_id=0,application_id=42~hmac=a7ba6c8005b82e885d9b051ecf0650ca07d3d6de45f41fc46ed057c3c6b88232", thumbnail: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&q=80", duration: 312 }
     ]
   },
   {
@@ -61,9 +71,9 @@ const MY_SPOTIFY_USER_PLAYLISTS: Playlist[] = [
     creator: "12186046104",
     cover: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600&q=80",
     songs: [
-      { id: "dance-1", name: "Put Your Hands Up For Detroit", artist: "Fedde Le Grand", thumbnail: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=400&q=80", duration: 150 },
-      { id: "dance-2", name: "Destination Calabria", artist: "Alex Gaudino", thumbnail: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&q=80", duration: 182 },
-      { id: "dance-3", name: "Satisfaction", artist: "Benny Benassi", thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80", duration: 264 }
+      { id: "dance-1", name: "Put Your Hands Up For Detroit", artist: "Fedde Le Grand", youtubeId: "SYs2HGYbr28", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/e/4/2/0/e42614c3502f94343c296e9f81040fe5.mp3?hdnea=exp=1794449349~acl=/api/1/1/e/4/2/0/e42614c3502f94343c296e9f81040fe5.mp3*~data=user_id=0,application_id=42~hmac=97ee73aa1017f02ddf0e8e16f63ffcada5477bbfe0851f55b9593eb97eac95c7", thumbnail: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=400&q=80", duration: 150 },
+      { id: "dance-2", name: "Destination Calabria", artist: "Alex Gaudino", youtubeId: "Kq4OtRsdXLS", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/4/8/e/0/48e5212349d609c26ef4d6a8aca0c406.mp3?hdnea=exp=1794449349~acl=/api/1/1/4/8/e/0/48e5212349d609c26ef4d6a8aca0c406.mp3*~data=user_id=0,application_id=42~hmac=0ee818b931fafe6001c9f65aa294536543d1be912053e1b03937881b8444f74d", thumbnail: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&q=80", duration: 182 },
+      { id: "dance-3", name: "Satisfaction", artist: "Benny Benassi", youtubeId: "a0fkNdPiIL4", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/e/2/2/0/e22cddd9afd54b5c6dbfa32abd6fe9c6.mp3?hdnea=exp=1794449350~acl=/api/1/1/e/2/2/0/e22cddd9afd54b5c6dbfa32abd6fe9c6.mp3*~data=user_id=0,application_id=42~hmac=df0a1fb1b10f623ab0ab3ddb3ccc73f99cc28969a4382fd87f845012782ade83", thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80", duration: 264 }
     ]
   },
   {
@@ -72,8 +82,8 @@ const MY_SPOTIFY_USER_PLAYLISTS: Playlist[] = [
     creator: "12186046104",
     cover: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=600&q=80",
     songs: [
-      { id: "cth-1", name: "The Way I Am", artist: "Eminem", thumbnail: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=400&q=80", duration: 290 },
-      { id: "cth-2", name: "POWER", artist: "Kanye West", thumbnail: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&q=80", duration: 292 }
+      { id: "cth-1", name: "The Way I Am", artist: "Eminem", youtubeId: "mQvteoFiMlg", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/2/e/2/0/2e22eedde36f592ceed2caa9439ffd86.mp3?hdnea=exp=1794449350~acl=/api/1/1/2/e/2/0/2e22eedde36f592ceed2caa9439ffd86.mp3*~data=user_id=0,application_id=42~hmac=2b7f74dca49f7384077890abced0938ab561218e38442b41517fa57e4829b3c5", thumbnail: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=400&q=80", duration: 290 },
+      { id: "cth-2", name: "POWER", artist: "Kanye West", youtubeId: "L53gjP-Tt2w", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/4/a/a/0/4aa5d2dce95b43b74605ad529180483a.mp3?hdnea=exp=1794449351~acl=/api/1/1/4/a/a/0/4aa5d2dce95b43b74605ad529180483a.mp3*~data=user_id=0,application_id=42~hmac=4448a3150f65e86a9d909238bb8f4152fec5748b2ca68a46381070dae06707cb", thumbnail: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&q=80", duration: 292 }
     ]
   },
   {
@@ -82,9 +92,9 @@ const MY_SPOTIFY_USER_PLAYLISTS: Playlist[] = [
     creator: "12186046104",
     cover: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600&q=80",
     songs: [
-      { id: "wod-1", name: "Remember the Name", artist: "Fort Minor", thumbnail: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=400&q=80", duration: 230 },
-      { id: "wod-2", name: "B.O.B. - Bombs Over Baghdad", artist: "Outkast", thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80", duration: 304 },
-      { id: "wod-3", name: "Bleed It Out", artist: "Linkin Park", thumbnail: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&q=80", duration: 164 }
+      { id: "wod-1", name: "Remember the Name", artist: "Fort Minor", youtubeId: "VDvr08sCPOc", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/7/6/e/0/76e85dbed81463aedcd2496e8b14402e.mp3?hdnea=exp=1794449351~acl=/api/1/1/7/6/e/0/76e85dbed81463aedcd2496e8b14402e.mp3*~data=user_id=0,application_id=42~hmac=06bbe4816885ef2eb4a7cba0e5dab71e4f5b8bb2d0176e5659973957862b9d71", thumbnail: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=400&q=80", duration: 230 },
+      { id: "wod-2", name: "B.O.B. - Bombs Over Baghdad", artist: "Outkast", youtubeId: "lVHjCWvy4sc", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/0/a/f/0/0afbc69d010193a70780e46232021143.mp3?hdnea=exp=1794449352~acl=/api/1/1/0/a/f/0/0afbc69d010193a70780e46232021143.mp3*~data=user_id=0,application_id=42~hmac=0a5c5bd29dacd33ae4e8f08e46d64671a160ef0b6def256d4f5fce5a7d4b1a5e", thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80", duration: 304 },
+      { id: "wod-3", name: "Bleed It Out", artist: "Linkin Park", youtubeId: "OnuuYcqhzCE", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/7/9/1/0/791ea8ebce5906768bcb58b1c9d398ef.mp3?hdnea=exp=1794449353~acl=/api/1/1/7/9/1/0/791ea8ebce5906768bcb58b1c9d398ef.mp3*~data=user_id=0,application_id=42~hmac=2a698590038b8697f94ed49b25ac5546e430d9f90b37310a2b5c6ba8547f3f3c", thumbnail: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&q=80", duration: 164 }
     ]
   },
   {
@@ -93,8 +103,8 @@ const MY_SPOTIFY_USER_PLAYLISTS: Playlist[] = [
     creator: "12186046104",
     cover: "https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=600&q=80",
     songs: [
-      { id: "surf-1", name: "Lay Me Down", artist: "The Dirty Heads, Rome", thumbnail: "https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=400&q=80", duration: 215 },
-      { id: "surf-2", name: "Right On Time", artist: "State Radio", thumbnail: "https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=400&q=80", duration: 250 }
+      { id: "surf-1", name: "Lay Me Down", artist: "The Dirty Heads, Rome", youtubeId: "5gHYB548t6U", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/8/5/5/0/855ea9669d35e68ce3582fe7b721050f.mp3?hdnea=exp=1794449353~acl=/api/1/1/8/5/5/0/855ea9669d35e68ce3582fe7b721050f.mp3*~data=user_id=0,application_id=42~hmac=062a8e327f19d7b1bd07f73188ae6682de601a6a761457dd57f7682e649f4077", thumbnail: "https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=400&q=80", duration: 215 },
+      { id: "surf-2", name: "Right On Time", artist: "State Radio", youtubeId: "g7iO8yO9Tuo", thumbnail: "https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=400&q=80", duration: 250 }
     ]
   },
   {
@@ -103,8 +113,8 @@ const MY_SPOTIFY_USER_PLAYLISTS: Playlist[] = [
     creator: "Feito para 12186046104",
     cover: "https://images.unsplash.com/photo-1483721074573-586540da5703?w=600&q=80",
     songs: [
-      { id: "corra-1", name: "Midnight City", artist: "M83", thumbnail: "https://images.unsplash.com/photo-1483721074573-586540da5703?w=400&q=80", duration: 243 },
-      { id: "corra-2", name: "Stolen Dance", artist: "Milky Chance", thumbnail: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&q=80", duration: 313 }
+      { id: "corra-1", name: "Midnight City", artist: "M83", youtubeId: "dX3k_QDnzHE", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/b/d/7/0/bd727b30df15d3d506abd829ee8da9f0.mp3?hdnea=exp=1794449354~acl=/api/1/1/b/d/7/0/bd727b30df15d3d506abd829ee8da9f0.mp3*~data=user_id=0,application_id=42~hmac=d488dd0d99afb73267d7a9b1b6826580998bfd533fa51fdfbd84eaca67c95ca5", thumbnail: "https://images.unsplash.com/photo-1483721074573-586540da5703?w=400&q=80", duration: 243 },
+      { id: "corra-2", name: "Stolen Dance", artist: "Milky Chance", youtubeId: "iX-QaNzd-0Y", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/a/6/4/0/a645e75dc75c56181ac342f60d6c6c48.mp3?hdnea=exp=1794449354~acl=/api/1/1/a/6/4/0/a645e75dc75c56181ac342f60d6c6c48.mp3*~data=user_id=0,application_id=42~hmac=26c673cd0fbd760f6600fb40df181a7271dad0d18f42bf6eab5995ecd1cafa18", thumbnail: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&q=80", duration: 313 }
     ]
   },
   {
@@ -113,8 +123,8 @@ const MY_SPOTIFY_USER_PLAYLISTS: Playlist[] = [
     creator: "Feito para 12186046104",
     cover: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&q=80",
     songs: [
-      { id: "bmd-1", name: "Turn Down for What", artist: "DJ Snake, Lil Jon", thumbnail: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&q=80", duration: 213 },
-      { id: "bmd-2", name: "Levels", artist: "Avicii", thumbnail: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=400&q=80", duration: 202 }
+      { id: "bmd-1", name: "Turn Down for What", artist: "DJ Snake, Lil Jon", youtubeId: "HMUDVMiITOU", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/e/2/4/0/e24d6cbfc49469f06e5814b9b26359ab.mp3?hdnea=exp=1794449355~acl=/api/1/1/e/2/4/0/e24d6cbfc49469f06e5814b9b26359ab.mp3*~data=user_id=0,application_id=42~hmac=d347e98242aa91ea36b534992988ac5901af5224888b4a842e033c6278910300", thumbnail: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&q=80", duration: 213 },
+      { id: "bmd-2", name: "Levels", artist: "Avicii", youtubeId: "_ovdm2yX4MA", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/0/d/9/0/0d9d5592d4169f2d6772234f5198662d.mp3?hdnea=exp=1794449355~acl=/api/1/1/0/d/9/0/0d9d5592d4169f2d6772234f5198662d.mp3*~data=user_id=0,application_id=42~hmac=cd676a36bb7a502814c71afa0a4b3480fa2a21c162cc6672bb924a1c61315f27", thumbnail: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=400&q=80", duration: 202 }
     ]
   },
   {
@@ -123,8 +133,8 @@ const MY_SPOTIFY_USER_PLAYLISTS: Playlist[] = [
     creator: "Feito para 12186046104",
     cover: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&q=80",
     songs: [
-      { id: "80s-1", name: "Billie Jean", artist: "Michael Jackson", thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80", duration: 294 },
-      { id: "80s-2", name: "Eye of the Tiger", artist: "Survivor", thumbnail: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=400&q=80", duration: 245 }
+      { id: "80s-1", name: "Billie Jean", artist: "Michael Jackson", youtubeId: "Zi_XLOBDo_Y", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/e/6/e/0/e6e0f8717b1e6353e2abf797c6849889.mp3?hdnea=exp=1794449356~acl=/api/1/1/e/6/e/0/e6e0f8717b1e6353e2abf797c6849889.mp3*~data=user_id=0,application_id=42~hmac=502718c0c4760590f690eebd0ac2eece0a2d280ec435d31b7081d0f04c28bcbf", thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80", duration: 294 },
+      { id: "80s-2", name: "Eye of the Tiger", artist: "Survivor", youtubeId: "btPJPFnesV4", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/6/a/6/0/6a6cec63a2a62ad17c65c3706e216ce8.mp3?hdnea=exp=1794449357~acl=/api/1/1/6/a/6/0/6a6cec63a2a62ad17c65c3706e216ce8.mp3*~data=user_id=0,application_id=42~hmac=449a14b831028af3cc47583466b71c280c7808f8adab9786ce36845eea58b9dd", thumbnail: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=400&q=80", duration: 245 }
     ]
   },
   {
@@ -133,8 +143,8 @@ const MY_SPOTIFY_USER_PLAYLISTS: Playlist[] = [
     creator: "12186046104",
     cover: "https://images.unsplash.com/photo-1545454675-3531b543be5d?w=600&q=80",
     songs: [
-      { id: "jbl-1", name: "Bass Cannon Sub-Woofer Ultra Boost", artist: "Excision & Flux Pavilion", thumbnail: "https://images.unsplash.com/photo-1545454675-3531b543be5d?w=400&q=80", duration: 260 },
-      { id: "jbl-2", name: "Limit to Your Love", artist: "James Blake", thumbnail: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&q=80", duration: 276 }
+      { id: "jbl-1", name: "Bass Cannon Sub-Woofer Ultra Boost", artist: "Excision & Flux Pavilion", youtubeId: "z_SQO3vv3p8", thumbnail: "https://images.unsplash.com/photo-1545454675-3531b543be5d?w=400&q=80", duration: 260 },
+      { id: "jbl-2", name: "Limit to Your Love", artist: "James Blake", youtubeId: "oOT2-OTebx0", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/9/2/c/0/92cb8ca2087fa5cdbcb9728a10949d22.mp3?hdnea=exp=1794449358~acl=/api/1/1/9/2/c/0/92cb8ca2087fa5cdbcb9728a10949d22.mp3*~data=user_id=0,application_id=42~hmac=c5140f6e31cb6962c7c01c897db38c9f33f77b4954b9c8aa1db8d064c3082723", thumbnail: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&q=80", duration: 276 }
     ]
   },
   {
@@ -143,9 +153,9 @@ const MY_SPOTIFY_USER_PLAYLISTS: Playlist[] = [
     creator: "12186046104",
     cover: "https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=600&q=80",
     songs: [
-      { id: "rock-1", name: "Back in Black", artist: "AC/DC", thumbnail: "https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=400&q=80", duration: 255 },
-      { id: "rock-2", name: "Sweet Child O' Mine", artist: "Guns N' Roses", thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80", duration: 356 },
-      { id: "rock-3", name: "Smells Like Teen Spirit", artist: "Nirvana", thumbnail: "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=400&q=80", duration: 301 }
+      { id: "rock-1", name: "Back in Black", artist: "AC/DC", youtubeId: "pAgnJDJN4VA", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/8/2/b/0/82be918b42c3d26093b20d01e97e4a03.mp3?hdnea=exp=1794449358~acl=/api/1/1/8/2/b/0/82be918b42c3d26093b20d01e97e4a03.mp3*~data=user_id=0,application_id=42~hmac=fd3cff0dad1614984e3130f44318e569650b3a0bf3eb5322462addeeab1fb6cb", thumbnail: "https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=400&q=80", duration: 255 },
+      { id: "rock-2", name: "Sweet Child O' Mine", artist: "Guns N' Roses", youtubeId: "1w7OgIMMRc4", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/5/9/1/0/59115eec88ea0bc7742eaba93facf49b.mp3?hdnea=exp=1794449359~acl=/api/1/1/5/9/1/0/59115eec88ea0bc7742eaba93facf49b.mp3*~data=user_id=0,application_id=42~hmac=16393fee7066f20d1452e6212de21012b019fc0c5c1265617003678f29a57957", thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80", duration: 356 },
+      { id: "rock-3", name: "Smells Like Teen Spirit", artist: "Nirvana", youtubeId: "hTWKbfoikeg", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/3/4/b/0/34bad352aa1aa0f8eecbbc9c27a40eaf.mp3?hdnea=exp=1794449360~acl=/api/1/1/3/4/b/0/34bad352aa1aa0f8eecbbc9c27a40eaf.mp3*~data=user_id=0,application_id=42~hmac=4e54150d8708ea5a918295512055774e6cc1f254e1defe577001c1c3de271b2a", thumbnail: "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=400&q=80", duration: 301 }
     ]
   }
 ];
@@ -156,7 +166,7 @@ export default function App() {
   // Playlists State
   const [playlists, setPlaylists] = useState<Playlist[]>(() => {
     try {
-      const stored = localStorage.getItem('able_playlists');
+      const stored = localStorage.getItem('able_playlists_v2');
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
@@ -179,6 +189,8 @@ export default function App() {
   const [isShuffle, setIsShuffle] = useState<boolean>(false);
   const [isRepeat, setIsRepeat] = useState<boolean>(false);
   const [queue, setQueue] = useState<Song[]>(() => playlists[0]?.songs || MY_SPOTIFY_USER_PLAYLISTS[0].songs);
+
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Full Screen Player Sheet
   const [isFullScreenPlayer, setIsFullScreenPlayer] = useState<boolean>(false);
@@ -220,7 +232,7 @@ export default function App() {
   };
 
   useEffect(() => {
-    localStorage.setItem('able_playlists', JSON.stringify(playlists));
+    localStorage.setItem('able_playlists_v2', JSON.stringify(playlists));
   }, [playlists]);
 
   useEffect(() => {
@@ -231,28 +243,135 @@ export default function App() {
     localStorage.setItem('able_downloads', JSON.stringify(downloadedSongs));
   }, [downloadedSongs]);
 
-  // Audio Playback Timer
+  // Inicialização do YouTube IFrame Player API
   useEffect(() => {
-    let timer: any = null;
-    if (isPlaying) {
-      timer = setInterval(() => {
-        setCurrentTime((prev) => {
-          if (prev >= duration) {
-            handleNextSong();
-            return 0;
-          }
-          return prev + 1;
-        });
-      }, 1000);
+    const initYt = () => {
+      if (window.YT && window.YT.Player && !window.ytPlayer) {
+        try {
+          window.ytPlayer = new window.YT.Player('able-yt-player', {
+            height: '240',
+            width: '320',
+            videoId: currentSong?.youtubeId || '_1xXYeNrW9k',
+            playerVars: {
+              autoplay: 1,
+              controls: 0,
+              disablekb: 1,
+              fs: 0,
+              rel: 0,
+              playsinline: 1,
+              origin: window.location.origin
+            },
+            events: {
+              onReady: (event: any) => {
+                try {
+                  event.target.setVolume(Math.round(volume * 100));
+                  if (!isMuted) event.target.unMute();
+                } catch {}
+              },
+              onStateChange: (event: any) => {
+                // 1 = PLAYING, 2 = PAUSED, 0 = ENDED, 3 = BUFFERING
+                if (event.data === 1) {
+                  setIsPlaying(true);
+                } else if (event.data === 2) {
+                  setIsPlaying(false);
+                } else if (event.data === 0) {
+                  handleNextSong();
+                }
+              }
+            }
+          });
+        } catch (e) {
+          console.warn('Erro ao inicializar YouTube Player:', e);
+        }
+      }
+    };
+
+    if (window.YT && window.YT.Player) {
+      initYt();
+    } else {
+      window.onYouTubeIframeAPIReady = initYt;
     }
-    return () => clearInterval(timer);
+  }, []);
+
+  // Sincronização em Tempo Real do Progresso de Áudio (YouTube Player + HTML5 Audio)
+  useEffect(() => {
+    let interval: any = null;
+    if (isPlaying) {
+      interval = setInterval(() => {
+        if (window.ytPlayer && typeof window.ytPlayer.getCurrentTime === 'function') {
+          try {
+            const state = window.ytPlayer.getPlayerState();
+            if (state === 1) {
+              const cur = window.ytPlayer.getCurrentTime() || 0;
+              const dur = window.ytPlayer.getDuration() || 0;
+              setCurrentTime(Math.floor(cur));
+              if (dur > 0 && Math.floor(dur) !== duration) {
+                setDuration(Math.floor(dur));
+              }
+            }
+          } catch {}
+        } else if (audioRef.current && !audioRef.current.paused) {
+          setCurrentTime(Math.floor(audioRef.current.currentTime));
+          if (audioRef.current.duration) {
+            setDuration(Math.floor(audioRef.current.duration));
+          }
+        }
+      }, 500);
+    }
+    return () => clearInterval(interval);
   }, [isPlaying, duration]);
 
+  // Sincronização de Volume
+  useEffect(() => {
+    const vol100 = isMuted ? 0 : Math.round(volume * 100);
+    if (window.ytPlayer && typeof window.ytPlayer.setVolume === 'function') {
+      try {
+        window.ytPlayer.setVolume(vol100);
+        if (isMuted && typeof window.ytPlayer.mute === 'function') {
+          window.ytPlayer.mute();
+        } else if (!isMuted && typeof window.ytPlayer.unMute === 'function') {
+          window.ytPlayer.unMute();
+        }
+      } catch {}
+    }
+    if (audioRef.current) {
+      audioRef.current.volume = isMuted ? 0 : volume;
+    }
+  }, [volume, isMuted]);
+
   const togglePlay = () => {
-    setIsPlaying(!isPlaying);
+    if (isPlaying) {
+      if (window.ytPlayer && typeof window.ytPlayer.pauseVideo === 'function') {
+        window.ytPlayer.pauseVideo();
+      }
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      setIsPlaying(false);
+    } else {
+      if (window.ytPlayer && typeof window.ytPlayer.playVideo === 'function') {
+        window.ytPlayer.playVideo();
+      }
+      if (audioRef.current && audioRef.current.src) {
+        audioRef.current.play().catch(console.warn);
+      }
+      setIsPlaying(true);
+    }
   };
 
-  const playSong = (song: Song, newQueue?: Song[]) => {
+  const handleSeek = (newTime: number) => {
+    setCurrentTime(newTime);
+    if (window.ytPlayer && typeof window.ytPlayer.seekTo === 'function') {
+      try {
+        window.ytPlayer.seekTo(newTime, true);
+      } catch {}
+    }
+    if (audioRef.current) {
+      audioRef.current.currentTime = newTime;
+    }
+  };
+
+  const playSong = async (song: Song, newQueue?: Song[]) => {
     setCurrentSong(song);
     setCurrentTime(0);
     setDuration(song.duration || 240);
@@ -261,6 +380,78 @@ export default function App() {
       setQueue(newQueue);
     }
     showToast(`Tocando: ${song.name}`);
+
+    // Opção 1: Audio nativo via áudio URL direto
+    if (song.audioUrl && audioRef.current) {
+      try {
+        if (window.ytPlayer && typeof window.ytPlayer.pauseVideo === 'function') {
+          window.ytPlayer.pauseVideo();
+        }
+        audioRef.current.src = song.audioUrl;
+        audioRef.current.volume = isMuted ? 0 : volume;
+        await audioRef.current.play();
+        return;
+      } catch (err) {
+        console.warn('Erro ao tocar audioUrl nativo, fallback YouTube:', err);
+      }
+    }
+
+    // Opção 2: YouTube Player (Áudio Oficial sem cortes)
+    let ytId = song.youtubeId;
+    if (!ytId) {
+      // Lookup dinâmico de ID via busca
+      try {
+        const cleanQuery = `${song.name} ${song.artist}`.trim();
+        const res = await fetch(`/api/youtube/search?q=${encodeURIComponent(cleanQuery)}`);
+        if (res.ok) {
+          const data = await res.json();
+          const first = data.songs?.[0];
+          if (first?.id) {
+            ytId = first.id.replace(/^yt-/, '');
+          }
+        }
+      } catch {}
+    }
+
+    // Fallback de ID se ainda não encontrou
+    if (!ytId) {
+      ytId = '_1xXYeNrW9k'; // Eminem Till I Collapse
+    }
+
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.removeAttribute('src');
+    }
+
+    if (window.ytPlayer && typeof window.ytPlayer.loadVideoById === 'function') {
+      try {
+        window.ytPlayer.loadVideoById({
+          videoId: ytId,
+          startSeconds: 0
+        });
+        if (typeof window.ytPlayer.unMute === 'function' && !isMuted) window.ytPlayer.unMute();
+        if (typeof window.ytPlayer.setVolume === 'function') window.ytPlayer.setVolume(Math.round(volume * 100));
+        window.ytPlayer.playVideo();
+      } catch (e) {
+        console.warn('Erro ao carregar no YouTube Player:', e);
+      }
+    } else if (window.YT && window.YT.Player) {
+      try {
+        window.ytPlayer = new window.YT.Player('able-yt-player', {
+          height: '240',
+          width: '320',
+          videoId: ytId,
+          playerVars: { autoplay: 1, controls: 0, playsinline: 1, origin: window.location.origin },
+          events: {
+            onReady: (event: any) => {
+              event.target.setVolume(Math.round(volume * 100));
+              if (!isMuted) event.target.unMute();
+              event.target.playVideo();
+            }
+          }
+        });
+      } catch {}
+    }
   };
 
   const handleNextSong = () => {
@@ -394,6 +585,7 @@ export default function App() {
             id: s.id || `yt-${Date.now()}`,
             name: s.title || s.name || 'Música',
             artist: s.artist || 'Artista',
+            youtubeId: (s.id || '').replace(/^yt-/, ''),
             thumbnail: s.thumbnail || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80',
             duration: s.duration || 210
           }));
@@ -423,6 +615,23 @@ export default function App() {
   return (
     <div className="flex h-screen w-full flex-col bg-[#121212] text-white font-sans overflow-hidden select-none">
       
+      {/* PLAYER DE ÁUDIO OCULTO (HTML5 Audio) */}
+      <audio
+        ref={audioRef}
+        onTimeUpdate={() => {
+          if (audioRef.current) {
+            setCurrentTime(Math.floor(audioRef.current.currentTime));
+          }
+        }}
+        onLoadedMetadata={() => {
+          if (audioRef.current && audioRef.current.duration) {
+            setDuration(Math.floor(audioRef.current.duration));
+          }
+        }}
+        onEnded={handleNextSong}
+        className="hidden"
+      />
+
       {/* TOAST NOTIFICATION */}
       {toastMessage && (
         <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 rounded-full bg-[#282828] border border-white/10 px-5 py-2.5 text-xs font-semibold text-white shadow-2xl animate-fade-in flex items-center gap-2">
@@ -439,92 +648,75 @@ export default function App() {
           </div>
           <div>
             <h1 className="text-xl font-black tracking-tight text-[#fbfbfb]">Able</h1>
-            <p className="text-[10px] text-neutral-400 font-medium">Free Music Streaming • Spotify Engine</p>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Botão Oficial Importar Spotify */}
           <button
             onClick={() => setIsSpotifyModalOpen(true)}
-            className="flex items-center gap-1.5 rounded-full bg-[#1DB954] px-3.5 py-1.5 text-xs font-bold text-black shadow-md hover:scale-105 active:scale-95 transition"
+            className="flex items-center gap-2 rounded-full bg-[#1DB954] hover:bg-[#1ed760] active:scale-95 px-4 py-2 text-xs font-bold text-black shadow-lg transition"
           >
-            <svg className="w-3.5 h-3.5 fill-black" viewBox="0 0 24 24">
-              <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
-            </svg>
-            <span>Importar Spotify</span>
-          </button>
-
-          <button
-            onClick={() => {
-              if (navigator.share) {
-                navigator.share({ title: 'AbleMusic', text: 'Ouça músicas sem anúncios no AbleMusic', url: window.location.href });
-              } else {
-                navigator.clipboard.writeText(window.location.href);
-                showToast('Link do Able copiado!');
-              }
-            }}
-            className="rounded-full p-2 text-neutral-400 hover:text-white hover:bg-white/5 transition"
-            title="Compartilhar"
-          >
-            <Share2 size={18} />
+            <Plus size={16} strokeWidth={2.5} />
+            <span className="hidden sm:inline">Importar do Spotify</span>
+            <span className="sm:hidden">Spotify</span>
           </button>
         </div>
       </header>
 
-      {/* MAIN CONTENT AREA */}
-      <main className="flex-1 overflow-y-auto px-4 py-6 sm:px-8 pb-36">
+      {/* MAIN VIEW CONTENT */}
+      <main className="flex-1 overflow-y-auto px-4 sm:px-8 py-6 pb-40">
         
-        {/* VIEW 1: HOME */}
+        {/* VIEW 1: HOME (Início com Playlists Oficiais do Spotify) */}
         {activeTab === 'home' && !selectedPlaylist && (
-          <div className="space-y-8 max-w-6xl mx-auto">
+          <div className="space-y-8 max-w-7xl mx-auto">
+            
+            {/* Header da Home */}
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-[#fbfbfb]">Início</h2>
-                <p className="text-xs text-neutral-400 mt-1">Suas músicas e playlists do Spotify</p>
+                <h2 className="text-2xl font-black text-white">Sua Biblioteca Spotify</h2>
+                <p className="text-xs text-neutral-400 mt-0.5">10 playlists oficiais sincronizadas com o perfil 12186046104</p>
               </div>
               <button
                 onClick={() => setIsSpotifyModalOpen(true)}
                 className="text-xs font-bold text-[#1DB954] hover:underline flex items-center gap-1"
               >
-                <span>+ Adicionar Playlist do Spotify</span>
+                <span>Adicionar mais</span>
+                <Plus size={14} />
               </button>
             </div>
 
-            {/* Grid de Playlists Rápidas */}
-            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-              {playlists.slice(0, 8).map((pl) => (
+            {/* Grid 2x4 de Playlists do Spotify */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              {playlists.map((pl) => (
                 <div
                   key={pl.id}
                   onClick={() => setSelectedPlaylist(pl)}
-                  className="flex items-center gap-3 rounded-xl bg-[#181818] hover:bg-[#282828] p-2 pr-4 transition cursor-pointer border border-white/5 shadow-md group"
+                  className="group flex flex-col p-3 rounded-2xl bg-[#181818] hover:bg-[#282828] transition duration-200 cursor-pointer border border-white/5 relative"
                 >
-                  <img src={pl.cover} alt={pl.name} className="h-14 w-14 rounded-lg object-cover shadow" />
-                  <div className="min-w-0 flex-1">
-                    <p className="font-bold text-xs sm:text-sm text-white truncate">{pl.name}</p>
-                    <p className="text-[10px] text-neutral-400 truncate mt-0.5">{pl.songs.length} faixas</p>
+                  <div className="relative aspect-square w-full rounded-xl overflow-hidden mb-3 shadow-md">
+                    <img src={pl.cover} alt={pl.name} className="h-full w-full object-cover group-hover:scale-105 transition duration-300" />
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (pl.songs.length > 0) playSong(pl.songs[0], pl.songs);
+                      }}
+                      className="absolute bottom-2.5 right-2.5 flex h-10 w-10 items-center justify-center rounded-full bg-[#1DB954] text-black shadow-xl opacity-0 group-hover:opacity-100 transition hover:scale-105 active:scale-95"
+                    >
+                      <Play size={18} fill="currentColor" className="ml-0.5" />
+                    </button>
                   </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (pl.songs.length > 0) playSong(pl.songs[0], pl.songs);
-                    }}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#1DB954] text-black shadow-lg opacity-0 group-hover:opacity-100 transition hover:scale-105"
-                  >
-                    <Play size={16} fill="currentColor" className="ml-0.5" />
-                  </button>
+                  <h3 className="text-sm font-bold text-white truncate">{pl.name}</h3>
+                  <p className="text-xs text-neutral-400 truncate mt-0.5">{pl.creator}</p>
                 </div>
               ))}
             </div>
 
-            {/* Músicas Mais Tocadas */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between border-b border-white/5 pb-2">
-                <h3 className="text-lg font-bold text-white">Músicas da Sua Conta</h3>
-                <span className="text-xs text-neutral-400">{playlists.flatMap((p) => p.songs).length} faixas sincronizadas</span>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                {playlists.flatMap((p) => p.songs).slice(0, 12).map((song, idx) => {
+            {/* Seção de Músicas Recomendadas */}
+            <div className="space-y-4 pt-4">
+              <h3 className="text-lg font-bold text-white">Mais Tocadas</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {playlists.flatMap((p) => p.songs).slice(0, 9).map((song, idx) => {
                   const isCurrent = currentSong.id === song.id;
                   return (
                     <div
@@ -535,10 +727,6 @@ export default function App() {
                       }`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <span className="w-5 text-center text-xs font-semibold text-neutral-500 group-hover:hidden">
-                          {idx + 1}
-                        </span>
-                        <Play size={14} fill="currentColor" className="w-5 text-[#1DB954] hidden group-hover:block" />
                         <img src={song.thumbnail} alt={song.name} className="h-11 w-11 rounded-lg object-cover" />
                         <div className="min-w-0">
                           <p className={`text-sm font-bold truncate ${isCurrent ? 'text-[#1DB954]' : 'text-white'}`}>
@@ -547,95 +735,70 @@ export default function App() {
                           <p className="text-xs text-neutral-400 truncate">{song.artist}</p>
                         </div>
                       </div>
-
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleFavorite(song.id);
-                          }}
-                          className="rounded-full p-2 text-neutral-400 hover:text-white transition"
-                        >
-                          <Heart size={16} className={favoriteSongIds.includes(song.id) ? 'fill-[#1DB954] text-[#1DB954]' : ''} />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDownloadSong(song);
-                          }}
-                          className="rounded-full p-2 text-neutral-400 hover:text-white transition"
-                        >
-                          <Download size={16} />
-                        </button>
-                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleFavorite(song.id);
+                        }}
+                        className="p-1.5 text-neutral-400 hover:text-white"
+                      >
+                        <Heart size={16} className={favoriteSongIds.includes(song.id) ? 'fill-[#1DB954] text-[#1DB954]' : ''} />
+                      </button>
                     </div>
                   );
                 })}
               </div>
             </div>
+
           </div>
         )}
 
-        {/* VIEW 2: SEARCH */}
-        {activeTab === 'search' && (
-          <div className="space-y-6 max-w-5xl mx-auto">
-            <div>
-              <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-[#fbfbfb]">Buscar</h2>
-              <p className="text-xs text-neutral-400 mt-1">Pesquise músicas, artistas ou playlists na nuvem</p>
-            </div>
-
+        {/* VIEW 2: SEARCH (Busca Global de Músicas e Playlists) */}
+        {activeTab === 'search' && !selectedPlaylist && (
+          <div className="space-y-6 max-w-4xl mx-auto">
             <div className="relative">
-              <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400" />
+              <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value);
-                  void handleSearch(e.target.value);
+                  handleSearch(e.target.value);
                 }}
-                placeholder="O que você quer ouvir hoje?"
-                className="h-12 w-full rounded-full bg-[#242424] pl-12 pr-10 text-sm text-white placeholder-neutral-400 outline-none focus:ring-2 focus:ring-[#1DB954] transition shadow-inner"
+                placeholder="O que você quer ouvir? Músicas, artistas ou playlists..."
+                className="h-12 w-full rounded-2xl bg-[#1e1e1e] border border-white/10 pl-11 pr-4 text-sm text-white placeholder-neutral-400 outline-none focus:border-[#1DB954] transition"
               />
-              {searchQuery && (
-                <button
-                  onClick={() => {
-                    setSearchQuery('');
-                    setSearchResults([]);
-                  }}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white"
-                >
-                  <X size={16} />
-                </button>
+              {isSearching && (
+                <Loader2 size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-[#1DB954] animate-spin" />
               )}
             </div>
 
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+            {/* Categorias de Busca */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-2">
               {[
                 { id: 'all', label: 'Tudo' },
                 { id: 'songs', label: 'Músicas' },
-                { id: 'albums', label: 'Álbuns' },
                 { id: 'playlists', label: 'Playlists' }
-              ].map((tab) => (
+              ].map((filter) => (
                 <button
-                  key={tab.id}
-                  onClick={() => setSearchFilter(tab.id as any)}
-                  className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${
-                    searchFilter === tab.id ? 'bg-white text-black' : 'bg-[#242424] text-neutral-300 hover:bg-[#2e2e2e]'
+                  key={filter.id}
+                  onClick={() => setSearchFilter(filter.id as any)}
+                  className={`rounded-full px-4 py-1.5 text-xs font-bold transition ${
+                    searchFilter === filter.id
+                      ? 'bg-white text-black'
+                      : 'bg-white/10 text-neutral-300 hover:bg-white/15'
                   }`}
                 >
-                  {tab.label}
+                  {filter.label}
                 </button>
               ))}
             </div>
 
-            <div className="space-y-2 pt-2">
-              {isSearching ? (
-                <div className="py-20 text-center text-neutral-400">
-                  <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-[#1DB954] border-t-transparent mb-3" />
-                  <p className="text-xs">Buscando faixas no Able Cloud...</p>
-                </div>
-              ) : searchResults.length > 0 ? (
-                searchResults.map((song) => (
+            {/* Resultados de Busca */}
+            {searchResults.length > 0 ? (
+              <div className="space-y-2">
+                <h3 className="text-sm font-bold text-neutral-400">Resultados Encontrados</h3>
+                {searchResults.map((song) => (
                   <div
                     key={song.id}
                     onClick={() => playSong(song, searchResults)}
@@ -644,51 +807,54 @@ export default function App() {
                     <div className="flex items-center gap-3 min-w-0">
                       <img src={song.thumbnail} alt={song.name} className="h-12 w-12 rounded-lg object-cover" />
                       <div className="min-w-0">
-                        <p className="text-sm font-bold text-white truncate group-hover:text-[#1DB954] transition">{song.name}</p>
+                        <p className="text-sm font-bold text-white truncate group-hover:text-[#1DB954]">{song.name}</p>
                         <p className="text-xs text-neutral-400 truncate">{song.artist}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <button onClick={(e) => { e.stopPropagation(); toggleFavorite(song.id); }} className="rounded-full p-2 text-neutral-400 hover:text-white">
-                        <Heart size={16} className={favoriteSongIds.includes(song.id) ? 'fill-[#1DB954] text-[#1DB954]' : ''} />
-                      </button>
-                      <button onClick={(e) => { e.stopPropagation(); handleDownloadSong(song); }} className="rounded-full p-2 text-neutral-400 hover:text-white">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDownloadSong(song);
+                        }}
+                        className="p-2 text-neutral-400 hover:text-white"
+                        title="Baixar para Offline"
+                      >
                         <Download size={16} />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleFavorite(song.id);
+                        }}
+                        className="p-2 text-neutral-400 hover:text-white"
+                      >
+                        <Heart size={16} className={favoriteSongIds.includes(song.id) ? 'fill-[#1DB954] text-[#1DB954]' : ''} />
                       </button>
                     </div>
                   </div>
-                ))
-              ) : searchQuery ? (
-                <div className="py-16 text-center text-neutral-400">
-                  <p className="text-sm">Nenhum resultado para "{searchQuery}"</p>
-                </div>
-              ) : (
-                <div className="py-16 text-center text-neutral-500">
-                  <Search size={36} className="mx-auto mb-2 opacity-30" />
-                  <p className="text-xs">Digite qualquer música, artista ou álbum</p>
-                </div>
-              )}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-12 text-center text-neutral-500 text-sm">
+                Digite um termo para pesquisar faixas ou escolha uma playlist na tela de Início.
+              </div>
+            )}
           </div>
         )}
 
-        {/* VIEW 3: PLAYLISTS & BIBLIOTECA */}
+        {/* VIEW 3: PLAYLISTS / LIBRARY (Sua Biblioteca do Spotify) */}
         {activeTab === 'playlists' && !selectedPlaylist && (
-          <div className="space-y-6 max-w-5xl mx-auto">
+          <div className="space-y-6 max-w-6xl mx-auto">
             <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-[#fbfbfb]">Sua Biblioteca</h2>
-                <p className="text-xs text-neutral-400 mt-1">{playlists.length} playlists salvas no Able</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setIsSpotifyModalOpen(true)}
-                  className="flex items-center gap-1.5 rounded-full bg-[#1DB954] px-4 py-2 text-xs font-bold text-black shadow-md hover:scale-105 active:scale-95 transition"
-                >
-                  <Plus size={16} />
-                  <span>Importar do Spotify</span>
-                </button>
-              </div>
+              <h2 className="text-2xl font-black text-white">Suas Playlists</h2>
+              <button
+                onClick={() => setIsSpotifyModalOpen(true)}
+                className="flex items-center gap-2 rounded-full bg-[#1DB954] px-4 py-2 text-xs font-bold text-black hover:bg-[#1ed760] transition"
+              >
+                <Plus size={16} />
+                <span>Nova Playlist</span>
+              </button>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
@@ -696,10 +862,10 @@ export default function App() {
                 <div
                   key={pl.id}
                   onClick={() => setSelectedPlaylist(pl)}
-                  className="rounded-2xl bg-[#181818] hover:bg-[#282828] p-3.5 transition cursor-pointer border border-white/5 group shadow-lg"
+                  className="group flex flex-col p-3 rounded-2xl bg-[#181818] hover:bg-[#282828] transition cursor-pointer border border-white/5 relative"
                 >
-                  <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-black/40">
-                    <img src={pl.cover} alt={pl.name} className="h-full w-full object-cover transition group-hover:scale-105 duration-300" />
+                  <div className="relative aspect-square w-full rounded-xl overflow-hidden mb-3 shadow-md">
+                    <img src={pl.cover} alt={pl.name} className="h-full w-full object-cover group-hover:scale-105 transition duration-300" />
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -710,29 +876,28 @@ export default function App() {
                       <Play size={18} fill="currentColor" className="ml-0.5" />
                     </button>
                   </div>
-                  <h4 className="mt-3 text-sm font-bold text-white truncate group-hover:text-[#1DB954] transition">{pl.name}</h4>
-                  <p className="text-xs text-neutral-400 mt-0.5 truncate">{pl.songs.length} músicas • {pl.creator}</p>
+                  <h3 className="text-sm font-bold text-white truncate">{pl.name}</h3>
+                  <p className="text-xs text-neutral-400 truncate mt-0.5">{pl.songs.length} faixas • {pl.creator}</p>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* VIEW 4: DOWNLOADS */}
+        {/* VIEW 4: DOWNLOADS (Músicas Offline no Padrão Able) */}
         {activeTab === 'downloads' && !selectedPlaylist && (
-          <div className="space-y-6 max-w-5xl mx-auto">
-            <div>
-              <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-[#fbfbfb]">Downloads</h2>
-              <p className="text-xs text-neutral-400 mt-1">Músicas salvas para reprodução offline</p>
+          <div className="space-y-6 max-w-4xl mx-auto">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-black text-white">Downloads Offline</h2>
+                <p className="text-xs text-neutral-400 mt-0.5">Músicas salvas localmente no dispositivo para ouvir sem gastar dados</p>
+              </div>
+              <span className="text-xs font-bold text-neutral-400 bg-white/10 px-3 py-1.5 rounded-full">
+                {downloadedSongs.length} faixas salvas
+              </span>
             </div>
 
-            {downloadedSongs.length === 0 ? (
-              <div className="py-20 text-center text-neutral-500">
-                <Download size={40} className="mx-auto mb-3 opacity-30" />
-                <p className="text-sm font-semibold text-neutral-300">Nenhuma música baixada ainda</p>
-                <p className="text-xs mt-1">Toque no ícone de download em qualquer música para salvar offline.</p>
-              </div>
-            ) : (
+            {downloadedSongs.length > 0 ? (
               <div className="space-y-2">
                 {downloadedSongs.map((song, idx) => (
                   <div
@@ -749,53 +914,67 @@ export default function App() {
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="text-[11px] font-semibold text-[#1DB954] bg-[#1DB954]/10 border border-[#1DB954]/20 px-2.5 py-0.5 rounded-full">
-                        Offline Pronto
+                      <span className="text-xs text-[#1DB954] font-semibold flex items-center gap-1">
+                        <Check size={14} />
+                        <span>Offline</span>
                       </span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDownloadedSongs((prev) => prev.filter((s) => s.id !== song.id));
-                          showToast(`"${song.name}" removida dos downloads.`);
-                        }}
-                        className="rounded-full p-2 text-neutral-400 hover:text-red-400 transition"
-                      >
-                        <X size={16} />
-                      </button>
+                      <span className="text-xs text-neutral-500 font-mono">{formatTime(song.duration || 210)}</span>
                     </div>
                   </div>
                 ))}
+              </div>
+            ) : (
+              <div className="py-16 text-center space-y-3">
+                <Download size={40} className="mx-auto text-neutral-600" />
+                <p className="text-sm font-bold text-neutral-400">Nenhuma música baixada ainda</p>
+                <p className="text-xs text-neutral-500 max-w-xs mx-auto">
+                  Clique no ícone de download ao lado de qualquer música para salvá-la offline no seu aparelho.
+                </p>
               </div>
             )}
           </div>
         )}
 
-        {/* DETALHES DA PLAYLIST SELECIONADA */}
+        {/* DETALHE DA PLAYLIST SELECIONADA */}
         {selectedPlaylist && (
-          <div className="space-y-6 max-w-5xl mx-auto">
+          <div className="space-y-6 max-w-5xl mx-auto animate-fade-in">
             <button
               onClick={() => setSelectedPlaylist(null)}
-              className="flex items-center gap-2 text-xs font-bold text-neutral-400 hover:text-white transition"
+              className="text-xs font-bold text-neutral-400 hover:text-white flex items-center gap-1.5 transition"
             >
               <span>← Voltar para Playlists</span>
             </button>
 
-            <div className="flex flex-col sm:flex-row items-center sm:items-end gap-6 bg-gradient-to-b from-[#242424] to-transparent p-6 rounded-3xl border border-white/5">
-              <img src={selectedPlaylist.cover} alt={selectedPlaylist.name} className="h-44 w-44 rounded-2xl object-cover shadow-2xl" />
-              <div className="text-center sm:text-left flex-1 min-w-0">
-                <span className="text-xs font-bold uppercase tracking-wider text-neutral-400">Playlist</span>
-                <h2 className="text-3xl sm:text-5xl font-black text-white tracking-tight mt-1 truncate">{selectedPlaylist.name}</h2>
-                <p className="text-xs text-neutral-300 mt-2">{selectedPlaylist.songs.length} músicas • {selectedPlaylist.creator}</p>
-                <div className="mt-4 flex items-center justify-center sm:justify-start gap-3">
+            <div className="flex flex-col sm:flex-row items-center sm:items-end gap-6 bg-gradient-to-b from-white/10 to-transparent p-6 rounded-3xl border border-white/5">
+              <img
+                src={selectedPlaylist.cover}
+                alt={selectedPlaylist.name}
+                className="h-44 w-44 rounded-2xl object-cover shadow-2xl"
+              />
+              <div className="text-center sm:text-left space-y-2">
+                <span className="text-xs font-bold text-[#1DB954] uppercase tracking-wider">Playlist do Spotify</span>
+                <h2 className="text-3xl sm:text-4xl font-black text-white">{selectedPlaylist.name}</h2>
+                <p className="text-xs text-neutral-400">
+                  Criada por <span className="text-white font-semibold">{selectedPlaylist.creator}</span> • {selectedPlaylist.songs.length} faixas
+                </p>
+                <div className="pt-2 flex items-center justify-center sm:justify-start gap-3">
                   <button
                     onClick={() => {
                       if (selectedPlaylist.songs.length > 0) {
-                        playSong(selectedPlaylist.songs[0], selectedPlaylist.songs);
+                        if (isPlaying && selectedPlaylist.songs.some(s => s.id === currentSong.id)) {
+                          togglePlay();
+                        } else {
+                          playSong(selectedPlaylist.songs[0], selectedPlaylist.songs);
+                        }
                       }
                     }}
                     className="flex h-12 w-12 items-center justify-center rounded-full bg-[#1DB954] text-black shadow-lg hover:scale-105 active:scale-95 transition"
                   >
-                    <Play size={20} fill="currentColor" className="ml-0.5" />
+                    {isPlaying && selectedPlaylist.songs.some(s => s.id === currentSong.id) ? (
+                      <Pause size={20} fill="currentColor" />
+                    ) : (
+                      <Play size={20} fill="currentColor" className="ml-0.5" />
+                    )}
                   </button>
                 </div>
               </div>
@@ -956,8 +1135,15 @@ export default function App() {
 
           <div className="w-full max-w-md hidden sm:flex items-center gap-2">
             <span className="text-[10px] text-neutral-500 font-mono tabular-nums">{formatTime(currentTime)}</span>
-            <div className="h-1 flex-1 rounded-full bg-white/20 overflow-hidden">
-              <div className="h-full bg-white" style={{ width: `${(currentTime / duration) * 100}%` }} />
+            <div
+              onClick={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                const pos = (e.clientX - rect.left) / rect.width;
+                handleSeek(Math.floor(pos * duration));
+              }}
+              className="h-1.5 flex-1 rounded-full bg-white/20 overflow-hidden cursor-pointer relative group"
+            >
+              <div className="h-full bg-white group-hover:bg-[#1DB954] transition" style={{ width: `${(currentTime / Math.max(duration, 1)) * 100}%` }} />
             </div>
             <span className="text-[10px] text-neutral-500 font-mono tabular-nums">{formatTime(duration)}</span>
           </div>
@@ -1026,8 +1212,15 @@ export default function App() {
             </div>
 
             <div>
-              <div className="relative h-1.5 w-full rounded-full bg-white/20 overflow-hidden cursor-pointer">
-                <div className="h-full bg-white" style={{ width: `${(currentTime / duration) * 100}%` }} />
+              <div
+                onClick={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const pos = (e.clientX - rect.left) / rect.width;
+                  handleSeek(Math.floor(pos * duration));
+                }}
+                className="relative h-2 w-full rounded-full bg-white/20 overflow-hidden cursor-pointer group"
+              >
+                <div className="h-full bg-white group-hover:bg-[#1DB954] transition" style={{ width: `${(currentTime / Math.max(duration, 1)) * 100}%` }} />
               </div>
               <div className="flex justify-between text-xs font-mono text-neutral-400 mt-2">
                 <span>{formatTime(currentTime)}</span>

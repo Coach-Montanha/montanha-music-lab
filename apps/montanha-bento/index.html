@@ -10,8 +10,10 @@
     <meta name="apple-mobile-web-app-title" content="Able" />
     <link rel="manifest" href="/manifest.json" />
     <title>Able • Free Music Streaming</title>
+    <script src="https://www.youtube.com/iframe_api"></script>
   </head>
   <body class="bg-[#121212] text-white antialiased selection:bg-[#1DB954] selection:text-black overscroll-none">
+    <div id="able-yt-player" style="position:fixed;bottom:10px;right:10px;width:320px;height:240px;opacity:0.001;pointer-events:none;z-index:-9999;"></div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
