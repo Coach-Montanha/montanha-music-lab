@@ -15,6 +15,13 @@
   <body class="bg-[#121212] text-white antialiased selection:bg-[#1DB954] selection:text-black overscroll-none">
     <div id="able-yt-player" style="position:fixed;bottom:0;left:0;width:1px;height:1px;opacity:1;pointer-events:none;z-index:-1;overflow:hidden;"></div>
     <div id="root"></div>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(console.warn);
+        });
+      }
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

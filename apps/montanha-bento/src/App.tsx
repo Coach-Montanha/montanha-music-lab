@@ -29,7 +29,8 @@ import {
   Edit2,
   User as UserIcon,
   Cloud,
-  CheckCircle2
+  CheckCircle2,
+  Smartphone
 } from 'lucide-react';
 
 import { Song, Playlist } from './types';
@@ -38,6 +39,7 @@ import { supabase, syncCloudPlaylists, fetchCloudPlaylists } from './lib/supabas
 import { extractPlaylistFromUrl } from './lib/playlistExtractor';
 import { universalSearch } from './lib/searchEngine';
 import { AuthModal } from './components/AuthModal';
+import { mediaSessionController } from './lib/mediaSession';
 
 declare global {
   interface Window {
@@ -336,6 +338,72 @@ export default function App() {
     }
     return () => clearInterval(interval);
   }, [isPlaying, duration]);
+
+  // PWA Install Prompt State
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isInstallable, setIsInstallable] = useState<boolean>(false);
+
+  useEffect(() => {
+    const handleBeforeInstall = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setIsInstallable(true);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+  }, []);
+
+  const handleInstallPwa = async () => {
+    if (!deferredPrompt) {
+      showToast('No Edge/Chrome, clique nos 3 pontos e em "Instalar Aplicativo" ou "Adicionar à Tela de Início"');
+      return;
+    }
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setIsInstallable(false);
+      showToast('Able Music Player instalado com sucesso!');
+    }
+    setDeferredPrompt(null);
+  };
+
+  // Suporte a MediaSession API (Tela Bloqueada, Fones de Ouvido, Notificação no Celular)
+  useEffect(() => {
+    if (currentSong) {
+      mediaSessionController.updateMetadata({
+        title: currentSong.name,
+        artist: currentSong.artist,
+        album: currentSong.album || 'Able Music',
+        artworkUrl: currentSong.thumbnail
+      });
+    }
+  }, [currentSong]);
+
+  useEffect(() => {
+    mediaSessionController.setupActionHandlers({
+      onPlay: () => togglePlay(),
+      onPause: () => togglePlay(),
+      onPrevious: () => handlePrevSong(),
+      onNext: () => handleNextSong(),
+      onSeekTo: (details) => {
+        if (details.seekTime !== undefined) handleSeek(details.seekTime);
+      }
+    });
+  }, [queue, currentSong, isPlaying]);
+
+  useEffect(() => {
+    mediaSessionController.updatePlaybackState(isPlaying);
+  }, [isPlaying]);
+
+  useEffect(() => {
+    if (isPlaying && duration > 0) {
+      mediaSessionController.updatePositionState({
+        duration,
+        position: currentTime,
+        playbackRate: 1
+      });
+    }
+  }, [currentTime, duration, isPlaying]);
 
   // Volume
   useEffect(() => {
@@ -872,6 +940,16 @@ export default function App() {
             <Link2 size={16} strokeWidth={2.5} />
             <span className="hidden sm:inline">Importar Playlist</span>
             <span className="sm:hidden">Importar</span>
+          </button>
+
+          {/* Botão Instalar App PWA */}
+          <button
+            onClick={handleInstallPwa}
+            className="flex items-center gap-1.5 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 px-3 py-2 text-xs font-bold text-white transition border border-white/10"
+            title="Instalar Able Music como Aplicativo no Celular ou Desktop"
+          >
+            <Smartphone size={15} />
+            <span className="hidden sm:inline">Instalar App</span>
           </button>
 
           {/* Botão de Conta / Sincronização em Nuvem */}
