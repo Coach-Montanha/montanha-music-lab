@@ -55,10 +55,10 @@ const INITIAL_PLAYLISTS: Playlist[] = [
     creator: "Able Player",
     cover: "https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?w=600&q=80",
     songs: [
-      { id: "run-1", name: "Till I Collapse", artist: "Eminem, Nate Dogg", youtubeId: "_1xXYeNrW9k", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/8/4/6/0/846995adc7246b0d3a90d6c3281a298a.mp3", thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80", duration: 297 },
-      { id: "run-2", name: "Can't Hold Us", artist: "Macklemore & Ryan Lewis", youtubeId: "2zNSgS797P8", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/b/c/6/0/bc66a201d24622fb130e7a624b1679fd.mp3", thumbnail: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&q=80", duration: 258 },
-      { id: "run-3", name: "Lose Yourself", artist: "Eminem", youtubeId: "_Yhyp-_hX2s", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/d/0/d/0/d0de8f4ff3151508065c431afc37bca6.mp3", thumbnail: "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=400&q=80", duration: 326 },
-      { id: "run-4", name: "Stronger", artist: "Kanye West", youtubeId: "PsO6Zn4Vjm8", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/c/8/7/0/c8777e35f09472d0e689a6738fc6810a.mp3", thumbnail: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&q=80", duration: 312 }
+      { id: "run-1", name: "Till I Collapse", artist: "Eminem, Nate Dogg", youtubeId: "_1xXYeNrW9k", audioUrl: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/cf/8f/f1/cf8ff198-b736-395b-6b3f-877048ea5384/mzaf_11538452963444220646.plus.aac.p.m4a", thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80", duration: 297 },
+      { id: "run-2", name: "Can't Hold Us", artist: "Macklemore & Ryan Lewis", youtubeId: "2zNSgS797P8", audioUrl: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/83/4d/57/834d57bd-505a-2b6a-3a38-cc26f4d34171/mzaf_18284634626678368772.plus.aac.p.m4a", thumbnail: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&q=80", duration: 258 },
+      { id: "run-3", name: "Lose Yourself", artist: "Eminem", youtubeId: "_Yhyp-_hX2s", audioUrl: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/13/5a/61/135a6154-8ca2-0523-1fa2-f4ac0ea9e1e7/mzaf_13242749689945681184.plus.aac.p.m4a", thumbnail: "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=400&q=80", duration: 326 },
+      { id: "run-4", name: "Stronger", artist: "Kanye West", youtubeId: "PsO6Zn4Vjm8", audioUrl: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/9e/cc/69/9ecc6918-a8dc-354f-909f-ccc20a0a7a33/mzaf_7863921970418240507.plus.aac.p.m4a", thumbnail: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&q=80", duration: 312 }
     ]
   },
   {
@@ -67,9 +67,9 @@ const INITIAL_PLAYLISTS: Playlist[] = [
     creator: "Able Player",
     cover: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600&q=80",
     songs: [
-      { id: "dance-1", name: "Put Your Hands Up For Detroit", artist: "Fedde Le Grand", youtubeId: "SYs2HGYbr28", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/e/4/2/0/e42614c3502f94343c296e9f81040fe5.mp3", thumbnail: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=400&q=80", duration: 150 },
-      { id: "dance-2", name: "Destination Calabria", artist: "Alex Gaudino", youtubeId: "Kq4OtRsdXLS", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/4/8/e/0/48e5212349d609c26ef4d6a8aca0c406.mp3", thumbnail: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&q=80", duration: 182 },
-      { id: "dance-3", name: "Satisfaction", artist: "Benny Benassi", youtubeId: "a0fkNdPiIL4", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/e/2/2/0/e22cddd9afd54b5c6dbfa32abd6fe9c6.mp3", thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80", duration: 264 }
+      { id: "dance-1", name: "Put Your Hands Up For Detroit", artist: "Fedde Le Grand", youtubeId: "SYs2HGYbr28", audioUrl: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/6c/fc/88/6cfc8899-d938-cfe9-033c-c759c2694812/mzaf_17237461606960792378.plus.aac.p.m4a", thumbnail: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=400&q=80", duration: 150 },
+      { id: "dance-2", name: "Destination Calabria", artist: "Alex Gaudino", youtubeId: "Kq4OtRsdXLS", audioUrl: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/23/54/78/235478a2-cea9-301a-b0a1-110abbda9a90/mzaf_9958751150220849219.plus.aac.p.m4a", thumbnail: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&q=80", duration: 182 },
+      { id: "dance-3", name: "Satisfaction", artist: "Benny Benassi", youtubeId: "a0fkNdPiIL4", audioUrl: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/a9/62/37/a9623748-8068-5016-6ee8-7e18ec23e9f6/mzaf_4883073172019809194.plus.aac.p.m4a", thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80", duration: 264 }
     ]
   },
   {
@@ -78,8 +78,8 @@ const INITIAL_PLAYLISTS: Playlist[] = [
     creator: "Able Player",
     cover: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=600&q=80",
     songs: [
-      { id: "cth-1", name: "The Way I Am", artist: "Eminem", youtubeId: "mQvteoFiMlg", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/2/e/2/0/2e22eedde36f592ceed2caa9439ffd86.mp3", thumbnail: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=400&q=80", duration: 290 },
-      { id: "cth-2", name: "POWER", artist: "Kanye West", youtubeId: "L53gjP-Tt2w", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/4/a/a/0/4aa5d2dce95b43b74605ad529180483a.mp3", thumbnail: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&q=80", duration: 292 }
+      { id: "cth-1", name: "The Way I Am", artist: "Eminem", youtubeId: "mQvteoFiMlg", audioUrl: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/69/49/72/6949729f-14ca-46fc-5437-e0ce2ab8b4e3/mzaf_1236646818496670462.plus.aac.p.m4a", thumbnail: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=400&q=80", duration: 290 },
+      { id: "cth-2", name: "POWER", artist: "Kanye West", youtubeId: "L53gjP-Tt2w", audioUrl: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/42/44/e2/4244e2f7-675b-0e99-063d-8f3be99ae7ef/mzaf_3803512807555325083.plus.aac.p.m4a", thumbnail: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&q=80", duration: 292 }
     ]
   },
   {
@@ -88,9 +88,9 @@ const INITIAL_PLAYLISTS: Playlist[] = [
     creator: "Able Player",
     cover: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600&q=80",
     songs: [
-      { id: "wod-1", name: "Remember the Name", artist: "Fort Minor", youtubeId: "VDvr08sCPOc", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/7/6/e/0/76e85dbed81463aedcd2496e8b14402e.mp3", thumbnail: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=400&q=80", duration: 230 },
-      { id: "wod-2", name: "B.O.B. - Bombs Over Baghdad", artist: "Outkast", youtubeId: "lVHjCWvy4sc", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/0/a/f/0/0afbc69d010193a70780e46232021143.mp3", thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80", duration: 304 },
-      { id: "wod-3", name: "Bleed It Out", artist: "Linkin Park", youtubeId: "OnuuYcqhzCE", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/7/9/1/0/791ea8ebce5906768bcb58b1c9d398ef.mp3", thumbnail: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&q=80", duration: 164 }
+      { id: "wod-1", name: "Remember the Name", artist: "Fort Minor", youtubeId: "VDvr08sCPOc", audioUrl: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/ff/30/24/ff3024f1-5321-75d0-d269-ab72014b024c/mzaf_9912505582177526449.plus.aac.p.m4a", thumbnail: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=400&q=80", duration: 230 },
+      { id: "wod-2", name: "B.O.B. - Bombs Over Baghdad", artist: "Outkast", youtubeId: "lVHjCWvy4sc", audioUrl: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/dc/52/40/dc524018-e096-0f15-7150-b147e05e5597/mzaf_12340997808257225417.plus.aac.p.m4a", thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80", duration: 304 },
+      { id: "wod-3", name: "Bleed It Out", artist: "Linkin Park", youtubeId: "OnuuYcqhzCE", audioUrl: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/19/04/1f/19041f96-6046-3d9b-8eb8-3f6c88b1f1ed/mzaf_16802305418710775806.plus.aac.p.m4a", thumbnail: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&q=80", duration: 164 }
     ]
   },
   {
@@ -99,9 +99,9 @@ const INITIAL_PLAYLISTS: Playlist[] = [
     creator: "Able Player",
     cover: "https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=600&q=80",
     songs: [
-      { id: "rock-1", name: "Back in Black", artist: "AC/DC", youtubeId: "pAgnJDJN4VA", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/8/2/b/0/82be918b42c3d26093b20d01e97e4a03.mp3", thumbnail: "https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=400&q=80", duration: 255 },
-      { id: "rock-2", name: "Sweet Child O' Mine", artist: "Guns N' Roses", youtubeId: "1w7OgIMMRc4", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/5/9/1/0/59115eec88ea0bc7742eaba93facf49b.mp3", thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80", duration: 356 },
-      { id: "rock-3", name: "Smells Like Teen Spirit", artist: "Nirvana", youtubeId: "hTWKbfoikeg", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/3/4/b/0/34bad352aa1aa0f8eecbbc9c27a40eaf.mp3", thumbnail: "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=400&q=80", duration: 301 }
+      { id: "rock-1", name: "Back in Black", artist: "AC/DC", youtubeId: "pAgnJDJN4VA", audioUrl: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/08/2e/ac/082eac8c-1d0e-f72f-7b37-b8e037ff1579/mzaf_7587164327744022409.plus.aac.p.m4a", thumbnail: "https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=400&q=80", duration: 255 },
+      { id: "rock-2", name: "Sweet Child O' Mine", artist: "Guns N' Roses", youtubeId: "1w7OgIMMRc4", audioUrl: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/0d/cb/f3/0dcbf381-7cbf-78b8-7f74-d5789adf65a1/mzaf_17081805577020235844.plus.aac.p.m4a", thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80", duration: 356 },
+      { id: "rock-3", name: "Smells Like Teen Spirit", artist: "Nirvana", youtubeId: "hTWKbfoikeg", audioUrl: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/65/49/4e/65494e02-b6d3-26d8-6b0c-9bd98dcf4d5d/mzaf_7665413316386155700.plus.aac.p.m4a", thumbnail: "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=400&q=80", duration: 301 }
     ]
   }
 ];
@@ -363,13 +363,23 @@ export default function App() {
       }
       setIsPlaying(false);
     } else {
+      // Se não há áudio carregado ou se o src for nulo, dispara playSong diretamente
+      if (!audioRef.current?.src || audioRef.current.src === '' || audioRef.current.src === window.location.href) {
+        if (currentSong) {
+          playSong(currentSong);
+          return;
+        }
+      }
       if (audioRef.current && audioRef.current.src) {
-        audioRef.current.play().catch(console.warn);
+        audioRef.current.play().then(() => {
+          setIsPlaying(true);
+        }).catch((err) => {
+          console.warn('Erro ao despausar áudio, recarregando stream:', err);
+          if (currentSong) playSong(currentSong);
+        });
+      } else if (currentSong) {
+        playSong(currentSong);
       }
-      if (window.ytPlayer && typeof window.ytPlayer.playVideo === 'function') {
-        window.ytPlayer.playVideo();
-      }
-      setIsPlaying(true);
     }
   };
 
@@ -381,7 +391,7 @@ export default function App() {
     }
   };
 
-  // Reprodução Cirúrgica (Verifica Cache Offline IndexedDB primeiro!)
+  // Reprodução Cirúrgica (IndexedDB Offline -> Apple Music AAC -> YouTube Player)
   const playSong = async (song: Song, newQueue?: Song[]) => {
     setCurrentSong(song);
     setCurrentTime(0);
@@ -407,8 +417,8 @@ export default function App() {
       }
     }
 
-    // 2. TENTA ÁUDIO NATIVO DIRETO (MP3)
-    if (song.audioUrl && audioRef.current) {
+    // 2. TENTA ÁUDIO NATIVO DIRETO SE JÁ FOR VÁLIDO E NÃO FOR DEEZER (Evita erro 403 da Akamai)
+    if (song.audioUrl && !song.audioUrl.includes('dzcdn.net') && audioRef.current) {
       try {
         if (window.ytPlayer && typeof window.ytPlayer.pauseVideo === 'function') {
           window.ytPlayer.pauseVideo();
@@ -418,35 +428,44 @@ export default function App() {
         await audioRef.current.play();
         return;
       } catch (err) {
-        console.warn('Fallback YouTube Player:', err);
+        console.warn('Fallback stream:', err);
       }
     }
 
-    // 3. TENTA BUSCAR STREAM DINÂMICA
+    // 3. BUSCA STREAM DIRETA VIA APPLE MUSIC / ITUNES API (100% livre de CORS e sem 403)
     try {
-      const deezerResp = await fetch(`https://api.deezer.com/search?q=${encodeURIComponent(song.name + ' ' + song.artist)}`);
-      if (deezerResp.ok) {
-        const deezerData = await deezerResp.json();
-        const previewUrl = deezerData?.data?.[0]?.preview;
-        if (previewUrl && audioRef.current) {
-          song.audioUrl = previewUrl;
-          audioRef.current.src = previewUrl;
+      const itunesQuery = `${song.name} ${song.artist}`;
+      const itunesResp = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(itunesQuery)}&media=music&entity=song&limit=1`);
+      if (itunesResp.ok) {
+        const itunesData = await itunesResp.json();
+        const item = itunesData?.results?.[0];
+        if (item?.previewUrl && audioRef.current) {
+          song.audioUrl = item.previewUrl;
+          if (item.artworkUrl100 && (!song.thumbnail || song.thumbnail.includes('unsplash'))) {
+            song.thumbnail = item.artworkUrl100.replace('100x100bb', '600x600bb');
+          }
+          if (window.ytPlayer && typeof window.ytPlayer.pauseVideo === 'function') {
+            window.ytPlayer.pauseVideo();
+          }
+          audioRef.current.src = item.previewUrl;
           audioRef.current.volume = isMuted ? 0 : volume;
           await audioRef.current.play();
           return;
         }
       }
-    } catch {}
+    } catch (e) {
+      console.warn('Apple Music API Stream search error:', e);
+    }
 
     // 4. REPRODUÇÃO VIA YOUTUBE IFRAME PLAYER
     let ytId = song.youtubeId;
     if (!ytId) {
       try {
-        const res = await fetch(`/api/youtube/search?q=${encodeURIComponent(`${song.name} ${song.artist}`)}`);
-        if (res.ok) {
-          const data = await res.json();
-          const first = data.songs?.[0];
-          if (first?.id) ytId = first.id.replace(/^yt-/, '');
+        const piped = await fetch(`https://api.piped.private.coffee/search?q=${encodeURIComponent(`${song.name} ${song.artist}`)}&filter=music_songs`);
+        if (piped.ok) {
+          const pData = await piped.json();
+          const first = pData.items?.[0];
+          if (first?.url) ytId = first.url.replace('/watch?v=', '').split('&')[0];
         }
       } catch {}
     }
