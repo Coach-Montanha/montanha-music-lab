@@ -57,7 +57,7 @@ const INITIAL_PLAYLISTS: Playlist[] = [
     creator: "Able Player",
     cover: "https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?w=600&q=80",
     songs: [
-      { id: "run-1", name: "Till I Collapse", artist: "Eminem, Nate Dogg", youtubeId: "_1xXYeNrW9k", audioUrl: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/cf/8f/f1/cf8ff198-b736-395b-6b3f-877048ea5384/mzaf_11538452963444220646.plus.aac.p.m4a", thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80", duration: 297 },
+      { id: "run-1", name: "Till I Collapse", artist: "Eminem, Nate Dogg", youtubeId: "ytQ5CYE1VZw", audioUrl: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/cf/8f/f1/cf8ff198-b736-395b-6b3f-877048ea5384/mzaf_11538452963444220646.plus.aac.p.m4a", thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80", duration: 297 },
       { id: "run-2", name: "Can't Hold Us", artist: "Macklemore & Ryan Lewis", youtubeId: "2zNSgS797P8", audioUrl: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/83/4d/57/834d57bd-505a-2b6a-3a38-cc26f4d34171/mzaf_18284634626678368772.plus.aac.p.m4a", thumbnail: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&q=80", duration: 258 },
       { id: "run-3", name: "Lose Yourself", artist: "Eminem", youtubeId: "_Yhyp-_hX2s", audioUrl: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/13/5a/61/135a6154-8ca2-0523-1fa2-f4ac0ea9e1e7/mzaf_13242749689945681184.plus.aac.p.m4a", thumbnail: "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=400&q=80", duration: 326 },
       { id: "run-4", name: "Stronger", artist: "Kanye West", youtubeId: "PsO6Zn4Vjm8", audioUrl: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/9e/cc/69/9ecc6918-a8dc-354f-909f-ccc20a0a7a33/mzaf_7863921970418240507.plus.aac.p.m4a", thumbnail: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&q=80", duration: 312 }
@@ -270,7 +270,7 @@ export default function App() {
           window.ytPlayer = new window.YT.Player('able-yt-player', {
             height: '240',
             width: '320',
-            videoId: currentSong?.youtubeId || '_1xXYeNrW9k',
+            videoId: currentSong?.youtubeId || 'ytQ5CYE1VZw',
             playerVars: {
               autoplay: 1,
               controls: 0,
@@ -485,7 +485,24 @@ export default function App() {
       }
     }
 
-    // 2. MOTOR YOUTUBE MUSIC (OPÇÃO 1): ÁUDIO INTEGRAL DE 3 A 6+ MINUTOS
+        // 2. DISPOSITIVOS MÓVEIS (EDGE/CHROME MOBILE): HTML5 AUDIO IMEDIATO NO TOQUE DO USUÁRIO
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    if (isMobile && song.audioUrl && audioRef.current) {
+      try {
+        if (window.ytPlayer && typeof window.ytPlayer.pauseVideo === 'function') {
+          window.ytPlayer.pauseVideo();
+        }
+        audioRef.current.src = song.audioUrl;
+        audioRef.current.volume = isMuted ? 0 : volume;
+        await audioRef.current.play();
+        setIsPlaying(true);
+        return;
+      } catch (err) {
+        console.warn('Erro ao reproduzir HTML5 audio no mobile:', err);
+      }
+    }
+
+    // 3. MOTOR YOUTUBE MUSIC (DESKTOP): ÁUDIO INTEGRAL DE 3 A 6+ MINUTOS
     let ytId = song.youtubeId;
     if (!ytId) {
       try {
@@ -509,13 +526,13 @@ export default function App() {
       }
     }
 
-    if (!ytId) ytId = '_1xXYeNrW9k';
+    if (!ytId) ytId = 'ytQ5CYE1VZw';
     song.youtubeId = ytId;
 
     // Pausa qualquer áudio local anterior para não sobrepor
     if (audioRef.current) {
       audioRef.current.pause();
-      audioRef.current.removeAttribute('src');
+      // audioRef.current.removeAttribute('src');
     }
 
     // Reproduz áudio completo via YouTube Music Engine
