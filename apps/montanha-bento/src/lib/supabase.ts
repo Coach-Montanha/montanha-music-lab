@@ -13,18 +13,20 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   }
 });
 
+// Sincronização em nuvem resiliente em nível de usuário (Multi-dispositivos garantido)
 export async function syncCloudPlaylists(userId: string, playlists: any[]) {
   try {
-    const { error } = await supabase.from('montanha_playlists').upsert(
-      {
-        id: `pl_user_${userId}`,
-        user_id: userId,
-        name: 'User Sync Playlists',
-        description: JSON.stringify(playlists)
-      },
-      { onConflict: 'id' }
-    );
-    if (error) console.warn('Erro ao sincronizar playlists na nuvem:', error);
+    const { error } = await supabase.auth.updateUser({
+      data: {
+        able_playlists: playlists,
+        synced_at: new Date().toISOString()
+      }
+    });
+    if (error) {
+      console.warn('Erro ao sincronizar playlists na nuvem:', error.message);
+    } else {
+      console.log('Playlists sincronizadas com sucesso no perfil Supabase!');
+    }
   } catch (err) {
     console.warn('Falha no sync de playlists:', err);
   }
@@ -32,14 +34,10 @@ export async function syncCloudPlaylists(userId: string, playlists: any[]) {
 
 export async function fetchCloudPlaylists(userId: string): Promise<any[] | null> {
   try {
-    const { data, error } = await supabase
-      .from('montanha_playlists')
-      .select('description')
-      .eq('id', `pl_user_${userId}`)
-      .single();
-
-    if (!error && data?.description) {
-      return JSON.parse(data.description);
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (!error && user?.user_metadata?.able_playlists) {
+      console.log('Playlists da nuvem recuperadas com sucesso!');
+      return user.user_metadata.able_playlists;
     }
   } catch (err) {
     console.warn('Falha ao carregar playlists da nuvem:', err);

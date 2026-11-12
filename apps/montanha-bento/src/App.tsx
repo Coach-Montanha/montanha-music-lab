@@ -20,6 +20,8 @@ import {
   Music,
   Check,
   Share2,
+  Upload,
+  Image as ImageIcon,
   Sparkles,
   Link2,
   Loader2,
@@ -164,6 +166,21 @@ export default function App() {
 
   // Modal: Editar Playlist
   const [isEditPlaylistModalOpen, setIsEditPlaylistModalOpen] = useState<boolean>(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          setEditPlaylistCover(reader.result);
+          showToast('Imagem carregada com sucesso!');
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
   const [editPlaylistTitle, setEditPlaylistTitle] = useState<string>('');
   const [editPlaylistCover, setEditPlaylistCover] = useState<string>('');
   const [playlistBeingEdited, setPlaylistBeingEdited] = useState<Playlist | null>(null);
@@ -526,8 +543,28 @@ export default function App() {
       }
     }
 
-    if (!ytId) ytId = 'ytQ5CYE1VZw';
-    song.youtubeId = ytId;
+    // Se a música já tiver áudio nativo (ex: busca universal), toca o áudio correto imediatamente
+    if (song.audioUrl && audioRef.current) {
+      try {
+        if (window.ytPlayer && typeof window.ytPlayer.pauseVideo === 'function') {
+          window.ytPlayer.pauseVideo();
+        }
+        audioRef.current.src = song.audioUrl;
+        audioRef.current.volume = isMuted ? 0 : volume;
+        await audioRef.current.play();
+        setIsPlaying(true);
+        return;
+      } catch {}
+    }
+
+    // Se tiver YouTube ID específico, toca o vídeo exato
+    if (ytId && ytId !== 'ytQ5CYE1VZw') {
+      song.youtubeId = ytId;
+    } else if (song.youtubeId) {
+      ytId = song.youtubeId;
+    } else {
+      ytId = 'ytQ5CYE1VZw';
+    }
 
     // Pausa qualquer áudio local anterior para não sobrepor
     if (audioRef.current) {
@@ -731,7 +768,7 @@ export default function App() {
   const handleSaveEditPlaylist = () => {
     if (!playlistBeingEdited) return;
     const updatedTitle = editPlaylistTitle.trim() || playlistBeingEdited.name;
-    const updatedCover = editPlaylistCover.trim() || playlistBeingEdited.cover;
+    const updatedCover = editPlaylistCover.trim() || playlistBeingEdited.songs[0]?.thumbnail || playlistBeingEdited.cover;
 
     setPlaylists((prev) =>
       prev.map((pl) =>
@@ -1601,7 +1638,7 @@ export default function App() {
               </div>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-4">
               <div>
                 <label className="text-[11px] font-bold uppercase text-neutral-400">Nome da Playlist</label>
                 <input
@@ -1612,14 +1649,69 @@ export default function App() {
                 />
               </div>
 
+              {/* Prévia e Upload de Capa */}
+              <div className="flex items-center gap-4 p-3.5 rounded-2xl bg-[#121212] border border-white/10">
+                <img
+                  src={editPlaylistCover || playlistBeingEdited?.songs[0]?.thumbnail || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80'}
+                  alt="Prévia da Capa"
+                  className="h-16 w-16 rounded-xl object-cover shadow border border-white/10 flex-shrink-0"
+                />
+                <div className="flex-1 min-w-0 space-y-1.5">
+                  <p className="text-xs font-bold text-white">Imagem de Capa</p>
+                  <p className="text-[11px] text-neutral-400">Envie um arquivo do aparelho ou escolha uma capa das músicas</p>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleImageUpload}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-bold text-[#1DB954] transition active:scale-95"
+                  >
+                    <Upload size={14} />
+                    <span>Upload de Foto / Imagem</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Seleção de Capa a partir das músicas da playlist */}
+              {playlistBeingEdited && playlistBeingEdited.songs.length > 0 && (
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold uppercase text-neutral-400">
+                    Ou selecione a capa de uma música da playlist:
+                  </label>
+                  <div className="flex gap-2 overflow-x-auto pb-2 pt-1">
+                    {playlistBeingEdited.songs.slice(0, 8).map((song, i) => (
+                      <button
+                        key={`${song.id}-${i}`}
+                        type="button"
+                        onClick={() => {
+                          setEditPlaylistCover(song.thumbnail);
+                          showToast(`Capa de "${song.name}" selecionada!`);
+                        }}
+                        className={`flex-shrink-0 relative rounded-xl overflow-hidden border-2 transition hover:scale-105 ${
+                          editPlaylistCover === song.thumbnail ? 'border-[#1DB954]' : 'border-transparent opacity-70 hover:opacity-100'
+                        }`}
+                        title={song.name}
+                      >
+                        <img src={song.thumbnail} alt={song.name} className="h-12 w-12 object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div>
-                <label className="text-[11px] font-bold uppercase text-neutral-400">URL da Imagem de Capa</label>
+                <label className="text-[11px] font-bold uppercase text-neutral-400">Ou cole a URL da Imagem</label>
                 <input
                   type="text"
                   value={editPlaylistCover}
                   onChange={(e) => setEditPlaylistCover(e.target.value)}
                   placeholder="https://images.unsplash.com/..."
-                  className="h-12 w-full rounded-2xl bg-[#121212] border border-white/10 px-4 text-sm text-white outline-none focus:border-[#1DB954] mt-1"
+                  className="h-10 w-full rounded-2xl bg-[#121212] border border-white/10 px-4 text-xs text-white outline-none focus:border-[#1DB954] mt-1"
                 />
               </div>
 

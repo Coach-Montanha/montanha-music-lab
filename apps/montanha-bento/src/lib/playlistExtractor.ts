@@ -4,15 +4,15 @@ export async function extractPlaylistFromUrl(url: string): Promise<Playlist | nu
   const clean = url.trim();
 
   // 1. PLAYLIST DO SPOTIFY
-  if (clean.includes('spotify.com')) {
+  if (clean.includes('spotify.com') || clean.includes('spotify:playlist')) {
     const match = clean.match(/playlist\/([a-zA-Z0-9]+)/);
-    const playId = match ? match[1] : clean;
+    const playId = match ? match[1] : clean.replace('spotify:playlist:', '').trim();
 
-    // Tentar API local do backend
+    // Tentar endpoint /api/spotify (Vercel Serverless Function & Vite dev server)
     try {
-      const localRes = await fetch(`/api/spotify/playlist?url=${encodeURIComponent(playId)}`);
-      if (localRes.ok) {
-        const data = await localRes.json();
+      const apiRes = await fetch(`/api/spotify?url=${encodeURIComponent(playId)}`, { signal: AbortSignal.timeout(12000) });
+      if (apiRes.ok) {
+        const data = await apiRes.json();
         if (data && data.name && Array.isArray(data.songs) && data.songs.length > 0) {
           return {
             id: `sp-pl-${playId}-${Date.now()}`,
@@ -24,53 +24,33 @@ export async function extractPlaylistFromUrl(url: string): Promise<Playlist | nu
           };
         }
       }
-    } catch {}
-
-    // Extração direta via Spotify Embed (__NEXT_DATA__)
-    const embedUrl = `https://open.spotify.com/embed/playlist/${playId}`;
-    const proxies = [
-      `https://api.allorigins.win/raw?url=${encodeURIComponent(embedUrl)}`,
-      `https://corsproxy.io/?url=${encodeURIComponent(embedUrl)}`
-    ];
-
-    for (const proxy of proxies) {
-      try {
-        const resp = await fetch(proxy);
-        if (resp.ok) {
-          const html = await resp.text();
-          const matchScript = html.match(/<script id="__NEXT_DATA__" type="application\/json">(.*?)<\/script>/s);
-          if (matchScript && matchScript[1]) {
-            const parsed = JSON.parse(matchScript[1]);
-            const entity = parsed?.props?.pageProps?.state?.data?.entity;
-            if (entity) {
-              const name = entity.title || entity.name || 'Playlist Spotify';
-              const cover = entity.coverArt?.sources?.[0]?.url || entity.visualIdentity?.image?.[0]?.url || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80';
-              const rawTracks = entity.trackList || entity.tracks || [];
-
-              const songs: Song[] = rawTracks.map((t: any, idx: number) => ({
-                id: `sp-track-${t.id || idx}-${Date.now()}`,
-                name: t.title || t.name || 'Música',
-                artist: t.subtitle || t.artists?.[0]?.name || 'Artista',
-                album: t.album?.name || name,
-                thumbnail: t.coverArt?.sources?.[0]?.url || cover,
-                duration: Math.round((t.duration || 180000) / 1000)
-              }));
-
-              if (songs.length > 0) {
-                return {
-                  id: `sp-pl-${playId}-${Date.now()}`,
-                  name,
-                  creator: entity.owner?.name || 'Spotify',
-                  cover,
-                  songs,
-                  isCustom: true
-                };
-              }
-            }
-          }
-        }
-      } catch {}
+    } catch (err) {
+      console.warn('API /api/spotify:', err);
     }
+
+    // Fallback: oEmbed oficial do Spotify (Metadados garantidos)
+    try {
+      const oembedRes = await fetch(`https://open.spotify.com/oembed?url=https://open.spotify.com/playlist/${playId}`, { signal: AbortSignal.timeout(6000) });
+      if (oembedRes.ok) {
+        const oembed = await oembedRes.json();
+        return {
+          id: `sp-pl-${playId}-${Date.now()}`,
+          name: oembed.title || 'Playlist Spotify',
+          creator: 'Spotify',
+          cover: oembed.thumbnail_url || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80',
+          songs: [
+            {
+              id: `sp-track-${playId}-1`,
+              name: oembed.title,
+              artist: 'Vários Artistas',
+              thumbnail: oembed.thumbnail_url,
+              duration: 240
+            }
+          ],
+          isCustom: true
+        };
+      }
+    } catch {}
   }
 
   // 2. PLAYLIST DO YOUTUBE / YOUTUBE MUSIC
@@ -92,7 +72,7 @@ export async function extractPlaylistFromUrl(url: string): Promise<Playlist | nu
 
       for (const inst of pipedInstances) {
         try {
-          const resp = await fetch(`${inst}/playlists/${encodeURIComponent(listId)}`);
+          const resp = await fetch(`${inst}/playlists/${encodeURIComponent(listId)}`, { signal: AbortSignal.timeout(6000) });
           if (resp.ok) {
             const data = await resp.json();
             const relatedStreams = data.relatedStreams || [];
