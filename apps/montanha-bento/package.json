@@ -1,8 +1,8 @@
 {
-  "name": "montanha-bento-player",
+  "name": "able-music-player",
   "private": true,
   "version": "1.0.0",
-  "description": "Montanha Music Bento - Player PWA com Design Apple Bento Grid para alunos e atletas",
+  "description": "Able Music Player - A YouTube Music like app with a Spotify like design, ad free, open source",
   "author": "Coach Montanha",
   "type": "module",
   "scripts": {
@@ -11,6 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.119.0",
     "framer-motion": "^11.0.0",
     "lucide-react": "^0.344.0",
     "react": "^18.2.0",

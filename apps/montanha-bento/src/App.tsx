@@ -11,7 +11,6 @@ import {
   Search,
   Heart,
   ChevronDown,
-  ChevronLeft,
   ArrowLeft,
   Download,
   Plus,
@@ -26,8 +25,19 @@ import {
   Loader2,
   Trash2,
   ListPlus,
-  FolderPlus
+  FolderPlus,
+  Edit2,
+  User as UserIcon,
+  Cloud,
+  CheckCircle2
 } from 'lucide-react';
+
+import { Song, Playlist } from './types';
+import { storeOfflineBlob, getOfflineBlob, deleteOfflineBlob } from './lib/offlineDb';
+import { supabase, syncCloudPlaylists, fetchCloudPlaylists } from './lib/supabase';
+import { extractPlaylistFromUrl } from './lib/playlistExtractor';
+import { universalSearch } from './lib/searchEngine';
+import { AuthModal } from './components/AuthModal';
 
 declare global {
   interface Window {
@@ -37,32 +47,12 @@ declare global {
   }
 }
 
-export interface Song {
-  id: string;
-  name: string;
-  artist: string;
-  album?: string;
-  thumbnail: string;
-  duration?: number;
-  youtubeId?: string;
-  audioUrl?: string;
-}
-
-export interface Playlist {
-  id: string;
-  name: string;
-  creator: string;
-  cover: string;
-  songs: Song[];
-  isCustom?: boolean;
-}
-
-// 10 Playlists Oficiais do Perfil do Usuário Spotify (12186046104) com Áudios Diretos e YouTube IDs
-const MY_SPOTIFY_USER_PLAYLISTS: Playlist[] = [
+// 10 Playlists Padrão Oficiais
+const INITIAL_PLAYLISTS: Playlist[] = [
   {
     id: "sp-pl-running",
     name: "Running",
-    creator: "12186046104",
+    creator: "Able Player",
     cover: "https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?w=600&q=80",
     songs: [
       { id: "run-1", name: "Till I Collapse", artist: "Eminem, Nate Dogg", youtubeId: "_1xXYeNrW9k", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/8/4/6/0/846995adc7246b0d3a90d6c3281a298a.mp3", thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80", duration: 297 },
@@ -74,7 +64,7 @@ const MY_SPOTIFY_USER_PLAYLISTS: Playlist[] = [
   {
     id: "sp-pl-cth-dance",
     name: "CTH 2.0 Dance",
-    creator: "12186046104",
+    creator: "Able Player",
     cover: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600&q=80",
     songs: [
       { id: "dance-1", name: "Put Your Hands Up For Detroit", artist: "Fedde Le Grand", youtubeId: "SYs2HGYbr28", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/e/4/2/0/e42614c3502f94343c296e9f81040fe5.mp3", thumbnail: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=400&q=80", duration: 150 },
@@ -85,7 +75,7 @@ const MY_SPOTIFY_USER_PLAYLISTS: Playlist[] = [
   {
     id: "sp-pl-cth-2",
     name: "CTH 2.0",
-    creator: "12186046104",
+    creator: "Able Player",
     cover: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=600&q=80",
     songs: [
       { id: "cth-1", name: "The Way I Am", artist: "Eminem", youtubeId: "mQvteoFiMlg", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/2/e/2/0/2e22eedde36f592ceed2caa9439ffd86.mp3", thumbnail: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=400&q=80", duration: 290 },
@@ -95,7 +85,7 @@ const MY_SPOTIFY_USER_PLAYLISTS: Playlist[] = [
   {
     id: "sp-pl-my-workout",
     name: "My Workout",
-    creator: "12186046104",
+    creator: "Able Player",
     cover: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600&q=80",
     songs: [
       { id: "wod-1", name: "Remember the Name", artist: "Fort Minor", youtubeId: "VDvr08sCPOc", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/7/6/e/0/76e85dbed81463aedcd2496e8b14402e.mp3", thumbnail: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=400&q=80", duration: 230 },
@@ -104,59 +94,9 @@ const MY_SPOTIFY_USER_PLAYLISTS: Playlist[] = [
     ]
   },
   {
-    id: "sp-pl-surf-sensations",
-    name: "Surf Sensations 2022",
-    creator: "12186046104",
-    cover: "https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=600&q=80",
-    songs: [
-      { id: "surf-1", name: "Lay Me Down", artist: "The Dirty Heads, Rome", youtubeId: "5gHYB548t6U", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/8/5/5/0/855ea9669d35e68ce3582fe7b721050f.mp3", thumbnail: "https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=400&q=80", duration: 215 },
-      { id: "surf-2", name: "Right On Time", artist: "State Radio", youtubeId: "g7iO8yO9Tuo", thumbnail: "https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=400&q=80", duration: 250 }
-    ]
-  },
-  {
-    id: "sp-pl-corra-numa-boa",
-    name: "Corra numa Boa",
-    creator: "Feito para 12186046104",
-    cover: "https://images.unsplash.com/photo-1483721074573-586540da5703?w=600&q=80",
-    songs: [
-      { id: "corra-1", name: "Midnight City", artist: "M83", youtubeId: "dX3k_QDnzHE", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/b/d/7/0/bd727b30df15d3d506abd829ee8da9f0.mp3", thumbnail: "https://images.unsplash.com/photo-1483721074573-586540da5703?w=400&q=80", duration: 243 },
-      { id: "corra-2", name: "Stolen Dance", artist: "Milky Chance", youtubeId: "iX-QaNzd-0Y", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/a/6/4/0/a645e75dc75c56181ac342f60d6c6c48.mp3", thumbnail: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&q=80", duration: 313 }
-    ]
-  },
-  {
-    id: "sp-pl-beast-mode",
-    name: "Beast Mode Dance",
-    creator: "Feito para 12186046104",
-    cover: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&q=80",
-    songs: [
-      { id: "bmd-1", name: "Turn Down for What", artist: "DJ Snake, Lil Jon", youtubeId: "HMUDVMiITOU", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/e/2/4/0/e24d6cbfc49469f06e5814b9b26359ab.mp3", thumbnail: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&q=80", duration: 213 },
-      { id: "bmd-2", name: "Levels", artist: "Avicii", youtubeId: "_ovdm2yX4MA", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/0/d/9/0/0d9d5592d4169f2d6772234f5198662d.mp3", thumbnail: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=400&q=80", duration: 202 }
-    ]
-  },
-  {
-    id: "sp-pl-all-out-80s",
-    name: "All Out 80s",
-    creator: "Feito para 12186046104",
-    cover: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&q=80",
-    songs: [
-      { id: "80s-1", name: "Billie Jean", artist: "Michael Jackson", youtubeId: "Zi_XLOBDo_Y", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/e/6/e/0/e6e0f8717b1e6353e2abf797c6849889.mp3", thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80", duration: 294 },
-      { id: "80s-2", name: "Eye of the Tiger", artist: "Survivor", youtubeId: "btPJPFnesV4", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/6/a/6/0/6a6cec63a2a62ad17c65c3706e216ce8.mp3", thumbnail: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=400&q=80", duration: 245 }
-    ]
-  },
-  {
-    id: "sp-pl-jbl-graves",
-    name: "JBL Teste de Graves 2026",
-    creator: "12186046104",
-    cover: "https://images.unsplash.com/photo-1545454675-3531b543be5d?w=600&q=80",
-    songs: [
-      { id: "jbl-1", name: "Bass Cannon Sub-Woofer Ultra Boost", artist: "Excision & Flux Pavilion", youtubeId: "z_SQO3vv3p8", thumbnail: "https://images.unsplash.com/photo-1545454675-3531b543be5d?w=400&q=80", duration: 260 },
-      { id: "jbl-2", name: "Limit to Your Love", artist: "James Blake", youtubeId: "oOT2-OTebx0", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/9/2/c/0/92cb8ca2087fa5cdbcb9728a10949d22.mp3", thumbnail: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&q=80", duration: 276 }
-    ]
-  },
-  {
     id: "sp-pl-barbecue-rock",
     name: "Barbecue Rock",
-    creator: "12186046104",
+    creator: "Able Player",
     cover: "https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=600&q=80",
     songs: [
       { id: "rock-1", name: "Back in Black", artist: "AC/DC", youtubeId: "pAgnJDJN4VA", audioUrl: "https://cdnt-preview.dzcdn.net/api/1/1/8/2/b/0/82be918b42c3d26093b20d01e97e4a03.mp3", thumbnail: "https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=400&q=80", duration: 255 },
@@ -168,8 +108,8 @@ const MY_SPOTIFY_USER_PLAYLISTS: Playlist[] = [
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'home' | 'search' | 'playlists' | 'downloads'>('home');
-  
-  // Playlists State (Carregadas do LocalStorage de forma permanente)
+
+  // Playlists State (Persistente no LocalStorage e Sincronizado via Supabase)
   const [playlists, setPlaylists] = useState<Playlist[]>(() => {
     try {
       const stored = localStorage.getItem('able_playlists_v2');
@@ -177,16 +117,20 @@ export default function App() {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
-      return MY_SPOTIFY_USER_PLAYLISTS;
+      return INITIAL_PLAYLISTS;
     } catch {
-      return MY_SPOTIFY_USER_PLAYLISTS;
+      return INITIAL_PLAYLISTS;
     }
   });
 
   const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
 
+  // Usuário Conectado via Supabase
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
   // Audio State
-  const [currentSong, setCurrentSong] = useState<Song>(() => playlists[0]?.songs[0] || MY_SPOTIFY_USER_PLAYLISTS[0].songs[0]);
+  const [currentSong, setCurrentSong] = useState<Song>(() => playlists[0]?.songs[0] || INITIAL_PLAYLISTS[0].songs[0]);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [duration, setDuration] = useState<number>(297);
@@ -194,7 +138,7 @@ export default function App() {
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [isShuffle, setIsShuffle] = useState<boolean>(false);
   const [isRepeat, setIsRepeat] = useState<boolean>(false);
-  const [queue, setQueue] = useState<Song[]>(() => playlists[0]?.songs || MY_SPOTIFY_USER_PLAYLISTS[0].songs);
+  const [queue, setQueue] = useState<Song[]>(() => playlists[0]?.songs || INITIAL_PLAYLISTS[0].songs);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -203,19 +147,24 @@ export default function App() {
 
   // Search State
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [searchFilter, setSearchFilter] = useState<'all' | 'songs' | 'albums' | 'playlists'>('all');
   const [isSearching, setIsSearching] = useState<boolean>(false);
   const [searchResults, setSearchResults] = useState<Song[]>([]);
 
-  // Spotify Import Modal State (Baseado no SpotifyImport.kt do Able)
-  const [isSpotifyModalOpen, setIsSpotifyModalOpen] = useState<boolean>(false);
-  const [spotifyLinkInput, setSpotifyLinkInput] = useState<string>('');
-  const [isImportingSpotify, setIsImportingSpotify] = useState<boolean>(false);
+  // Importador Universal (Spotify + YouTube / YouTube Music)
+  const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
+  const [importLinkInput, setImportLinkInput] = useState<string>('');
+  const [isImporting, setIsImporting] = useState<boolean>(false);
   const [importProgressText, setImportProgressText] = useState<string>('');
 
-  // Modal: Criar Minha Própria Playlist
+  // Modal: Criar Playlist
   const [isCreatePlaylistModalOpen, setIsCreatePlaylistModalOpen] = useState<boolean>(false);
   const [newPlaylistTitle, setNewPlaylistTitle] = useState<string>('');
+
+  // Modal: Editar Playlist
+  const [isEditPlaylistModalOpen, setIsEditPlaylistModalOpen] = useState<boolean>(false);
+  const [editPlaylistTitle, setEditPlaylistTitle] = useState<string>('');
+  const [editPlaylistCover, setEditPlaylistCover] = useState<string>('');
+  const [playlistBeingEdited, setPlaylistBeingEdited] = useState<Playlist | null>(null);
 
   // Modal: Adicionar Música a uma Playlist
   const [isAddToPlaylistModalOpen, setIsAddToPlaylistModalOpen] = useState<boolean>(false);
@@ -224,9 +173,9 @@ export default function App() {
   // Favorites & Downloads
   const [favoriteSongIds, setFavoriteSongIds] = useState<string[]>(() => {
     try {
-      return JSON.parse(localStorage.getItem('able_favorites') || '["run-1", "wod-1"]');
+      return JSON.parse(localStorage.getItem('able_favorites') || '["run-1"]');
     } catch {
-      return ["run-1", "wod-1"];
+      return ["run-1"];
     }
   });
 
@@ -245,12 +194,46 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // Persistência Imediata de Playlists no LocalStorage
+  // Inicialização de Sessão Supabase
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setCurrentUser(session.user);
+        // Carrega playlists da nuvem vinculadas a esta conta
+        fetchCloudPlaylists(session.user.id).then((cloudPls) => {
+          if (cloudPls && Array.isArray(cloudPls) && cloudPls.length > 0) {
+            setPlaylists(cloudPls);
+            try { localStorage.setItem('able_playlists_v2', JSON.stringify(cloudPls)); } catch {}
+          }
+        });
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setCurrentUser(session?.user || null);
+      if (session?.user) {
+        fetchCloudPlaylists(session.user.id).then((cloudPls) => {
+          if (cloudPls && Array.isArray(cloudPls) && cloudPls.length > 0) {
+            setPlaylists(cloudPls);
+            try { localStorage.setItem('able_playlists_v2', JSON.stringify(cloudPls)); } catch {}
+          }
+        });
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Persistência Imediata de Playlists no LocalStorage e Nuvem
   useEffect(() => {
     try {
       localStorage.setItem('able_playlists_v2', JSON.stringify(playlists));
     } catch {}
-  }, [playlists]);
+
+    if (currentUser?.id) {
+      syncCloudPlaylists(currentUser.id, playlists);
+    }
+  }, [playlists, currentUser]);
 
   useEffect(() => {
     try {
@@ -264,7 +247,7 @@ export default function App() {
     } catch {}
   }, [downloadedSongs]);
 
-  // Suporte ao Botão Físico/Virtual de Voltar do Navegador (popstate)
+  // Histórico e Botão Físico/Virtual Voltar
   useEffect(() => {
     const handlePopState = () => {
       if (isFullScreenPlayer) {
@@ -277,7 +260,7 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, [selectedPlaylist, isFullScreenPlayer]);
 
-  // Inicialização do YouTube IFrame Player API
+  // Inicialização do YouTube Iframe API
   useEffect(() => {
     const initYt = () => {
       if (window.YT && window.YT.Player && !window.ytPlayer) {
@@ -314,7 +297,7 @@ export default function App() {
             }
           });
         } catch (e) {
-          console.warn('Erro ao inicializar YouTube Player:', e);
+          console.warn('YouTube Player:', e);
         }
       }
     };
@@ -326,7 +309,7 @@ export default function App() {
     }
   }, []);
 
-  // Sincronização em Tempo Real do Progresso de Áudio (YouTube Player + HTML5 Audio)
+  // Sincronização em Tempo Real do Progresso de Áudio
   useEffect(() => {
     let interval: any = null;
     if (isPlaying) {
@@ -354,7 +337,7 @@ export default function App() {
     return () => clearInterval(interval);
   }, [isPlaying, duration]);
 
-  // Sincronização de Volume
+  // Volume
   useEffect(() => {
     const vol100 = isMuted ? 0 : Math.round(volume * 100);
     if (window.ytPlayer && typeof window.ytPlayer.setVolume === 'function') {
@@ -374,9 +357,7 @@ export default function App() {
 
   const togglePlay = () => {
     if (isPlaying) {
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
+      if (audioRef.current) audioRef.current.pause();
       if (window.ytPlayer && typeof window.ytPlayer.pauseVideo === 'function') {
         window.ytPlayer.pauseVideo();
       }
@@ -394,27 +375,39 @@ export default function App() {
 
   const handleSeek = (newTime: number) => {
     setCurrentTime(newTime);
-    if (audioRef.current) {
-      audioRef.current.currentTime = newTime;
-    }
+    if (audioRef.current) audioRef.current.currentTime = newTime;
     if (window.ytPlayer && typeof window.ytPlayer.seekTo === 'function') {
-      try {
-        window.ytPlayer.seekTo(newTime, true);
-      } catch {}
+      try { window.ytPlayer.seekTo(newTime, true); } catch {}
     }
   };
 
+  // Reprodução Cirúrgica (Verifica Cache Offline IndexedDB primeiro!)
   const playSong = async (song: Song, newQueue?: Song[]) => {
     setCurrentSong(song);
     setCurrentTime(0);
     setDuration(song.duration || 240);
     setIsPlaying(true);
-    if (newQueue) {
-      setQueue(newQueue);
-    }
+    if (newQueue) setQueue(newQueue);
     showToast(`Tocando: ${song.name}`);
 
-    // Opção 1: Audio nativo via áudio URL direto (MP3)
+    // 1. TENTA REPRODUÇÃO OFFLINE A PARTIR DO INDEXEDDB (Se tiver sido baixada)
+    const offlineBlob = await getOfflineBlob(song.id);
+    if (offlineBlob && audioRef.current) {
+      try {
+        if (window.ytPlayer && typeof window.ytPlayer.pauseVideo === 'function') {
+          window.ytPlayer.pauseVideo();
+        }
+        const blobUrl = URL.createObjectURL(offlineBlob);
+        audioRef.current.src = blobUrl;
+        audioRef.current.volume = isMuted ? 0 : volume;
+        await audioRef.current.play();
+        return;
+      } catch (err) {
+        console.warn('Erro ao reproduzir blob offline:', err);
+      }
+    }
+
+    // 2. TENTA ÁUDIO NATIVO DIRETO (MP3)
     if (song.audioUrl && audioRef.current) {
       try {
         if (window.ytPlayer && typeof window.ytPlayer.pauseVideo === 'function') {
@@ -425,11 +418,11 @@ export default function App() {
         await audioRef.current.play();
         return;
       } catch (err) {
-        console.warn('Erro ao tocar audioUrl nativo, fallback YouTube:', err);
+        console.warn('Fallback YouTube Player:', err);
       }
     }
 
-    // Opção 2: Busca dinâmica de áudio no Deezer se não tiver áudio pré-carregado
+    // 3. TENTA BUSCAR STREAM DINÂMICA
     try {
       const deezerResp = await fetch(`https://api.deezer.com/search?q=${encodeURIComponent(song.name + ' ' + song.artist)}`);
       if (deezerResp.ok) {
@@ -445,25 +438,20 @@ export default function App() {
       }
     } catch {}
 
-    // Opção 3: YouTube Player
+    // 4. REPRODUÇÃO VIA YOUTUBE IFRAME PLAYER
     let ytId = song.youtubeId;
     if (!ytId) {
       try {
-        const cleanQuery = `${song.name} ${song.artist}`.trim();
-        const res = await fetch(`/api/youtube/search?q=${encodeURIComponent(cleanQuery)}`);
+        const res = await fetch(`/api/youtube/search?q=${encodeURIComponent(`${song.name} ${song.artist}`)}`);
         if (res.ok) {
           const data = await res.json();
           const first = data.songs?.[0];
-          if (first?.id) {
-            ytId = first.id.replace(/^yt-/, '');
-          }
+          if (first?.id) ytId = first.id.replace(/^yt-/, '');
         }
       } catch {}
     }
 
-    if (!ytId) {
-      ytId = '_1xXYeNrW9k';
-    }
+    if (!ytId) ytId = '_1xXYeNrW9k';
 
     if (audioRef.current) {
       audioRef.current.pause();
@@ -477,7 +465,7 @@ export default function App() {
         if (typeof window.ytPlayer.setVolume === 'function') window.ytPlayer.setVolume(Math.round(volume * 100));
         window.ytPlayer.playVideo();
       } catch (e) {
-        console.warn('Erro ao carregar no YouTube Player:', e);
+        console.warn('YouTube Load Error:', e);
       }
     }
   };
@@ -486,12 +474,8 @@ export default function App() {
     if (queue.length === 0) return;
     const currentIdx = queue.findIndex((s) => s.id === currentSong.id);
     let nextIdx = currentIdx + 1;
-    if (nextIdx >= queue.length) {
-      nextIdx = 0;
-    }
-    if (isShuffle) {
-      nextIdx = Math.floor(Math.random() * queue.length);
-    }
+    if (nextIdx >= queue.length) nextIdx = 0;
+    if (isShuffle) nextIdx = Math.floor(Math.random() * queue.length);
     playSong(queue[nextIdx]);
   };
 
@@ -499,9 +483,7 @@ export default function App() {
     if (queue.length === 0) return;
     const currentIdx = queue.findIndex((s) => s.id === currentSong.id);
     let prevIdx = currentIdx - 1;
-    if (prevIdx < 0) {
-      prevIdx = queue.length - 1;
-    }
+    if (prevIdx < 0) prevIdx = queue.length - 1;
     playSong(queue[prevIdx]);
   };
 
@@ -514,119 +496,158 @@ export default function App() {
     });
   };
 
-  // Disparo Físico de Download no Navegador
-  const triggerBrowserFileDownload = (song: Song) => {
-    const fileName = `${song.name.replace(/[/\\?%*:|"<>]/g, '_')} - ${song.artist.replace(/[/\\?%*:|"<>]/g, '_')}.mp3`;
-    
-    if (song.audioUrl) {
-      const a = document.createElement('a');
-      a.href = song.audioUrl;
-      a.download = fileName;
-      a.target = '_blank';
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(() => {
-        try { document.body.removeChild(a); } catch {}
-      }, 100);
-      return;
+  // DOWNLOAD REAL SEGURO PARA DISPOSITIVOS MÓVEIS & DESKTOP (INDEXEDDB BLOB)
+  const handleDownloadSong = async (song: Song) => {
+    showToast(`Baixando "${song.name}" para offline...`);
+
+    let audioSourceUrl = song.audioUrl;
+    if (!audioSourceUrl) {
+      try {
+        const r = await fetch(`https://api.deezer.com/search?q=${encodeURIComponent(song.name + ' ' + song.artist)}`);
+        const data = await r.json();
+        audioSourceUrl = data?.data?.[0]?.preview;
+      } catch {}
     }
 
-    // Busca rápida de preview de áudio para disparar download
-    fetch(`https://api.deezer.com/search?q=${encodeURIComponent(song.name + ' ' + song.artist)}`)
-      .then((r) => r.json())
-      .then((data) => {
-        const preview = data?.data?.[0]?.preview;
-        if (preview) {
+    if (audioSourceUrl) {
+      try {
+        const resp = await fetch(audioSourceUrl);
+        if (resp.ok) {
+          const blob = await resp.blob();
+          await storeOfflineBlob(song.id, blob);
+          
+          // Dispara download local via Blob (Evita 100% de erro da Akamai / EdgeSuite!)
+          const blobUrl = URL.createObjectURL(blob);
           const a = document.createElement('a');
-          a.href = preview;
-          a.download = fileName;
-          a.target = '_blank';
+          a.href = blobUrl;
+          a.download = `${song.name} - ${song.artist}.mp3`;
           document.body.appendChild(a);
           a.click();
           setTimeout(() => {
-            try { document.body.removeChild(a); } catch {}
-          }, 100);
+            try { document.body.removeChild(a); URL.revokeObjectURL(blobUrl); } catch {}
+          }, 300);
         }
-      })
-      .catch(() => {});
-  };
-
-  // Download Individual de Música
-  const handleDownloadSong = (song: Song) => {
-    setDownloadedSongs((prev) => {
-      if (prev.some((s) => s.id === song.id)) {
-        showToast(`"${song.name}" já está salva nos Downloads!`);
-        return prev;
+      } catch (err) {
+        console.warn('Erro ao obter blob:', err);
       }
+    }
+
+    setDownloadedSongs((prev) => {
+      if (prev.some((s) => s.id === song.id)) return prev;
       const updated = [song, ...prev];
-      try {
-        localStorage.setItem('able_downloads', JSON.stringify(updated));
-      } catch {}
+      try { localStorage.setItem('able_downloads', JSON.stringify(updated)); } catch {}
       return updated;
     });
 
-    triggerBrowserFileDownload(song);
-    showToast(`Baixando "${song.name}" para offline...`);
+    showToast(`"${song.name}" salva com sucesso para offline!`);
   };
 
-  // Download Completo de Playlist Inteira (Todas as Músicas)
-  const handleDownloadPlaylist = (playlist: Playlist) => {
+  // EXCLUIR MÚSICA DOS DOWNLOADS OFFLINE
+  const handleDeleteDownloadedSong = async (songId: string) => {
+    await deleteOfflineBlob(songId);
+    setDownloadedSongs((prev) => {
+      const updated = prev.filter((s) => s.id !== songId);
+      try { localStorage.setItem('able_downloads', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+    showToast('Música removida dos downloads.');
+  };
+
+  // DOWNLOAD DE PLAYLIST COMPLETA
+  const handleDownloadPlaylist = async (playlist: Playlist) => {
     if (!playlist.songs || playlist.songs.length === 0) {
       showToast('A playlist está vazia!');
       return;
     }
 
-    showToast(`Baixando ${playlist.songs.length} faixas de "${playlist.name}"...`);
+    showToast(`Iniciando download de ${playlist.songs.length} faixas de "${playlist.name}"...`);
 
     setDownloadedSongs((prev) => {
-      const existingIds = new Set(prev.map((s) => s.id));
-      const newItems = playlist.songs.filter((s) => !existingIds.has(s.id));
+      const existingIds = new Set(prev.map(s => s.id));
+      const newItems = playlist.songs.filter(s => !existingIds.has(s.id));
       const updated = [...newItems, ...prev];
-      try {
-        localStorage.setItem('able_downloads', JSON.stringify(updated));
-      } catch {}
+      try { localStorage.setItem('able_downloads', JSON.stringify(updated)); } catch {}
       return updated;
     });
 
-    playlist.songs.forEach((song, idx) => {
-      setTimeout(() => {
-        triggerBrowserFileDownload(song);
-      }, idx * 600);
-    });
+    for (let i = 0; i < playlist.songs.length; i++) {
+      const song = playlist.songs[i];
+      if (song.audioUrl) {
+        try {
+          const resp = await fetch(song.audioUrl);
+          if (resp.ok) {
+            const blob = await resp.blob();
+            await storeOfflineBlob(song.id, blob);
+          }
+        } catch {}
+      }
+    }
+
+    showToast(`Todas as faixas de "${playlist.name}" foram salvas offline!`);
   };
 
-  // Criação de Nova Playlist Própria
+  // CRIAR PLAYLIST PRÓPRIA
   const handleCreateNewPlaylist = () => {
     const title = newPlaylistTitle.trim() || `Minha Playlist #${playlists.length + 1}`;
     const newPl: Playlist = {
       id: `custom-pl-${Date.now()}`,
       name: title,
-      creator: 'Você',
+      creator: currentUser?.email ? currentUser.email.split('@')[0] : 'Você',
       cover: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80',
       songs: [],
       isCustom: true
     };
 
-    setPlaylists((prev) => {
-      const updated = [newPl, ...prev];
-      try {
-        localStorage.setItem('able_playlists_v2', JSON.stringify(updated));
-      } catch {}
-      return updated;
-    });
-
+    setPlaylists((prev) => [newPl, ...prev]);
     setNewPlaylistTitle('');
     setIsCreatePlaylistModalOpen(false);
     setSelectedPlaylist(newPl);
     showToast(`Playlist "${newPl.name}" criada com sucesso!`);
   };
 
-  // Adicionar Música a uma Playlist Específica
+  // EDITAR PLAYLIST
+  const handleOpenEditPlaylist = (pl: Playlist) => {
+    setPlaylistBeingEdited(pl);
+    setEditPlaylistTitle(pl.name);
+    setEditPlaylistCover(pl.cover);
+    setIsEditPlaylistModalOpen(true);
+  };
+
+  const handleSaveEditPlaylist = () => {
+    if (!playlistBeingEdited) return;
+    const updatedTitle = editPlaylistTitle.trim() || playlistBeingEdited.name;
+    const updatedCover = editPlaylistCover.trim() || playlistBeingEdited.cover;
+
+    setPlaylists((prev) =>
+      prev.map((pl) =>
+        pl.id === playlistBeingEdited.id
+          ? { ...pl, name: updatedTitle, cover: updatedCover }
+          : pl
+      )
+    );
+
+    if (selectedPlaylist?.id === playlistBeingEdited.id) {
+      setSelectedPlaylist({ ...selectedPlaylist, name: updatedTitle, cover: updatedCover });
+    }
+
+    setIsEditPlaylistModalOpen(false);
+    setPlaylistBeingEdited(null);
+    showToast('Playlist atualizada com sucesso!');
+  };
+
+  // EXCLUIR PLAYLIST (Qualquer Playlist)
+  const handleDeletePlaylist = (playlistId: string) => {
+    setPlaylists((prev) => prev.filter((p) => p.id !== playlistId));
+    setSelectedPlaylist(null);
+    showToast('Playlist excluída com sucesso.');
+  };
+
+  // ADICIONAR MÚSICA A UMA PLAYLIST
   const handleAddSongToTargetPlaylist = (targetPlaylistId: string) => {
     if (!songToAddToPlaylist) return;
 
-    setPlaylists((prev) => {
-      const updated = prev.map((pl) => {
+    setPlaylists((prev) =>
+      prev.map((pl) => {
         if (pl.id === targetPlaylistId) {
           if (pl.songs.some((s) => s.id === songToAddToPlaylist.id)) {
             showToast(`"${songToAddToPlaylist.name}" já está nesta playlist!`);
@@ -637,213 +658,60 @@ export default function App() {
           return { ...pl, songs: nextSongs };
         }
         return pl;
-      });
-
-      try {
-        localStorage.setItem('able_playlists_v2', JSON.stringify(updated));
-      } catch {}
-
-      if (selectedPlaylist && selectedPlaylist.id === targetPlaylistId) {
-        const found = updated.find((p) => p.id === targetPlaylistId);
-        if (found) setSelectedPlaylist(found);
-      }
-
-      return updated;
-    });
+      })
+    );
 
     setIsAddToPlaylistModalOpen(false);
     setSongToAddToPlaylist(null);
   };
 
-  // Remover Música de Playlist Própria
+  // REMOVER MÚSICA DE UMA PLAYLIST
   const handleRemoveSongFromPlaylist = (playlistId: string, songId: string) => {
-    setPlaylists((prev) => {
-      const updated = prev.map((pl) => {
+    setPlaylists((prev) =>
+      prev.map((pl) => {
         if (pl.id === playlistId) {
-          const nextSongs = pl.songs.filter((s) => s.id !== songId);
-          return { ...pl, songs: nextSongs };
+          return { ...pl, songs: pl.songs.filter((s) => s.id !== songId) };
         }
         return pl;
+      })
+    );
+
+    if (selectedPlaylist?.id === playlistId) {
+      setSelectedPlaylist({
+        ...selectedPlaylist,
+        songs: selectedPlaylist.songs.filter((s) => s.id !== songId)
       });
+    }
 
-      try {
-        localStorage.setItem('able_playlists_v2', JSON.stringify(updated));
-      } catch {}
-
-      if (selectedPlaylist && selectedPlaylist.id === playlistId) {
-        const found = updated.find((p) => p.id === playlistId);
-        if (found) setSelectedPlaylist(found);
-      }
-
-      showToast('Música removida da playlist.');
-      return updated;
-    });
+    showToast('Música removida da playlist.');
   };
 
-  // Excluir Playlist Própria
-  const handleDeletePlaylist = (playlistId: string) => {
-    setPlaylists((prev) => {
-      const updated = prev.filter((p) => p.id !== playlistId);
-      try {
-        localStorage.setItem('able_playlists_v2', JSON.stringify(updated));
-      } catch {}
-      return updated;
-    });
+  // IMPORTAÇÃO UNIVERSAL POR LINK (SPOTIFY OU YOUTUBE)
+  const handleImportByUrl = async () => {
+    if (!importLinkInput.trim()) return;
+    setIsImporting(true);
+    setImportProgressText('Lendo metadados e faixas da playlist...');
 
-    setSelectedPlaylist(null);
-    showToast('Playlist excluída com sucesso.');
-  };
-
-  // Importação Completa do Spotify (1 Clique: 10 Playlists do Perfil 12186046104)
-  const handleImportAllMySpotifyPlaylists = () => {
-    setIsImportingSpotify(true);
-    setImportProgressText('Conectando ao perfil 12186046104...');
-
-    setTimeout(() => {
-      setImportProgressText('Importando 10 playlists oficiais do Spotify...');
-      setTimeout(() => {
-        setPlaylists((prev) => {
-          const ids = new Set(prev.map((p) => p.id));
-          const toAdd = MY_SPOTIFY_USER_PLAYLISTS.filter((p) => !ids.has(p.id));
-          const updated = [...prev, ...toAdd];
-          try {
-            localStorage.setItem('able_playlists_v2', JSON.stringify(updated));
-          } catch {}
-          return updated;
-        });
-        setIsImportingSpotify(false);
-        setIsSpotifyModalOpen(false);
-        showToast('Todas as 10 playlists do Spotify foram importadas com sucesso!');
-      }, 1200);
-    }, 800);
-  };
-
-  // Importação por Link de Playlist do Spotify (Scraping Completo de Embed __NEXT_DATA__)
-  const handleImportSpotifyByUrl = async () => {
-    if (!spotifyLinkInput.trim()) return;
-    setIsImportingSpotify(true);
-    setImportProgressText('Lendo metadados e faixas da playlist do Spotify...');
-
-    let playId = spotifyLinkInput.trim();
-    const match = spotifyLinkInput.match(/playlist\/([a-zA-Z0-9]+)/);
-    if (match) playId = match[1];
-
-    let importedData: any = null;
-
-    // 1. Tenta API local do servidor
     try {
-      const res = await fetch(`/api/spotify/playlist?url=${encodeURIComponent(playId)}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.name && Array.isArray(data.songs) && data.songs.length > 0) {
-          importedData = data;
-        }
+      const extracted = await extractPlaylistFromUrl(importLinkInput.trim());
+      if (extracted && extracted.songs.length > 0) {
+        setPlaylists((prev) => [extracted, ...prev]);
+        setIsImporting(false);
+        setIsImportModalOpen(false);
+        setImportLinkInput('');
+        setSelectedPlaylist(extracted);
+        showToast(`Playlist "${extracted.name}" importada na íntegra (${extracted.songs.length} faixas)!`);
+        return;
       }
-    } catch {}
-
-    // 2. Extração direta via proxies CORS de Embed (como o Able faz nativamente)
-    if (!importedData) {
-      const embedUrl = `https://open.spotify.com/embed/playlist/${playId}`;
-      const proxies = [
-        `https://api.allorigins.win/raw?url=${encodeURIComponent(embedUrl)}`,
-        `https://corsproxy.io/?url=${encodeURIComponent(embedUrl)}`
-      ];
-
-      for (const proxy of proxies) {
-        try {
-          const res = await fetch(proxy);
-          if (res.ok) {
-            const html = await res.text();
-            const nextDataMatch = html.match(/<script id="__NEXT_DATA__" type="application\/json">(.*?)<\/script>/s);
-            if (nextDataMatch && nextDataMatch[1]) {
-              const parsed = JSON.parse(nextDataMatch[1]);
-              const entity = parsed?.props?.pageProps?.state?.data?.entity;
-              if (entity) {
-                const playlistName = entity.title || entity.name || 'Playlist Spotify';
-                const cover = entity.coverArt?.sources?.[0]?.url || entity.visualIdentity?.image?.[0]?.url || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80';
-                const rawTracks = entity.trackList || entity.tracks || [];
-
-                const tracks: Song[] = rawTracks.map((t: any, idx: number) => ({
-                  id: `sp-${t.id || idx}-${Date.now()}`,
-                  name: t.title || t.name || 'Faixa Desconhecida',
-                  artist: t.subtitle || t.artists?.[0]?.name || 'Artista',
-                  album: t.album?.name || playlistName,
-                  thumbnail: t.coverArt?.sources?.[0]?.url || cover,
-                  duration: Math.round((t.duration || 180000) / 1000)
-                }));
-
-                importedData = {
-                  id: `sp-pl-${playId}-${Date.now()}`,
-                  name: playlistName,
-                  creator: entity.owner?.name || 'Spotify',
-                  cover,
-                  songs: tracks
-                };
-                break;
-              }
-            }
-          }
-        } catch {}
-      }
+    } catch (e) {
+      console.warn('Erro ao extrair playlist:', e);
     }
 
-    if (importedData && Array.isArray(importedData.songs)) {
-      const newPl: Playlist = {
-        id: importedData.id || `sp-custom-${Date.now()}`,
-        name: importedData.name || 'Playlist do Spotify',
-        creator: importedData.creator || 'Spotify',
-        cover: importedData.cover || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80',
-        songs: importedData.songs,
-        isCustom: true
-      };
-
-      setPlaylists((prev) => {
-        const updated = [newPl, ...prev];
-        try {
-          localStorage.setItem('able_playlists_v2', JSON.stringify(updated));
-        } catch {}
-        return updated;
-      });
-
-      setIsImportingSpotify(false);
-      setIsSpotifyModalOpen(false);
-      setSpotifyLinkInput('');
-      setSelectedPlaylist(newPl);
-      showToast(`Playlist "${newPl.name}" importada na íntegra (${newPl.songs.length} faixas)!`);
-      return;
-    }
-
-    // Fallback amigável caso a rede esteja sem acesso
-    setTimeout(() => {
-      const parsedTitle = spotifyLinkInput.includes('playlist/')
-        ? `Spotify Playlist (${spotifyLinkInput.split('playlist/')[1].substring(0, 8)})`
-        : 'Playlist Importada do Spotify';
-
-      const fallbackPl: Playlist = {
-        id: `sp-custom-${Date.now()}`,
-        name: parsedTitle,
-        creator: 'Spotify User',
-        cover: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&q=80',
-        songs: MY_SPOTIFY_USER_PLAYLISTS[0].songs,
-        isCustom: true
-      };
-
-      setPlaylists((prev) => {
-        const updated = [fallbackPl, ...prev];
-        try {
-          localStorage.setItem('able_playlists_v2', JSON.stringify(updated));
-        } catch {}
-        return updated;
-      });
-
-      setIsImportingSpotify(false);
-      setIsSpotifyModalOpen(false);
-      setSpotifyLinkInput('');
-      setSelectedPlaylist(fallbackPl);
-      showToast(`Playlist importada e salva na sua biblioteca!`);
-    }, 1200);
+    setIsImporting(false);
+    showToast('Não foi possível importar a playlist pelo link. Verifique se o link é público.');
   };
 
+  // BUSCA UNIVERSAL (Deezer + Piped + YouTube)
   const handleSearch = async (query: string) => {
     if (!query.trim()) {
       setSearchResults([]);
@@ -851,22 +719,11 @@ export default function App() {
     }
     setIsSearching(true);
     try {
-      const res = await fetch(`/api/youtube/search?q=${encodeURIComponent(query)}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data.songs) && data.songs.length > 0) {
-          const mapped: Song[] = data.songs.map((s: any) => ({
-            id: s.id || `yt-${Date.now()}`,
-            name: s.title || s.name || 'Música',
-            artist: s.artist || 'Artista',
-            youtubeId: (s.id || '').replace(/^yt-/, ''),
-            thumbnail: s.thumbnail || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80',
-            duration: s.duration || 210
-          }));
-          setSearchResults(mapped);
-          setIsSearching(false);
-          return;
-        }
+      const results = await universalSearch(query);
+      if (results.length > 0) {
+        setSearchResults(results);
+        setIsSearching(false);
+        return;
       }
     } catch {}
 
@@ -936,7 +793,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* NAVEGAÇÃO CENTRAL DESKTOP (Início, Buscar, Playlists, Downloads) */}
+        {/* NAVEGAÇÃO CENTRAL DESKTOP */}
         <nav className="hidden sm:flex items-center gap-1 bg-[#181818] p-1 rounded-full border border-white/5 shadow-inner">
           {[
             { id: 'home', label: 'Início', icon: HomeIcon },
@@ -967,24 +824,37 @@ export default function App() {
         </nav>
 
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Botão Criar Playlist Própria */}
+          {/* Botão Criar Playlist */}
           <button
             onClick={() => setIsCreatePlaylistModalOpen(true)}
             className="flex items-center gap-1.5 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 px-3.5 py-2 text-xs font-bold text-white transition border border-white/10"
-            title="Criar Nova Playlist"
+            title="Criar Playlist"
           >
             <FolderPlus size={15} />
             <span className="hidden sm:inline">Criar Playlist</span>
           </button>
 
-          {/* Botão Oficial Importar Spotify */}
+          {/* Botão Importar Playlist por Link (Spotify / YouTube) */}
           <button
-            onClick={() => setIsSpotifyModalOpen(true)}
+            onClick={() => setIsImportModalOpen(true)}
             className="flex items-center gap-2 rounded-full bg-[#1DB954] hover:bg-[#1ed760] active:scale-95 px-4 py-2 text-xs font-bold text-black shadow-lg transition"
           >
-            <Plus size={16} strokeWidth={2.5} />
-            <span className="hidden sm:inline">Importar do Spotify</span>
-            <span className="sm:hidden">Spotify</span>
+            <Link2 size={16} strokeWidth={2.5} />
+            <span className="hidden sm:inline">Importar Playlist</span>
+            <span className="sm:hidden">Importar</span>
+          </button>
+
+          {/* Botão de Conta / Sincronização em Nuvem */}
+          <button
+            onClick={() => setIsAuthModalOpen(true)}
+            className={`flex h-9 w-9 items-center justify-center rounded-full border transition ${
+              currentUser
+                ? 'bg-[#1DB954]/20 border-[#1DB954] text-[#1DB954]'
+                : 'bg-white/10 border-white/10 text-white hover:bg-white/20'
+            }`}
+            title={currentUser ? `Logado como ${currentUser.email}` : 'Entrar na minha conta'}
+          >
+            {currentUser ? <Cloud size={18} /> : <UserIcon size={18} />}
           </button>
         </div>
       </header>
@@ -992,15 +862,16 @@ export default function App() {
       {/* MAIN VIEW CONTENT */}
       <main className="flex-1 overflow-y-auto px-4 sm:px-8 py-6 pb-40">
         
-        {/* VIEW 1: HOME (Início com Playlists Oficiais do Spotify) */}
+        {/* VIEW 1: HOME */}
         {activeTab === 'home' && !selectedPlaylist && (
           <div className="space-y-8 max-w-7xl mx-auto">
             
-            {/* Header da Home */}
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-2xl font-black text-white">Sua Biblioteca Spotify</h2>
-                <p className="text-xs text-neutral-400 mt-0.5">Playlists salvas permanentemente no dispositivo</p>
+                <h2 className="text-2xl font-black text-white">Sua Biblioteca</h2>
+                <p className="text-xs text-neutral-400 mt-0.5">
+                  {currentUser ? `Sincronizada na nuvem como ${currentUser.email}` : 'Playlists salvas no dispositivo'}
+                </p>
               </div>
               <div className="flex items-center gap-3">
                 <button
@@ -1011,11 +882,11 @@ export default function App() {
                   <span>Criar Playlist</span>
                 </button>
                 <button
-                  onClick={() => setIsSpotifyModalOpen(true)}
+                  onClick={() => setIsImportModalOpen(true)}
                   className="text-xs font-bold text-[#1DB954] hover:underline flex items-center gap-1"
                 >
-                  <span>Importar</span>
-                  <Plus size={14} />
+                  <Link2 size={14} />
+                  <span>Importar Link</span>
                 </button>
               </div>
             </div>
@@ -1030,6 +901,11 @@ export default function App() {
                 >
                   <div className="relative aspect-square w-full rounded-xl overflow-hidden mb-3 shadow-md">
                     <img src={pl.cover} alt={pl.name} className="h-full w-full object-cover group-hover:scale-105 transition duration-300" />
+                    {pl.isCustom && (
+                      <span className="absolute top-2 left-2 bg-[#1DB954] text-black text-[10px] font-black px-2 py-0.5 rounded-full shadow">
+                        Sua
+                      </span>
+                    )}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -1050,15 +926,29 @@ export default function App() {
                       )}
                     </button>
                   </div>
-                  <h3 className="text-sm font-bold text-white truncate">{pl.name}</h3>
-                  <p className="text-xs text-neutral-400 truncate mt-0.5">{pl.songs.length} faixas • {pl.creator}</p>
+                  <div className="flex items-start justify-between gap-1">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-sm font-bold text-white truncate">{pl.name}</h3>
+                      <p className="text-xs text-neutral-400 truncate mt-0.5">{pl.songs.length} faixas • {pl.creator}</p>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenEditPlaylist(pl);
+                      }}
+                      className="opacity-0 group-hover:opacity-100 p-1 text-neutral-400 hover:text-white transition"
+                      title="Editar Playlist"
+                    >
+                      <Edit2 size={14} />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
 
-            {/* Seção de Músicas Mais Tocadas */}
+            {/* Seção Mais Tocadas */}
             <div className="space-y-4 pt-4">
-              <h3 className="text-lg font-bold text-white">Mais Tocadas</h3>
+              <h3 className="text-lg font-bold text-white">Músicas em Destaque</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                 {playlists.flatMap((p) => p.songs).slice(0, 9).map((song, idx) => {
                   const isCurrent = currentSong.id === song.id;
@@ -1120,7 +1010,7 @@ export default function App() {
           </div>
         )}
 
-        {/* VIEW 2: SEARCH (Busca Global de Músicas e Playlists) */}
+        {/* VIEW 2: SEARCH */}
         {activeTab === 'search' && !selectedPlaylist && (
           <div className="space-y-6 max-w-4xl mx-auto">
             <div className="relative">
@@ -1132,7 +1022,7 @@ export default function App() {
                   setSearchQuery(e.target.value);
                   handleSearch(e.target.value);
                 }}
-                placeholder="O que você quer ouvir? Músicas, artistas ou playlists..."
+                placeholder="Buscar qualquer música, artista ou banda..."
                 className="h-12 w-full rounded-2xl bg-[#1e1e1e] border border-white/10 pl-11 pr-4 text-sm text-white placeholder-neutral-400 outline-none focus:border-[#1DB954] transition"
               />
               {isSearching && (
@@ -1140,31 +1030,10 @@ export default function App() {
               )}
             </div>
 
-            {/* Categorias de Busca */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-2">
-              {[
-                { id: 'all', label: 'Tudo' },
-                { id: 'songs', label: 'Músicas' },
-                { id: 'playlists', label: 'Playlists' }
-              ].map((filter) => (
-                <button
-                  key={filter.id}
-                  onClick={() => setSearchFilter(filter.id as any)}
-                  className={`rounded-full px-4 py-1.5 text-xs font-bold transition ${
-                    searchFilter === filter.id
-                      ? 'bg-white text-black'
-                      : 'bg-white/10 text-neutral-300 hover:bg-white/15'
-                  }`}
-                >
-                  {filter.label}
-                </button>
-              ))}
-            </div>
-
             {/* Resultados de Busca */}
             {searchResults.length > 0 ? (
               <div className="space-y-2">
-                <h3 className="text-sm font-bold text-neutral-400">Resultados Encontrados</h3>
+                <h3 className="text-sm font-bold text-neutral-400">Resultados da Busca</h3>
                 {searchResults.map((song) => (
                   <div
                     key={song.id}
@@ -1214,20 +1083,20 @@ export default function App() {
                 ))}
               </div>
             ) : (
-              <div className="py-12 text-center text-neutral-500 text-sm">
-                Digite um termo para pesquisar faixas ou escolha uma playlist na tela de Início.
+              <div className="py-16 text-center text-neutral-500 text-sm">
+                Digite um termo para pesquisar ou ouça qualquer playlist da sua biblioteca.
               </div>
             )}
           </div>
         )}
 
-        {/* VIEW 3: PLAYLISTS / LIBRARY (Sua Biblioteca com Playlists Criadas e Importadas) */}
+        {/* VIEW 3: PLAYLISTS */}
         {activeTab === 'playlists' && !selectedPlaylist && (
           <div className="space-y-6 max-w-6xl mx-auto">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-2xl font-black text-white">Suas Playlists</h2>
-                <p className="text-xs text-neutral-400 mt-0.5">Playlists criadas por você e importadas do Spotify</p>
+                <p className="text-xs text-neutral-400 mt-0.5">Gerencie, edite e crie suas listas de reprodução</p>
               </div>
               <div className="flex items-center gap-3">
                 <button
@@ -1242,7 +1111,7 @@ export default function App() {
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
               
-              {/* Card Rápido para Criar Playlist */}
+              {/* Card Criar Nova Playlist */}
               <div
                 onClick={() => setIsCreatePlaylistModalOpen(true)}
                 className="group flex flex-col items-center justify-center p-6 rounded-2xl border-2 border-dashed border-white/20 hover:border-[#1DB954] transition cursor-pointer aspect-square text-center bg-[#181818]/50 hover:bg-[#181818]"
@@ -1283,24 +1152,38 @@ export default function App() {
                       <Play size={18} fill="currentColor" className="ml-0.5" />
                     </button>
                   </div>
-                  <h3 className="text-sm font-bold text-white truncate">{pl.name}</h3>
-                  <p className="text-xs text-neutral-400 truncate mt-0.5">{pl.songs.length} faixas • {pl.creator}</p>
+                  <div className="flex items-start justify-between gap-1">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-sm font-bold text-white truncate">{pl.name}</h3>
+                      <p className="text-xs text-neutral-400 truncate mt-0.5">{pl.songs.length} faixas • {pl.creator}</p>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenEditPlaylist(pl);
+                      }}
+                      className="opacity-0 group-hover:opacity-100 p-1 text-neutral-400 hover:text-white transition"
+                      title="Editar Playlist"
+                    >
+                      <Edit2 size={14} />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* VIEW 4: DOWNLOADS (Músicas Offline no Padrão Able) */}
+        {/* VIEW 4: DOWNLOADS */}
         {activeTab === 'downloads' && !selectedPlaylist && (
           <div className="space-y-6 max-w-4xl mx-auto">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-2xl font-black text-white">Downloads Offline</h2>
-                <p className="text-xs text-neutral-400 mt-0.5">Músicas salvas localmente no dispositivo para ouvir sem gastar dados</p>
+                <p className="text-xs text-neutral-400 mt-0.5">Músicas salvas localmente no dispositivo para ouvir sem gastar internet</p>
               </div>
               <span className="text-xs font-bold text-neutral-400 bg-white/10 px-3 py-1.5 rounded-full">
-                {downloadedSongs.length} faixas salvas
+                {downloadedSongs.length} faixas
               </span>
             </div>
 
@@ -1330,20 +1213,21 @@ export default function App() {
                         <p className="text-xs text-neutral-400 truncate">{song.artist}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs text-[#1DB954] font-semibold flex items-center gap-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-[#1DB954] font-semibold flex items-center gap-1 mr-2">
                         <Check size={14} />
-                        <span>Baixada</span>
+                        <span>Offline</span>
                       </span>
+                      {/* BOTÃO EXCLUIR MÚSICA DOS DOWNLOADS */}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          triggerBrowserFileDownload(song);
+                          handleDeleteDownloadedSong(song.id);
                         }}
-                        className="p-1.5 text-neutral-400 hover:text-white"
-                        title="Baixar Novamente"
+                        className="p-2 text-neutral-500 hover:text-red-400 transition"
+                        title="Remover dos Downloads"
                       >
-                        <Download size={15} />
+                        <Trash2 size={16} />
                       </button>
                       <span className="text-xs text-neutral-500 font-mono">{formatTime(song.duration || 210)}</span>
                     </div>
@@ -1362,7 +1246,7 @@ export default function App() {
           </div>
         )}
 
-        {/* DETALHE DA PLAYLIST SELECIONADA (Com Botão de Voltar e Baixar Playlist) */}
+        {/* DETALHE DA PLAYLIST SELECIONADA */}
         {selectedPlaylist && (
           <div className="space-y-6 max-w-5xl mx-auto animate-fade-in">
             
@@ -1376,15 +1260,23 @@ export default function App() {
                 <span>Voltar</span>
               </button>
 
-              {selectedPlaylist.isCustom && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleOpenEditPlaylist(selectedPlaylist)}
+                  className="flex items-center gap-1.5 text-xs text-neutral-400 hover:text-white transition p-2 rounded-lg hover:bg-white/10"
+                >
+                  <Edit2 size={15} />
+                  <span>Editar</span>
+                </button>
+
                 <button
                   onClick={() => handleDeletePlaylist(selectedPlaylist.id)}
                   className="flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 transition p-2 rounded-lg hover:bg-red-500/10"
                 >
                   <Trash2 size={15} />
-                  <span>Excluir Playlist</span>
+                  <span>Excluir</span>
                 </button>
-              )}
+              </div>
             </div>
 
             {/* CABEÇALHO DA PLAYLIST */}
@@ -1396,14 +1288,14 @@ export default function App() {
               />
               <div className="text-center sm:text-left space-y-2 flex-1">
                 <span className="text-xs font-bold text-[#1DB954] uppercase tracking-wider">
-                  {selectedPlaylist.isCustom ? 'Minha Playlist' : 'Playlist Spotify'}
+                  {selectedPlaylist.isCustom ? 'Minha Playlist' : 'Playlist Salva'}
                 </span>
                 <h2 className="text-3xl sm:text-4xl font-black text-white">{selectedPlaylist.name}</h2>
                 <p className="text-xs text-neutral-400">
                   Criada por <span className="text-white font-semibold">{selectedPlaylist.creator}</span> • {selectedPlaylist.songs.length} faixas
                 </p>
                 
-                {/* BOTÕES DE AÇÃO: TOCAR E BAIXAR PLAYLIST COMPLETA */}
+                {/* BOTÕES: TOCAR E BAIXAR PLAYLIST COMPLETA */}
                 <div className="pt-3 flex items-center justify-center sm:justify-start gap-3">
                   <button
                     onClick={() => {
@@ -1427,7 +1319,7 @@ export default function App() {
                   <button
                     onClick={() => handleDownloadPlaylist(selectedPlaylist)}
                     className="flex h-12 items-center gap-2 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 px-5 text-xs font-bold text-white border border-white/10 transition shadow-lg"
-                    title="Baixar todas as músicas desta playlist para ouvir offline"
+                    title="Baixar todas as faixas desta playlist para offline"
                   >
                     <Download size={18} />
                     <span>Baixar Playlist</span>
@@ -1477,18 +1369,17 @@ export default function App() {
                         <Download size={16} />
                       </button>
 
-                      {selectedPlaylist.isCustom && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRemoveSongFromPlaylist(selectedPlaylist.id, song.id);
-                          }}
-                          className="p-2 text-neutral-500 hover:text-red-400"
-                          title="Remover desta playlist"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      )}
+                      {/* REMOVER MÚSICA DA PLAYLIST */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveSongFromPlaylist(selectedPlaylist.id, song.id);
+                        }}
+                        className="p-2 text-neutral-500 hover:text-red-400"
+                        title="Remover desta playlist"
+                      >
+                        <Trash2 size={16} />
+                      </button>
 
                       <span className="text-xs text-neutral-500 font-mono w-12 text-right">{formatTime(song.duration || 210)}</span>
                     </div>
@@ -1498,8 +1389,11 @@ export default function App() {
                 <div className="py-12 text-center text-neutral-500 text-sm space-y-3">
                   <p>Esta playlist ainda não tem músicas.</p>
                   <button
-                    onClick={() => setActiveTab('search')}
-                    className="rounded-full bg-[#1DB954] px-4 py-2 text-xs font-bold text-black"
+                    onClick={() => {
+                      setSelectedPlaylist(null);
+                      setActiveTab('search');
+                    }}
+                    className="rounded-full bg-[#1DB954] px-5 py-2.5 text-xs font-bold text-black hover:bg-[#1ed760] transition shadow-lg"
                   >
                     Buscar Músicas para Adicionar
                   </button>
@@ -1528,7 +1422,7 @@ export default function App() {
               </div>
               <div>
                 <h3 className="text-lg font-black text-white">Criar Nova Playlist</h3>
-                <p className="text-xs text-neutral-400">Dê um nome para a sua playlist personalizada</p>
+                <p className="text-xs text-neutral-400">Dê um nome para sua nova playlist</p>
               </div>
             </div>
 
@@ -1537,7 +1431,7 @@ export default function App() {
                 type="text"
                 value={newPlaylistTitle}
                 onChange={(e) => setNewPlaylistTitle(e.target.value)}
-                placeholder="Ex: Minhas Favoritas, Treino Pesado..."
+                placeholder="Ex: Minhas Favoritas, Rock, etc..."
                 autoFocus
                 className="h-12 w-full rounded-2xl bg-[#121212] border border-white/10 px-4 text-sm text-white placeholder-neutral-500 outline-none focus:border-[#1DB954] transition"
               />
@@ -1554,6 +1448,68 @@ export default function App() {
                   className="flex-1 rounded-2xl bg-[#1DB954] hover:bg-[#1ed760] py-3 text-xs font-bold text-black shadow-lg transition"
                 >
                   Criar Playlist
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: EDITAR PLAYLIST */}
+      {isEditPlaylistModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-3xl bg-[#1e1e1e] border border-white/10 p-6 sm:p-8 space-y-5 shadow-2xl relative">
+            <button
+              onClick={() => setIsEditPlaylistModalOpen(false)}
+              className="absolute top-5 right-5 text-neutral-400 hover:text-white p-1"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#1DB954] text-black">
+                <Edit2 size={20} />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-white">Editar Playlist</h3>
+                <p className="text-xs text-neutral-400">Altere o nome e a imagem de capa</p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-[11px] font-bold uppercase text-neutral-400">Nome da Playlist</label>
+                <input
+                  type="text"
+                  value={editPlaylistTitle}
+                  onChange={(e) => setEditPlaylistTitle(e.target.value)}
+                  className="h-12 w-full rounded-2xl bg-[#121212] border border-white/10 px-4 text-sm text-white outline-none focus:border-[#1DB954] mt-1"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold uppercase text-neutral-400">URL da Imagem de Capa</label>
+                <input
+                  type="text"
+                  value={editPlaylistCover}
+                  onChange={(e) => setEditPlaylistCover(e.target.value)}
+                  placeholder="https://images.unsplash.com/..."
+                  className="h-12 w-full rounded-2xl bg-[#121212] border border-white/10 px-4 text-sm text-white outline-none focus:border-[#1DB954] mt-1"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={() => setIsEditPlaylistModalOpen(false)}
+                  className="flex-1 rounded-2xl bg-white/10 hover:bg-white/15 py-3 text-xs font-bold text-white transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSaveEditPlaylist}
+                  className="flex-1 rounded-2xl bg-[#1DB954] hover:bg-[#1ed760] py-3 text-xs font-bold text-black shadow-lg transition"
+                >
+                  Salvar Alterações
                 </button>
               </div>
             </div>
@@ -1615,13 +1571,13 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL DE IMPORTAÇÃO DO SPOTIFY (Oficial do AbleMusic) */}
-      {isSpotifyModalOpen && (
+      {/* MODAL: IMPORTADOR UNIVERSAL DE PLAYLISTS (SPOTIFY & YOUTUBE) */}
+      {isImportModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="w-full max-w-lg rounded-3xl bg-[#1e1e1e] border border-white/10 p-6 sm:p-8 space-y-6 shadow-2xl relative">
             <button
               onClick={() => {
-                if (!isImportingSpotify) setIsSpotifyModalOpen(false);
+                if (!isImporting) setIsImportModalOpen(false);
               }}
               className="absolute top-5 right-5 text-neutral-400 hover:text-white p-1"
             >
@@ -1630,69 +1586,65 @@ export default function App() {
 
             <div className="flex items-center gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#1DB954] text-black shadow-lg">
-                <svg className="w-6 h-6 fill-black" viewBox="0 0 24 24">
-                  <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
-                </svg>
+                <Link2 size={22} />
               </div>
               <div>
-                <h3 className="text-xl font-black text-white">Importador do Spotify</h3>
-                <p className="text-xs text-neutral-400">Importação completa de qualquer playlist do Spotify com salvamento permanente</p>
+                <h3 className="text-xl font-black text-white">Importar Playlist por Link</h3>
+                <p className="text-xs text-neutral-400">Cole o link público de qualquer playlist do Spotify ou YouTube</p>
               </div>
             </div>
 
-            {isImportingSpotify ? (
+            {isImporting ? (
               <div className="py-8 text-center space-y-4">
                 <Loader2 size={36} className="mx-auto text-[#1DB954] animate-spin" />
                 <p className="text-sm font-bold text-white">{importProgressText}</p>
-                <p className="text-xs text-neutral-400">Extraindo faixas reais e sincronizando com o Able...</p>
+                <p className="text-xs text-neutral-400">Extraindo faixas reais e sincronizando com o player...</p>
               </div>
             ) : (
-              <div className="space-y-5">
-                {/* Opção 1: 1 Clique - Todas as Playlists do Usuário */}
-                <div className="rounded-2xl bg-gradient-to-br from-[#1DB954]/20 via-[#181818] to-[#181818] p-5 border border-[#1DB954]/30 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-[#1DB954] uppercase tracking-wider">Recomendado</span>
-                    <Sparkles size={16} className="text-[#1DB954]" />
-                  </div>
-                  <h4 className="text-base font-bold text-white">Sincronizar Minhas 10 Playlists do Spotify</h4>
-                  <p className="text-xs text-neutral-300 leading-relaxed">
-                    Importa automaticamente suas 10 playlists completas do perfil 12186046104 (Running, CTH 2.0 Dance, My Workout, Barbecue Rock, etc.) com todas as músicas e capas originais salvas no dispositivo.
-                  </p>
-                  <button
-                    onClick={handleImportAllMySpotifyPlaylists}
-                    className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#1DB954] py-3 text-xs font-bold text-black hover:bg-[#1ed760] active:scale-98 transition shadow-lg"
-                  >
-                    <Check size={16} />
-                    <span>Importar Minhas 10 Playlists em 1 Clique</span>
-                  </button>
-                </div>
-
-                {/* Opção 2: Colar Link de Qualquer Playlist */}
-                <div className="space-y-3 pt-2">
-                  <label className="text-xs font-bold text-neutral-300 flex items-center gap-1.5">
-                    <Link2 size={14} className="text-neutral-400" />
-                    <span>Ou cole o link de qualquer playlist do Spotify:</span>
-                  </label>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-neutral-300">Link da Playlist:</label>
                   <input
                     type="text"
-                    value={spotifyLinkInput}
-                    onChange={(e) => setSpotifyLinkInput(e.target.value)}
-                    placeholder="https://open.spotify.com/playlist/..."
+                    value={importLinkInput}
+                    onChange={(e) => setImportLinkInput(e.target.value)}
+                    placeholder="https://open.spotify.com/playlist/... ou https://www.youtube.com/playlist?list=..."
                     className="h-12 w-full rounded-2xl bg-[#121212] border border-white/10 px-4 text-xs text-white placeholder-neutral-500 outline-none focus:border-[#1DB954] transition"
                   />
-                  <button
-                    onClick={handleImportSpotifyByUrl}
-                    disabled={!spotifyLinkInput.trim()}
-                    className="w-full rounded-2xl bg-white/[0.08] hover:bg-white/[0.15] py-3 text-xs font-bold text-white disabled:opacity-40 transition"
-                  >
-                    Importar Playlist via Link
-                  </button>
                 </div>
+
+                <div className="rounded-xl bg-white/5 p-3 text-xs text-neutral-400 space-y-1">
+                  <p className="font-semibold text-neutral-300">Formatos aceitos:</p>
+                  <p>• Spotify: https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M</p>
+                  <p>• YouTube: https://www.youtube.com/playlist?list=PLrAlX1vF51V... ou link do YouTube Music</p>
+                </div>
+
+                <button
+                  onClick={handleImportByUrl}
+                  disabled={!importLinkInput.trim()}
+                  className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#1DB954] hover:bg-[#1ed760] py-3.5 text-xs font-bold text-black shadow-lg disabled:opacity-40 transition"
+                >
+                  <Check size={16} />
+                  <span>Importar Playlist Agora</span>
+                </button>
               </div>
             )}
           </div>
         </div>
       )}
+
+      {/* MODAL DE AUTENTICAÇÃO SUPABASE */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        currentUser={currentUser}
+        onUserChange={(user) => setCurrentUser(user)}
+        onSyncPlaylists={() => {
+          if (currentUser?.id) {
+            syncCloudPlaylists(currentUser.id, playlists);
+          }
+        }}
+      />
 
       {/* MINI-PLAYER INFERIOR */}
       <div
@@ -1797,7 +1749,7 @@ export default function App() {
             >
               <ChevronDown size={28} />
             </button>
-            <span className="text-xs font-bold uppercase tracking-wider text-neutral-400">Tocando da Biblioteca</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-neutral-400">Tocando Agora</span>
             <div className="flex items-center gap-1">
               <button
                 onClick={() => {
@@ -1885,7 +1837,7 @@ export default function App() {
         </div>
       )}
 
-      {/* BOTTOM NAVIGATION TABS */}
+      {/* BOTTOM NAVIGATION TABS (Mobile) */}
       <nav className="fixed bottom-0 left-0 right-0 h-16 bg-[#121212]/95 border-t border-white/[0.08] backdrop-blur-lg flex items-center justify-around z-20 sm:hidden">
         {[
           { id: 'home', label: 'Início', icon: HomeIcon },
