@@ -135,6 +135,13 @@ export default function App() {
 
   // Audio State
   const [currentSong, setCurrentSong] = useState<Song>(() => playlists[0]?.songs[0] || INITIAL_PLAYLISTS[0].songs[0]);
+  const activeSong: Song = currentSong || playlists[0]?.songs[0] || INITIAL_PLAYLISTS[0].songs[0];
+
+  useEffect(() => {
+    if (!currentSong && playlists[0]?.songs[0]) {
+      setCurrentSong(playlists[0].songs[0]);
+    }
+  }, [playlists, currentSong]);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [duration, setDuration] = useState<number>(297);
@@ -221,8 +228,12 @@ export default function App() {
         // Carrega playlists da nuvem vinculadas a esta conta
         fetchCloudPlaylists(session.user.id).then((cloudPls) => {
           if (cloudPls && Array.isArray(cloudPls) && cloudPls.length > 0) {
-            setPlaylists(cloudPls);
-            try { localStorage.setItem('able_playlists_v2', JSON.stringify(cloudPls)); } catch {}
+            // Garante que playlists tenham faixas válidas e não apague tudo
+            const hasSongs = cloudPls.some(p => p.songs && p.songs.length > 0);
+            if (hasSongs) {
+              setPlaylists(cloudPls);
+              try { localStorage.setItem('able_playlists_v2', JSON.stringify(cloudPls)); } catch {}
+            }
           }
         });
       }
@@ -233,8 +244,12 @@ export default function App() {
       if (session?.user) {
         fetchCloudPlaylists(session.user.id).then((cloudPls) => {
           if (cloudPls && Array.isArray(cloudPls) && cloudPls.length > 0) {
-            setPlaylists(cloudPls);
-            try { localStorage.setItem('able_playlists_v2', JSON.stringify(cloudPls)); } catch {}
+            // Garante que playlists tenham faixas válidas e não apague tudo
+            const hasSongs = cloudPls.some(p => p.songs && p.songs.length > 0);
+            if (hasSongs) {
+              setPlaylists(cloudPls);
+              try { localStorage.setItem('able_playlists_v2', JSON.stringify(cloudPls)); } catch {}
+            }
           }
         });
       }
@@ -1869,19 +1884,19 @@ export default function App() {
         className="fixed bottom-16 sm:bottom-0 left-0 right-0 h-20 bg-[#181818] border-t border-white/[0.08] px-4 sm:px-6 flex items-center justify-between cursor-pointer z-30 hover:bg-[#202020] transition"
       >
         <div className="flex items-center gap-3 min-w-0 w-1/3">
-          <img src={currentSong.thumbnail} alt={currentSong.name} className="h-12 w-12 rounded-lg object-cover shadow" />
+          <img src={activeSong.thumbnail} alt={activeSong.name} className="h-12 w-12 rounded-lg object-cover shadow" />
           <div className="min-w-0">
-            <p className="text-sm font-bold text-white truncate">{currentSong.name}</p>
-            <p className="text-xs text-neutral-400 truncate">{currentSong.artist}</p>
+            <p className="text-sm font-bold text-white truncate">{activeSong.name}</p>
+            <p className="text-xs text-neutral-400 truncate">{activeSong.artist}</p>
           </div>
           <button
             onClick={(e) => {
               e.stopPropagation();
-              toggleFavorite(currentSong.id);
+              toggleFavorite(activeSong.id);
             }}
             className="hidden sm:block p-1.5 text-neutral-400 hover:text-white transition"
           >
-            <Heart size={18} className={favoriteSongIds.includes(currentSong.id) ? 'fill-[#1DB954] text-[#1DB954]' : ''} />
+            <Heart size={18} className={favoriteSongIds.includes(activeSong.id) ? 'fill-[#1DB954] text-[#1DB954]' : ''} />
           </button>
         </div>
 
@@ -1920,7 +1935,7 @@ export default function App() {
         <div className="flex items-center justify-end gap-3 w-1/3" onClick={(e) => e.stopPropagation()}>
           <button
             onClick={() => {
-              setSongToAddToPlaylist(currentSong);
+              setSongToAddToPlaylist(activeSong);
               setIsAddToPlaylistModalOpen(true);
             }}
             className="text-neutral-400 hover:text-white transition p-1.5"
@@ -1929,7 +1944,7 @@ export default function App() {
             <ListPlus size={18} />
           </button>
           <button
-            onClick={() => handleDownloadSong(currentSong)}
+            onClick={() => handleDownloadSong(activeSong)}
             className="text-neutral-400 hover:text-white transition p-1.5"
             title="Baixar Música"
           >
@@ -1989,14 +2004,14 @@ export default function App() {
           </div>
 
           <div className="my-auto max-w-sm sm:max-w-md mx-auto w-full aspect-square rounded-3xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.8)] border border-white/10">
-            <img src={currentSong.thumbnail} alt={currentSong.name} className="w-full h-full object-cover" />
+            <img src={activeSong.thumbnail} alt={activeSong.name} className="w-full h-full object-cover" />
           </div>
 
           <div className="max-w-md mx-auto w-full space-y-6">
             <div className="flex items-center justify-between">
               <div className="min-w-0 flex-1">
-                <h2 className="text-2xl font-black text-white truncate">{currentSong.name}</h2>
-                <p className="text-sm text-neutral-400 font-medium truncate mt-0.5">{currentSong.artist}</p>
+                <h2 className="text-2xl font-black text-white truncate">{activeSong.name}</h2>
+                <p className="text-sm text-neutral-400 font-medium truncate mt-0.5">{activeSong.artist}</p>
               </div>
               <button onClick={() => toggleFavorite(currentSong.id)} className="p-2 text-neutral-400 hover:text-white">
                 <Heart size={24} className={favoriteSongIds.includes(currentSong.id) ? 'fill-[#1DB954] text-[#1DB954]' : ''} />
