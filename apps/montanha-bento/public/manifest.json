@@ -1,11 +1,11 @@
 {
-  "name": "Montanha Music Bento",
-  "short_name": "Montanha Music",
-  "description": "Player oficial de treinos e playlists do Ecossistema Coach Montanha",
+  "name": "Able Music Player",
+  "short_name": "Able",
+  "description": "A YouTube Music like app with a Spotify like design - ad free, open source",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#000000",
-  "theme_color": "#000000",
+  "background_color": "#121212",
+  "theme_color": "#121212",
   "icons": [
     {
       "src": "/icon-192.png",
