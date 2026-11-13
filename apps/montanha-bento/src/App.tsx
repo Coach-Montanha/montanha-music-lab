@@ -312,8 +312,17 @@ export default function App() {
     }
   };
 
-  // Inicialização de Sessão Supabase com Persistência Robusta
+  // Inicialização de Sessão Supabase com Persistência Robusta e Auto-Sync
   useEffect(() => {
+    // Auto-hidratação imediata da biblioteca da nuvem via /api/sync
+    fetchCloudPlaylists('auto').then((cloudPls) => {
+      if (cloudPls && Array.isArray(cloudPls) && cloudPls.length > 0) {
+        setPlaylists(cloudPls);
+        isCloudLoadedRef.current = true;
+        try { localStorage.setItem('able_playlists_v2', JSON.stringify(cloudPls)); } catch {}
+      }
+    }).catch(() => {});
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setCurrentUser(session.user);
@@ -1121,9 +1130,9 @@ export default function App() {
         className="hidden"
       />
 
-      {/* TOAST NOTIFICATION */}
+      {/* TOAST NOTIFICATION (Posicionado abaixo do Header para não cobrir botões) */}
       {toastMessage && (
-        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 rounded-full bg-[#282828] border border-white/10 px-5 py-2.5 text-xs font-semibold text-white shadow-2xl animate-fade-in flex items-center gap-2">
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 rounded-full bg-[#282828] border border-white/10 px-5 py-2.5 text-xs font-semibold text-white shadow-2xl animate-fade-in flex items-center gap-2 pointer-events-none">
           <Check size={14} className="text-[#1DB954]" />
           <span>{toastMessage}</span>
         </div>
@@ -1143,13 +1152,13 @@ export default function App() {
             </button>
           )}
 
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#1DB954] text-black shadow-lg p-1.5 flex-shrink-0">
+          <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-[#1DB954] text-black shadow-lg p-1.5 flex-shrink-0">
             <img src="/music.svg" alt="Montanha Music Lab" className="w-full h-full object-contain" />
           </div>
           <div className="flex items-center gap-1.5">
-            <h1 className="text-base sm:text-lg font-black tracking-tight text-white flex items-center gap-1.5">
+            <h1 className="text-sm sm:text-base md:text-lg font-black tracking-tight text-white flex items-center gap-1 sm:gap-1.5 whitespace-nowrap">
               <span>Montanha</span>
-              <span className="text-[#1DB954] text-[11px] sm:text-xs font-black uppercase px-2 py-0.5 rounded-md bg-[#1DB954]/10 border border-[#1DB954]/30">Music Lab</span>
+              <span className="hidden sm:inline-block text-[#1DB954] text-[10px] sm:text-xs font-black uppercase px-1.5 sm:px-2 py-0.5 rounded-md bg-[#1DB954]/10 border border-[#1DB954]/30">Music Lab</span>
             </h1>
           </div>
         </div>
@@ -1184,60 +1193,59 @@ export default function App() {
           })}
         </nav>
 
-        <div className="flex items-center gap-2 sm:gap-3">
-          {/* Botão Criar Playlist */}
+        <div className="flex items-center gap-1.5 sm:gap-2.5">
+          {/* Botão Criar Playlist - Apenas telas médias/grandes (já presente na Home no mobile) */}
           <button
             onClick={() => setIsCreatePlaylistModalOpen(true)}
-            className="flex items-center gap-1.5 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 px-3.5 py-2 text-xs font-bold text-white transition border border-white/10"
+            className="hidden md:flex items-center gap-1.5 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 px-3.5 py-2 text-xs font-bold text-white transition border border-white/10"
             title="Criar Playlist"
           >
             <FolderPlus size={15} />
-            <span className="hidden sm:inline">Criar Playlist</span>
+            <span>Criar Playlist</span>
           </button>
 
-          {/* Botão Importar Playlist por Link (Spotify / YouTube) */}
+          {/* Botão Importar Playlist por Link - Apenas telas médias/grandes (já presente na Home no mobile) */}
           <button
             onClick={() => setIsImportModalOpen(true)}
-            className="flex items-center gap-2 rounded-full bg-[#1DB954] hover:bg-[#1ed760] active:scale-95 px-4 py-2 text-xs font-bold text-black shadow-lg transition"
+            className="hidden md:flex items-center gap-2 rounded-full bg-[#1DB954] hover:bg-[#1ed760] active:scale-95 px-4 py-2 text-xs font-bold text-black shadow-lg transition"
+            title="Importar Playlist"
           >
             <Link2 size={16} strokeWidth={2.5} />
-            <span className="hidden sm:inline">Importar Playlist</span>
-            <span className="sm:hidden">Importar</span>
+            <span>Importar</span>
           </button>
 
-          {/* Botão Instalar App PWA */}
+          {/* Botão de Atualizar / Sincronizar em Nuvem - VISÍVEL SEMPRE (Mobile e Desktop) */}
+          <button
+            onClick={handleForceCloudSync}
+            disabled={isSyncingCloud}
+            className="flex items-center gap-1.5 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-bold text-white transition border border-white/10 flex-shrink-0"
+            title="Atualizar e sincronizar biblioteca com a nuvem"
+          >
+            <RefreshCw size={14} className={isSyncingCloud ? "animate-spin text-[#1DB954]" : "text-[#1DB954]"} />
+            <span className="hidden sm:inline">Atualizar</span>
+          </button>
+
+          {/* Botão Instalar App PWA - VISÍVEL SEMPRE (Mobile e Desktop) */}
           <button
             onClick={handleInstallPwa}
-            className="flex items-center gap-1.5 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 px-3 py-2 text-xs font-bold text-white transition border border-white/10"
-            title="Instalar Able Music como Aplicativo no Celular ou Desktop"
+            className="flex items-center gap-1.5 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-bold text-white transition border border-white/10 flex-shrink-0"
+            title="Baixar e Instalar Montanha Music Lab no seu Celular ou Computador"
           >
-            <Smartphone size={15} />
-            <span className="hidden sm:inline">Instalar App</span>
+            <Smartphone size={14} className="text-[#1DB954]" />
+            <span className="hidden sm:inline">Baixar App</span>
           </button>
 
-          {/* Botão de Conta & Sincronização em Nuvem */}
-          {currentUser && (
-            <button
-              onClick={handleForceCloudSync}
-              disabled={isSyncingCloud}
-              className="flex items-center gap-1.5 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 px-3 py-2 text-xs font-bold text-white transition border border-white/10"
-              title="Puxar as playlists mais recentes da nuvem"
-            >
-              <RefreshCw size={13} className={isSyncingCloud ? "animate-spin text-[#1DB954]" : "text-[#1DB954]"} />
-              <span className="hidden sm:inline">Sincronizar</span>
-            </button>
-          )}
-
+          {/* Botão de Conta & Perfil */}
           <button
             onClick={() => setIsAuthModalOpen(true)}
-            className={`flex h-9 w-9 items-center justify-center rounded-full border transition ${
+            className={`flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full border transition flex-shrink-0 ${
               currentUser
                 ? 'bg-[#1DB954]/20 border-[#1DB954] text-[#1DB954]'
                 : 'bg-white/10 border-white/10 text-white hover:bg-white/20'
             }`}
             title={currentUser ? `Logado como ${currentUser.email}` : 'Entrar na minha conta'}
           >
-            {currentUser ? <Cloud size={18} /> : <UserIcon size={18} />}
+            {currentUser ? <Cloud size={16} /> : <UserIcon size={16} />}
           </button>
         </div>
       </header>
@@ -2299,141 +2307,199 @@ export default function App() {
         </aside>
       )}
 
-      {/* MINI-PLAYER INFERIOR */}
+      {/* MINI-PLAYER INFERIOR RESPONSIVO */}
       <div
         onClick={() => setIsFullScreenPlayer(true)}
-        className="fixed bottom-16 sm:bottom-0 left-0 right-0 h-20 bg-[#181818] border-t border-white/[0.08] px-4 sm:px-6 flex items-center justify-between cursor-pointer z-30 hover:bg-[#202020] transition"
+        className="fixed bottom-16 sm:bottom-0 left-0 right-0 h-20 bg-[#181818] border-t border-white/[0.08] px-3.5 sm:px-6 flex items-center cursor-pointer z-30 hover:bg-[#202020] transition select-none"
       >
-        <div className="flex items-center gap-3 min-w-0 w-1/3">
-          <img src={activeSong.thumbnail} alt={activeSong.name} className="h-12 w-12 rounded-lg object-cover shadow" />
-          <div className="min-w-0">
-            <p className="text-sm font-bold text-white truncate">{activeSong.name}</p>
-            <p className="text-xs text-neutral-400 truncate">{activeSong.artist}</p>
+        {/* LAYOUT MOBILE (sm:hidden) - Limpo, Descomplicado e Sem Aperto */}
+        <div className="flex sm:hidden items-center justify-between w-full gap-2">
+          {/* Esquerda: Capa + Título + Artista */}
+          <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-1">
+            <img
+              src={activeSong.thumbnail}
+              alt={activeSong.name}
+              className="h-11 w-11 rounded-lg object-cover shadow flex-shrink-0"
+            />
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold text-white truncate">{activeSong.name}</p>
+              <p className="text-[11px] text-neutral-400 truncate mt-0.5">{activeSong.artist}</p>
+            </div>
           </div>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleFavorite(activeSong.id);
-            }}
-            className="hidden sm:block p-1.5 text-neutral-400 hover:text-white transition"
-          >
-            <Heart size={18} className={favoriteSongIds.includes(activeSong.id) ? 'fill-[#1DB954] text-[#1DB954]' : ''} />
-          </button>
-        </div>
 
-        <div className="flex flex-col items-center gap-1.5 w-1/3" onClick={(e) => e.stopPropagation()}>
-          <div className="flex items-center gap-3 sm:gap-4">
-            {/* BOTÃO SHUFFLE NO MINI PLAYER */}
+          {/* Direita: Controles Essenciais Touch-Friendly */}
+          <div className="flex items-center gap-1.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+            {/* Fila com badge */}
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleShuffle();
-              }}
-              className={`p-1.5 rounded-full transition ${
-                isShuffle ? 'text-[#1DB954] bg-[#1DB954]/15' : 'text-neutral-400 hover:text-white'
+              onClick={() => setIsQueueOpen(!isQueueOpen)}
+              className={`p-2 rounded-xl transition relative ${
+                isQueueOpen
+                  ? 'bg-[#1DB954]/20 text-[#1DB954]'
+                  : 'text-neutral-300 hover:text-white'
               }`}
-              title={isShuffle ? 'Modo Aleatório Ativado' : 'Ativar Modo Aleatório'}
+              title="Abrir Fila de Reprodução"
             >
-              <Shuffle size={16} />
+              <ListMusic size={18} />
+              {queue.length > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-[#1DB954] text-[9px] font-black text-black shadow">
+                  {queue.length}
+                </span>
+              )}
             </button>
 
-            <button onClick={handlePrevSong} className="text-neutral-400 hover:text-white transition">
-              <SkipBack size={18} fill="currentColor" />
-            </button>
+            {/* Play/Pause */}
             <button
               onClick={togglePlay}
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-black hover:scale-105 active:scale-95 transition shadow"
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-black active:scale-95 transition shadow ml-0.5"
+              title={isPlaying ? "Pausar" : "Tocar"}
             >
               {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" className="ml-0.5" />}
             </button>
-            <button onClick={handleNextSong} className="text-neutral-400 hover:text-white transition">
+
+            {/* Próxima */}
+            <button
+              onClick={handleNextSong}
+              className="p-2 text-neutral-300 active:text-white transition"
+              title="Próxima Faixa"
+            >
               <SkipForward size={18} fill="currentColor" />
             </button>
-
-            {/* BOTÃO REPEAT NO MINI PLAYER */}
-            <button
-              onClick={() => {
-                const nextRep = !isRepeat;
-                setIsRepeat(nextRep);
-                showToast(nextRep ? 'Repetir música ativado' : 'Repetição desativada');
-              }}
-              className={`p-1.5 rounded-full transition ${
-                isRepeat ? 'text-[#1DB954] bg-[#1DB954]/15' : 'text-neutral-400 hover:text-white'
-              }`}
-              title={isRepeat ? 'Repetir Música Ativado' : 'Ativar Repetição'}
-            >
-              <Repeat size={16} />
-            </button>
-          </div>
-
-          <div className="w-full max-w-md hidden sm:flex items-center gap-2">
-            <span className="text-[10px] text-neutral-500 font-mono tabular-nums">{formatTime(currentTime)}</span>
-            <div
-              onClick={(e) => {
-                const rect = e.currentTarget.getBoundingClientRect();
-                const pos = (e.clientX - rect.left) / rect.width;
-                handleSeek(Math.floor(pos * duration));
-              }}
-              className="h-1.5 flex-1 rounded-full bg-white/20 overflow-hidden cursor-pointer relative group"
-            >
-              <div className="h-full bg-white group-hover:bg-[#1DB954] transition" style={{ width: `${(currentTime / Math.max(duration, 1)) * 100}%` }} />
-            </div>
-            <span className="text-[10px] text-neutral-500 font-mono tabular-nums">{formatTime(duration)}</span>
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-2 sm:gap-3 w-1/3" onClick={(e) => e.stopPropagation()}>
-          {/* BOTÃO DA FILA DE EXECUÇÃO */}
-          <button
-            onClick={() => setIsQueueOpen(!isQueueOpen)}
-            className={`p-2 rounded-xl transition relative ${
-              isQueueOpen
-                ? 'bg-[#1DB954]/20 text-[#1DB954] border border-[#1DB954]/40'
-                : 'text-neutral-400 hover:text-white hover:bg-white/5'
-            }`}
-            title="Abrir Fila de Reprodução"
-          >
-            <ListMusic size={18} />
-            {queue.length > 0 && (
-              <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-[#1DB954] text-[9px] font-black text-black shadow">
-                {queue.length}
-              </span>
-            )}
-          </button>
-
-          <button
-            onClick={() => {
-              setSongToAddToPlaylist(activeSong);
-              setIsAddToPlaylistModalOpen(true);
-            }}
-            className="text-neutral-400 hover:text-white transition p-1.5"
-            title="Adicionar à Playlist"
-          >
-            <ListPlus size={18} />
-          </button>
-          <button
-            onClick={() => handleDownloadSong(activeSong)}
-            className="text-neutral-400 hover:text-white transition p-1.5"
-            title="Baixar Música"
-          >
-            <Download size={18} />
-          </button>
-          <div className="hidden sm:flex items-center gap-2">
-            <button onClick={() => setIsMuted(!isMuted)} className="text-neutral-400 hover:text-white">
-              {isMuted || volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}
-            </button>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.01"
-              value={isMuted ? 0 : volume}
-              onChange={(e) => {
-                setVolume(parseFloat(e.target.value));
-                setIsMuted(false);
+        {/* LAYOUT DESKTOP (hidden sm:flex) - 3 Colunas Completas com Seeker e Volume */}
+        <div className="hidden sm:flex items-center justify-between w-full">
+          <div className="flex items-center gap-3 min-w-0 w-1/3">
+            <img src={activeSong.thumbnail} alt={activeSong.name} className="h-12 w-12 rounded-lg object-cover shadow" />
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-white truncate">{activeSong.name}</p>
+              <p className="text-xs text-neutral-400 truncate">{activeSong.artist}</p>
+            </div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleFavorite(activeSong.id);
               }}
-              className="w-20 h-1 accent-white bg-white/20 rounded-full cursor-pointer"
-            />
+              className="p-1.5 text-neutral-400 hover:text-white transition"
+            >
+              <Heart size={18} className={favoriteSongIds.includes(activeSong.id) ? 'fill-[#1DB954] text-[#1DB954]' : ''} />
+            </button>
+          </div>
+
+          <div className="flex flex-col items-center gap-1.5 w-1/3" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-4">
+              {/* BOTÃO SHUFFLE NO DESKTOP */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleShuffle();
+                }}
+                className={`p-1.5 rounded-full transition ${
+                  isShuffle ? 'text-[#1DB954] bg-[#1DB954]/15' : 'text-neutral-400 hover:text-white'
+                }`}
+                title={isShuffle ? 'Modo Aleatório Ativado' : 'Ativar Modo Aleatório'}
+              >
+                <Shuffle size={16} />
+              </button>
+
+              <button onClick={handlePrevSong} className="text-neutral-400 hover:text-white transition">
+                <SkipBack size={18} fill="currentColor" />
+              </button>
+              <button
+                onClick={togglePlay}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-black hover:scale-105 active:scale-95 transition shadow"
+              >
+                {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" className="ml-0.5" />}
+              </button>
+              <button onClick={handleNextSong} className="text-neutral-400 hover:text-white transition">
+                <SkipForward size={18} fill="currentColor" />
+              </button>
+
+              {/* BOTÃO REPEAT NO DESKTOP */}
+              <button
+                onClick={() => {
+                  const nextRep = !isRepeat;
+                  setIsRepeat(nextRep);
+                  showToast(nextRep ? 'Repetir música ativado' : 'Repetição desativada');
+                }}
+                className={`p-1.5 rounded-full transition ${
+                  isRepeat ? 'text-[#1DB954] bg-[#1DB954]/15' : 'text-neutral-400 hover:text-white'
+                }`}
+                title={isRepeat ? 'Repetir Música Ativado' : 'Ativar Repetição'}
+              >
+                <Repeat size={16} />
+              </button>
+            </div>
+
+            <div className="w-full max-w-md flex items-center gap-2">
+              <span className="text-[10px] text-neutral-500 font-mono tabular-nums">{formatTime(currentTime)}</span>
+              <div
+                onClick={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const pos = (e.clientX - rect.left) / rect.width;
+                  handleSeek(Math.floor(pos * duration));
+                }}
+                className="h-1.5 flex-1 rounded-full bg-white/20 overflow-hidden cursor-pointer relative group"
+              >
+                <div className="h-full bg-white group-hover:bg-[#1DB954] transition" style={{ width: `${(currentTime / Math.max(duration, 1)) * 100}%` }} />
+              </div>
+              <span className="text-[10px] text-neutral-500 font-mono tabular-nums">{formatTime(duration)}</span>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 sm:gap-3 w-1/3" onClick={(e) => e.stopPropagation()}>
+            {/* BOTÃO DA FILA DE EXECUÇÃO */}
+            <button
+              onClick={() => setIsQueueOpen(!isQueueOpen)}
+              className={`p-2 rounded-xl transition relative ${
+                isQueueOpen
+                  ? 'bg-[#1DB954]/20 text-[#1DB954] border border-[#1DB954]/40'
+                  : 'text-neutral-400 hover:text-white hover:bg-white/5'
+              }`}
+              title="Abrir Fila de Reprodução"
+            >
+              <ListMusic size={18} />
+              {queue.length > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-[#1DB954] text-[9px] font-black text-black shadow">
+                  {queue.length}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => {
+                setSongToAddToPlaylist(activeSong);
+                setIsAddToPlaylistModalOpen(true);
+              }}
+              className="text-neutral-400 hover:text-white transition p-1.5"
+              title="Adicionar à Playlist"
+            >
+              <ListPlus size={18} />
+            </button>
+            <button
+              onClick={() => handleDownloadSong(activeSong)}
+              className="text-neutral-400 hover:text-white transition p-1.5"
+              title="Baixar Música"
+            >
+              <Download size={18} />
+            </button>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setIsMuted(!isMuted)} className="text-neutral-400 hover:text-white">
+                {isMuted || volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}
+              </button>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={isMuted ? 0 : volume}
+                onChange={(e) => {
+                  setVolume(parseFloat(e.target.value));
+                  setIsMuted(false);
+                }}
+                className="w-20 h-1 accent-white bg-white/20 rounded-full cursor-pointer"
+              />
+            </div>
           </div>
         </div>
       </div>
