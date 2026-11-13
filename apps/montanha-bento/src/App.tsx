@@ -41,6 +41,7 @@ import { supabase, syncCloudPlaylists, fetchCloudPlaylists } from './lib/supabas
 import { extractPlaylistFromUrl } from './lib/playlistExtractor';
 import { universalSearch } from './lib/searchEngine';
 import { AuthModal } from './components/AuthModal';
+import { AuthGateway } from './components/AuthGateway';
 import { mediaSessionController } from './lib/mediaSession';
 
 declare global {
@@ -218,6 +219,49 @@ export default function App() {
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
+  };
+
+    // SUCESSO DE LOGIN / CADASTRO: FUSÃO INTELIGENTE DE PLAYLISTS ENTRE APARELHOS
+  const handleAuthSuccess = async (user: any) => {
+    setCurrentUser(user);
+    showToast(`Conectado como ${user.email}!`);
+
+    try {
+      const cloudPls = await fetchCloudPlaylists(user.id);
+      setPlaylists((prevLocal) => {
+        const map = new Map<string, Playlist>();
+        
+        // 1. Inclui playlists da nuvem
+        if (cloudPls && Array.isArray(cloudPls)) {
+          cloudPls.forEach((p) => {
+            if (p && p.id) map.set(p.id, p);
+          });
+        }
+
+        // 2. Funde as playlists locais deste aparelho (sem duplicar)
+        prevLocal.forEach((p) => {
+          if (p && p.id) {
+            if (!map.has(p.id)) {
+              map.set(p.id, p);
+            } else {
+              const existing = map.get(p.id)!;
+              if ((p.songs?.length || 0) > (existing.songs?.length || 0)) {
+                map.set(p.id, p);
+              }
+            }
+          }
+        });
+
+        const merged = Array.from(map.values());
+        try {
+          localStorage.setItem('able_playlists_v2', JSON.stringify(merged));
+        } catch {}
+        syncCloudPlaylists(user.id, merged);
+        return merged;
+      });
+    } catch (err) {
+      console.warn('Erro ao fundir playlists:', err);
+    }
   };
 
   // Inicialização de Sessão Supabase
@@ -911,7 +955,17 @@ export default function App() {
   };
 
   return (
-    <div className="flex h-screen w-full flex-col bg-[#121212] text-white font-sans overflow-hidden select-none">
+    <div className="relative h-screen w-full overflow-hidden bg-[#121212] text-white font-sans select-none">
+      
+      {/* TELA DE AUTENTICAÇÃO GATEWAY: Fundo Desfocado quando não logado */}
+      {!currentUser && (
+        <AuthGateway onSuccess={handleAuthSuccess} />
+      )}
+
+      {/* CORPO DO APLICATIVO: DESFOCADO QUANDO NÃO LOGADO, 100% NÍTIDO QUANDO CONECTADO */}
+      <div className={`flex h-full w-full flex-col transition-all duration-700 ease-out ${
+        !currentUser ? 'filter blur-2xl brightness-40 pointer-events-none scale-[0.98]' : 'filter-none brightness-100 scale-100'
+      }`}>
       
       {/* PLAYER DE ÁUDIO OCULTO (HTML5 Audio) */}
       <audio
@@ -2097,6 +2151,7 @@ export default function App() {
         })}
       </nav>
 
+      </div>
     </div>
   );
 }
