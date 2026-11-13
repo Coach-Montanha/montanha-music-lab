@@ -13,9 +13,17 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   }
 });
 
-// Sincronização em nuvem resiliente entre PC e Dispositivos Móveis
-export async function syncCloudPlaylists(userId: string, playlists: any[]) {
-  // 1. Tenta via API Serverless de alta velocidade e privilégio de admin
+// Sincronização em nuvem resiliente entre PC e Dispositivos Móveis com Trava Anti-Zeramento
+export async function syncCloudPlaylists(userId: string, playlists: any[], allowEmpty: boolean = false) {
+  if (!Array.isArray(playlists)) return;
+
+  // Trava de segurança inegociável: impede que limpar a tela do celular apague o acervo na nuvem
+  if (playlists.length === 0 && !allowEmpty) {
+    console.warn('Proteção de Nuvem: Bloqueada sobrescrita acidental da nuvem com 0 playlists.');
+    return;
+  }
+
+  // 1. Tenta via API Serverless de alta velocidade e privilégio de admin (/api/sync)
   try {
     const res = await fetch('/api/sync', {
       method: 'POST',
@@ -23,7 +31,7 @@ export async function syncCloudPlaylists(userId: string, playlists: any[]) {
       body: JSON.stringify({ email: 'albertosarly@gmail.com', playlists })
     });
     if (res.ok) {
-      console.log('Playlists sincronizadas com sucesso via /api/sync!');
+      console.log(`[Cloud Sync] ${playlists.length} playlists salvas via /api/sync!`);
       return;
     }
   } catch {}
@@ -36,19 +44,20 @@ export async function syncCloudPlaylists(userId: string, playlists: any[]) {
         synced_at: new Date().toISOString()
       }
     });
+    console.log(`[Cloud Sync] ${playlists.length} playlists salvas via Supabase client.`);
   } catch (err) {
     console.warn('Falha no sync de playlists:', err);
   }
 }
 
-export async function fetchCloudPlaylists(userId: string): Promise<any[] | null> {
+export async function fetchCloudPlaylists(userId?: string): Promise<any[] | null> {
   // 1. Tenta via API Serverless /api/sync
   try {
-    const res = await fetch('/api/sync', { signal: AbortSignal.timeout(5000) });
+    const res = await fetch('/api/sync', { signal: AbortSignal.timeout(6000) });
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data.playlists) && data.playlists.length > 0) {
-        console.log(`Recuperadas ${data.playlists.length} playlists via /api/sync!`);
+        console.log(`[Cloud Pull] ${data.playlists.length} playlists recuperadas via /api/sync!`);
         return data.playlists;
       }
     }
@@ -57,11 +66,13 @@ export async function fetchCloudPlaylists(userId: string): Promise<any[] | null>
   // 2. Fallback: Supabase Client direto
   try {
     const { data: { user }, error } = await supabase.auth.getUser();
-    if (!error && user?.user_metadata?.able_playlists) {
+    if (!error && user?.user_metadata?.able_playlists && Array.isArray(user.user_metadata.able_playlists) && user.user_metadata.able_playlists.length > 0) {
+      console.log(`[Cloud Pull] ${user.user_metadata.able_playlists.length} playlists recuperadas via Supabase user metadata.`);
       return user.user_metadata.able_playlists;
     }
   } catch (err) {
     console.warn('Falha ao carregar playlists da nuvem:', err);
   }
+
   return null;
 }

@@ -279,15 +279,24 @@ export default function App() {
     }
   };
 
-  // Forçar atualização manual da nuvem (1-Click Cloud Pull com Merge Inteligente Anti-Perda)
+  // Forçar atualização manual da nuvem (1-Click Cloud Pull com Restauração Segura Anti-Perda)
   const handleForceCloudSync = async () => {
-    if (!currentUser?.id) return;
     setIsSyncingCloud(true);
-    showToast('Sincronizando playlists com a nuvem...');
+    showToast('Buscando playlists atualizadas na nuvem...');
     try {
-      const cloudPls = await fetchCloudPlaylists(currentUser.id);
-      if (cloudPls && Array.isArray(cloudPls)) {
-        // Merge inteligente: junta as da nuvem com as locais sem apagar as novas
+      const cloudPls = await fetchCloudPlaylists(currentUser?.id || 'master');
+      if (cloudPls && Array.isArray(cloudPls) && cloudPls.length > 0) {
+        // Se o aparelho local estava vazio (ex: usuário apagou para puxar as limpas do PC):
+        // Restaura imediatamente 100% da biblioteca da nuvem!
+        if (playlists.length === 0) {
+          setPlaylists(cloudPls);
+          isCloudLoadedRef.current = true;
+          try { localStorage.setItem('able_playlists_v2', JSON.stringify(cloudPls)); } catch {}
+          showToast(`🎉 ${cloudPls.length} playlists restauradas da nuvem com sucesso!`);
+          return;
+        }
+
+        // Se o aparelho local tem playlists, faz o merge seguro sem apagar as novas
         const cloudMap = new Map<string, Playlist>(cloudPls.map(p => [p.id, p]));
         playlists.forEach((localPl) => {
           if (!cloudMap.has(localPl.id)) {
@@ -298,12 +307,16 @@ export default function App() {
         setPlaylists(merged);
         isCloudLoadedRef.current = true;
         try { localStorage.setItem('able_playlists_v2', JSON.stringify(merged)); } catch {}
-        await syncCloudPlaylists(currentUser.id, merged);
-        showToast(`Biblioteca sincronizada! (${merged.length} playlists salvas)`);
+        await syncCloudPlaylists(currentUser?.id || 'master', merged);
+        showToast(`🎉 Biblioteca sincronizada! (${merged.length} playlists salvas)`);
       } else {
-        // Se a nuvem estiver vazia, sobe as playlists locais
-        await syncCloudPlaylists(currentUser.id, playlists);
-        showToast(`Playlists locais enviadas para a nuvem! (${playlists.length} playlists)`);
+        // Nuvem vazia: se houver playlists locais, sobe para alimentar a nuvem
+        if (playlists.length > 0) {
+          await syncCloudPlaylists(currentUser?.id || 'master', playlists);
+          showToast(`Playlists locais enviadas para a nuvem! (${playlists.length} playlists)`);
+        } else {
+          showToast('Nenhuma playlist encontrada na nuvem ou no aparelho.');
+        }
       }
     } catch {
       showToast('Erro ao sincronizar da nuvem. Verifique a conexão.');
@@ -393,14 +406,16 @@ export default function App() {
     return Array.from(allSongsMap.values()).slice(0, 9);
   }, [playlists]);
 
-  // Persistência Imediata de Playlists no LocalStorage e Nuvem (Apenas quando já carregou da nuvem)
+  // Persistência Imediata de Playlists no LocalStorage e Nuvem (Com Trava Anti-Zeramento)
   useEffect(() => {
     try {
       localStorage.setItem('able_playlists_v2', JSON.stringify(playlists));
     } catch {}
 
-    if (currentUser?.id && isCloudLoadedRef.current) {
-      syncCloudPlaylists(currentUser.id, playlists);
+    // TRAVA ANTI-ZERAMENTO: Se playlists estiver vazio ([]), NUNCA dispara sync automático para a nuvem!
+    // Isso evita que apagar playlists localmente no celular destrua o banco de dados do computador!
+    if (playlists.length > 0 && isCloudLoadedRef.current) {
+      syncCloudPlaylists(currentUser?.id || 'master', playlists);
     }
   }, [playlists, currentUser]);
 
@@ -1291,7 +1306,14 @@ export default function App() {
                   className="group flex flex-col p-3 rounded-2xl bg-[#181818] hover:bg-[#282828] transition duration-200 cursor-pointer border border-white/5 relative"
                 >
                   <div className="relative aspect-square w-full rounded-xl overflow-hidden mb-3 shadow-md">
-                    <img src={pl.cover} alt={pl.name} className="h-full w-full object-cover group-hover:scale-105 transition duration-300" />
+                    <img
+                      src={pl.cover || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&auto=format&fit=crop&q=60'}
+                      alt={pl.name}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&auto=format&fit=crop&q=60';
+                      }}
+                      className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
+                    />
                     {pl.isCustom && (
                       <span className="absolute top-2 left-2 bg-[#1DB954] text-black text-[10px] font-black px-2 py-0.5 rounded-full shadow">
                         Sua
@@ -1543,7 +1565,14 @@ export default function App() {
                   className="group flex flex-col p-3 rounded-2xl bg-[#181818] hover:bg-[#282828] transition cursor-pointer border border-white/5 relative"
                 >
                   <div className="relative aspect-square w-full rounded-xl overflow-hidden mb-3 shadow-md">
-                    <img src={pl.cover} alt={pl.name} className="h-full w-full object-cover group-hover:scale-105 transition duration-300" />
+                    <img
+                      src={pl.cover || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&auto=format&fit=crop&q=60'}
+                      alt={pl.name}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&auto=format&fit=crop&q=60';
+                      }}
+                      className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
+                    />
                     {pl.isCustom && (
                       <span className="absolute top-2 left-2 bg-[#1DB954] text-black text-[10px] font-black px-2 py-0.5 rounded-full shadow">
                         Sua
