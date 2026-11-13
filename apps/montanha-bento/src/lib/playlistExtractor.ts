@@ -3,14 +3,17 @@ import { Song, Playlist } from '../types';
 export async function extractPlaylistFromUrl(url: string): Promise<Playlist | null> {
   const clean = url.trim();
 
-  // 1. PLAYLIST DO SPOTIFY
-  if (clean.includes('spotify.com') || clean.includes('spotify:playlist')) {
-    const match = clean.match(/playlist\/([a-zA-Z0-9]+)/);
-    const playId = match ? match[1] : clean.replace('spotify:playlist:', '').trim();
+  // 1. PLAYLIST OU ÁLBUM DO SPOTIFY
+  if (clean.includes('spotify.com') || clean.includes('spotify:')) {
+    const match = clean.match(/(playlist|album|track)[/:]([a-zA-Z0-9]+)/i);
+    const type = match ? match[1].toLowerCase() : 'playlist';
+    const playId = match ? match[2] : clean.replace(/.*playlist\//, '').split('?')[0].replace(/[^a-zA-Z0-9]/g, '');
 
-    // Tentar endpoint /api/spotify (Vercel Serverless Function & Vite dev server)
+    // Tenta endpoint /api/spotify (Vercel Serverless Function & Vite dev server)
     try {
-      const apiRes = await fetch(`/api/spotify?url=${encodeURIComponent(playId)}`, { signal: AbortSignal.timeout(12000) });
+      const apiRes = await fetch(`/api/spotify?url=${encodeURIComponent(clean)}`, {
+        signal: AbortSignal.timeout(8000)
+      });
       if (apiRes.ok) {
         const data = await apiRes.json();
         if (data && data.name && Array.isArray(data.songs) && data.songs.length > 0) {
@@ -28,9 +31,12 @@ export async function extractPlaylistFromUrl(url: string): Promise<Playlist | nu
       console.warn('API /api/spotify:', err);
     }
 
-    // Fallback: oEmbed oficial do Spotify (Metadados garantidos)
+    // Fallback: oEmbed oficial do Spotify
     try {
-      const oembedRes = await fetch(`https://open.spotify.com/oembed?url=https://open.spotify.com/playlist/${playId}`, { signal: AbortSignal.timeout(6000) });
+      const oembedRes = await fetch(
+        `https://open.spotify.com/oembed?url=https://open.spotify.com/${type}/${playId}`,
+        { signal: AbortSignal.timeout(4000) }
+      );
       if (oembedRes.ok) {
         const oembed = await oembedRes.json();
         return {
@@ -41,8 +47,8 @@ export async function extractPlaylistFromUrl(url: string): Promise<Playlist | nu
           songs: [
             {
               id: `sp-track-${playId}-1`,
-              name: oembed.title,
-              artist: 'Vários Artistas',
+              name: oembed.title || 'Faixa Importada',
+              artist: 'Spotify',
               thumbnail: oembed.thumbnail_url,
               duration: 240
             }
@@ -72,7 +78,9 @@ export async function extractPlaylistFromUrl(url: string): Promise<Playlist | nu
 
       for (const inst of pipedInstances) {
         try {
-          const resp = await fetch(`${inst}/playlists/${encodeURIComponent(listId)}`, { signal: AbortSignal.timeout(6000) });
+          const resp = await fetch(`${inst}/playlists/${encodeURIComponent(listId)}`, {
+            signal: AbortSignal.timeout(5000)
+          });
           if (resp.ok) {
             const data = await resp.json();
             const relatedStreams = data.relatedStreams || [];

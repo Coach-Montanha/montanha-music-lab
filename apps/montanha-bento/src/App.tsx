@@ -52,7 +52,7 @@ declare global {
   }
 }
 
-// 10 Playlists Padrão Oficiais
+// 10 Playlists Padrão Oficiais (Motor de Áudio Integral via YouTube Music Engine)
 const INITIAL_PLAYLISTS: Playlist[] = [
   {
     id: "sp-pl-running",
@@ -60,10 +60,10 @@ const INITIAL_PLAYLISTS: Playlist[] = [
     creator: "Able Player",
     cover: "https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?w=600&q=80",
     songs: [
-      { id: "run-1", name: "Till I Collapse", artist: "Eminem, Nate Dogg", youtubeId: "ytQ5CYE1VZw", audioUrl: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/cf/8f/f1/cf8ff198-b736-395b-6b3f-877048ea5384/mzaf_11538452963444220646.plus.aac.p.m4a", thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80", duration: 297 },
-      { id: "run-2", name: "Can't Hold Us", artist: "Macklemore & Ryan Lewis", youtubeId: "2zNSgS797P8", audioUrl: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/83/4d/57/834d57bd-505a-2b6a-3a38-cc26f4d34171/mzaf_18284634626678368772.plus.aac.p.m4a", thumbnail: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&q=80", duration: 258 },
-      { id: "run-3", name: "Lose Yourself", artist: "Eminem", youtubeId: "_Yhyp-_hX2s", audioUrl: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/13/5a/61/135a6154-8ca2-0523-1fa2-f4ac0ea9e1e7/mzaf_13242749689945681184.plus.aac.p.m4a", thumbnail: "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=400&q=80", duration: 326 },
-      { id: "run-4", name: "Stronger", artist: "Kanye West", youtubeId: "PsO6Zn4Vjm8", audioUrl: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/9e/cc/69/9ecc6918-a8dc-354f-909f-ccc20a0a7a33/mzaf_7863921970418240507.plus.aac.p.m4a", thumbnail: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&q=80", duration: 312 }
+      { id: "run-1", name: "Till I Collapse", artist: "Eminem, Nate Dogg", youtubeId: "ytQ5CYE1VZw", thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80", duration: 297 },
+      { id: "run-2", name: "Can't Hold Us", artist: "Macklemore & Ryan Lewis", youtubeId: "2zNSgS797P8", thumbnail: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&q=80", duration: 258 },
+      { id: "run-3", name: "Lose Yourself", artist: "Eminem", youtubeId: "_Yhyp-_hX2s", thumbnail: "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=400&q=80", duration: 326 },
+      { id: "run-4", name: "Stronger", artist: "Kanye West", youtubeId: "PsO6Zn4Vjm8", thumbnail: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&q=80", duration: 312 }
     ]
   },
   {
@@ -72,9 +72,9 @@ const INITIAL_PLAYLISTS: Playlist[] = [
     creator: "Able Player",
     cover: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600&q=80",
     songs: [
-      { id: "dance-1", name: "Put Your Hands Up For Detroit", artist: "Fedde Le Grand", youtubeId: "SYs2HGYbr28", audioUrl: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/6c/fc/88/6cfc8899-d938-cfe9-033c-c759c2694812/mzaf_17237461606960792378.plus.aac.p.m4a", thumbnail: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=400&q=80", duration: 150 },
-      { id: "dance-2", name: "Destination Calabria", artist: "Alex Gaudino", youtubeId: "Kq4OtRsdXLS", audioUrl: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/23/54/78/235478a2-cea9-301a-b0a1-110abbda9a90/mzaf_9958751150220849219.plus.aac.p.m4a", thumbnail: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&q=80", duration: 182 },
-      { id: "dance-3", name: "Satisfaction", artist: "Benny Benassi", youtubeId: "a0fkNdPiIL4", audioUrl: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/a9/62/37/a9623748-8068-5016-6ee8-7e18ec23e9f6/mzaf_4883073172019809194.plus.aac.p.m4a", thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80", duration: 264 }
+      { id: "dance-1", name: "Put Your Hands Up For Detroit", artist: "Fedde Le Grand", youtubeId: "SYs2HGYbr28", thumbnail: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=400&q=80", duration: 150 },
+      { id: "dance-2", name: "Destination Calabria", artist: "Alex Gaudino", youtubeId: "Kq4OtRsdXLS", thumbnail: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&q=80", duration: 182 },
+      { id: "dance-3", name: "Satisfaction", artist: "Benny Benassi", youtubeId: "a0fkNdPiIL4", thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80", duration: 264 }
     ]
   },
   {
@@ -83,8 +83,8 @@ const INITIAL_PLAYLISTS: Playlist[] = [
     creator: "Able Player",
     cover: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=600&q=80",
     songs: [
-      { id: "cth-1", name: "The Way I Am", artist: "Eminem", youtubeId: "mQvteoFiMlg", audioUrl: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/69/49/72/6949729f-14ca-46fc-5437-e0ce2ab8b4e3/mzaf_1236646818496670462.plus.aac.p.m4a", thumbnail: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=400&q=80", duration: 290 },
-      { id: "cth-2", name: "POWER", artist: "Kanye West", youtubeId: "L53gjP-Tt2w", audioUrl: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/42/44/e2/4244e2f7-675b-0e99-063d-8f3be99ae7ef/mzaf_3803512807555325083.plus.aac.p.m4a", thumbnail: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&q=80", duration: 292 }
+      { id: "cth-1", name: "The Way I Am", artist: "Eminem", youtubeId: "mQvteoFiMlg", thumbnail: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=400&q=80", duration: 290 },
+      { id: "cth-2", name: "POWER", artist: "Kanye West", youtubeId: "L53gjP-Tt2w", thumbnail: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&q=80", duration: 292 }
     ]
   },
   {
@@ -93,9 +93,9 @@ const INITIAL_PLAYLISTS: Playlist[] = [
     creator: "Able Player",
     cover: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600&q=80",
     songs: [
-      { id: "wod-1", name: "Remember the Name", artist: "Fort Minor", youtubeId: "VDvr08sCPOc", audioUrl: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/ff/30/24/ff3024f1-5321-75d0-d269-ab72014b024c/mzaf_9912505582177526449.plus.aac.p.m4a", thumbnail: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=400&q=80", duration: 230 },
-      { id: "wod-2", name: "B.O.B. - Bombs Over Baghdad", artist: "Outkast", youtubeId: "lVHjCWvy4sc", audioUrl: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/dc/52/40/dc524018-e096-0f15-7150-b147e05e5597/mzaf_12340997808257225417.plus.aac.p.m4a", thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80", duration: 304 },
-      { id: "wod-3", name: "Bleed It Out", artist: "Linkin Park", youtubeId: "OnuuYcqhzCE", audioUrl: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/19/04/1f/19041f96-6046-3d9b-8eb8-3f6c88b1f1ed/mzaf_16802305418710775806.plus.aac.p.m4a", thumbnail: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&q=80", duration: 164 }
+      { id: "wod-1", name: "Remember the Name", artist: "Fort Minor", youtubeId: "VDvr08sCPOc", thumbnail: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=400&q=80", duration: 230 },
+      { id: "wod-2", name: "B.O.B. - Bombs Over Baghdad", artist: "Outkast", youtubeId: "lVHjCWvy4sc", thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80", duration: 304 },
+      { id: "wod-3", name: "Bleed It Out", artist: "Linkin Park", youtubeId: "OnuuYcqhzCE", thumbnail: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&q=80", duration: 164 }
     ]
   },
   {
@@ -104,9 +104,9 @@ const INITIAL_PLAYLISTS: Playlist[] = [
     creator: "Able Player",
     cover: "https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=600&q=80",
     songs: [
-      { id: "rock-1", name: "Back in Black", artist: "AC/DC", youtubeId: "pAgnJDJN4VA", audioUrl: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/08/2e/ac/082eac8c-1d0e-f72f-7b37-b8e037ff1579/mzaf_7587164327744022409.plus.aac.p.m4a", thumbnail: "https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=400&q=80", duration: 255 },
-      { id: "rock-2", name: "Sweet Child O' Mine", artist: "Guns N' Roses", youtubeId: "1w7OgIMMRc4", audioUrl: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/0d/cb/f3/0dcbf381-7cbf-78b8-7f74-d5789adf65a1/mzaf_17081805577020235844.plus.aac.p.m4a", thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80", duration: 356 },
-      { id: "rock-3", name: "Smells Like Teen Spirit", artist: "Nirvana", youtubeId: "hTWKbfoikeg", audioUrl: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/65/49/4e/65494e02-b6d3-26d8-6b0c-9bd98dcf4d5d/mzaf_7665413316386155700.plus.aac.p.m4a", thumbnail: "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=400&q=80", duration: 301 }
+      { id: "rock-1", name: "Back in Black", artist: "AC/DC", youtubeId: "pAgnJDJN4VA", thumbnail: "https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=400&q=80", duration: 255 },
+      { id: "rock-2", name: "Sweet Child O' Mine", artist: "Guns N' Roses", youtubeId: "1w7OgIMMRc4", thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80", duration: 356 },
+      { id: "rock-3", name: "Smells Like Teen Spirit", artist: "Nirvana", youtubeId: "hTWKbfoikeg", thumbnail: "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=400&q=80", duration: 301 }
     ]
   }
 ];
@@ -167,6 +167,16 @@ export default function App() {
   const [importLinkInput, setImportLinkInput] = useState<string>('');
   const [isImporting, setIsImporting] = useState<boolean>(false);
   const [importProgressText, setImportProgressText] = useState<string>('');
+
+  // Contador de reproduções por música (Músicas Mais Tocadas da Conta)
+  const [playCounts, setPlayCounts] = useState<Record<string, number>>(() => {
+    try {
+      const stored = localStorage.getItem('able_play_counts');
+      return stored ? JSON.parse(stored) : {};
+    } catch {
+      return {};
+    }
+  });
 
   // Modal: Criar Playlist
   const [isCreatePlaylistModalOpen, setIsCreatePlaylistModalOpen] = useState<boolean>(false);
@@ -269,6 +279,9 @@ export default function App() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setCurrentUser(session.user);
+        if (session.user.user_metadata?.able_play_counts) {
+          setPlayCounts((prev) => ({ ...prev, ...session.user.user_metadata.able_play_counts }));
+        }
         // Carrega playlists da nuvem vinculadas a esta conta
         fetchCloudPlaylists(session.user.id).then((cloudPls) => {
           if (cloudPls && Array.isArray(cloudPls) && cloudPls.length > 0) {
@@ -286,6 +299,9 @@ export default function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setCurrentUser(session?.user || null);
       if (session?.user) {
+        if (session.user.user_metadata?.able_play_counts) {
+          setPlayCounts((prev) => ({ ...prev, ...session.user.user_metadata.able_play_counts }));
+        }
         fetchCloudPlaylists(session.user.id).then((cloudPls) => {
           if (cloudPls && Array.isArray(cloudPls) && cloudPls.length > 0) {
             // Garante que playlists tenham faixas válidas e não apague tudo
@@ -301,6 +317,21 @@ export default function App() {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Músicas em Destaque (Mais Tocadas da Conta do Usuário)
+  const featuredSongs = useMemo(() => {
+    const allSongsMap = new Map<string, Song>();
+    playlists.forEach((p) => {
+      (p.songs || []).forEach((s) => {
+        if (!allSongsMap.has(s.id)) {
+          allSongsMap.set(s.id, s);
+        }
+      });
+    });
+    const all = Array.from(allSongsMap.values());
+    all.sort((a, b) => (playCounts[b.id] || 0) - (playCounts[a.id] || 0));
+    return all.slice(0, 9);
+  }, [playlists, playCounts]);
 
   // Persistência Imediata de Playlists no LocalStorage e Nuvem
   useEffect(() => {
@@ -353,8 +384,7 @@ export default function App() {
               disablekb: 1,
               fs: 0,
               rel: 0,
-              playsinline: 1,
-              origin: window.location.origin
+              playsinline: 1
             },
             events: {
               onReady: (event: any) => {
@@ -544,6 +574,20 @@ export default function App() {
     if (newQueue) setQueue(newQueue);
     showToast(`Tocando: ${song.name}`);
 
+    // Incrementa contador de reprodução para Músicas em Destaque (Mais Tocadas da Conta)
+    setPlayCounts((prev) => {
+      const updated = { ...prev, [song.id]: (prev[song.id] || 0) + 1 };
+      try {
+        localStorage.setItem('able_play_counts', JSON.stringify(updated));
+      } catch {}
+      if (currentUser?.id) {
+        supabase.auth.updateUser({
+          data: { able_play_counts: updated }
+        }).catch(() => {});
+      }
+      return updated;
+    });
+
     // 1. TENTA REPRODUÇÃO OFFLINE A PARTIR DO INDEXEDDB (Se tiver sido baixada)
     const offlineBlob = await getOfflineBlob(song.id);
     if (offlineBlob && audioRef.current) {
@@ -561,24 +605,7 @@ export default function App() {
       }
     }
 
-        // 2. DISPOSITIVOS MÓVEIS (EDGE/CHROME MOBILE): HTML5 AUDIO IMEDIATO NO TOQUE DO USUÁRIO
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    if (isMobile && song.audioUrl && audioRef.current) {
-      try {
-        if (window.ytPlayer && typeof window.ytPlayer.pauseVideo === 'function') {
-          window.ytPlayer.pauseVideo();
-        }
-        audioRef.current.src = song.audioUrl;
-        audioRef.current.volume = isMuted ? 0 : volume;
-        await audioRef.current.play();
-        setIsPlaying(true);
-        return;
-      } catch (err) {
-        console.warn('Erro ao reproduzir HTML5 audio no mobile:', err);
-      }
-    }
-
-    // 3. MOTOR YOUTUBE MUSIC (DESKTOP): ÁUDIO INTEGRAL DE 3 A 6+ MINUTOS
+    // 2. MOTOR YOUTUBE MUSIC (ÁUDIO INTEGRAL COMPLETO DE 3 A 6+ MINUTOS)
     let ytId = song.youtubeId;
     if (!ytId) {
       try {
@@ -602,21 +629,6 @@ export default function App() {
       }
     }
 
-    // Se a música já tiver áudio nativo (ex: busca universal), toca o áudio correto imediatamente
-    if (song.audioUrl && audioRef.current) {
-      try {
-        if (window.ytPlayer && typeof window.ytPlayer.pauseVideo === 'function') {
-          window.ytPlayer.pauseVideo();
-        }
-        audioRef.current.src = song.audioUrl;
-        audioRef.current.volume = isMuted ? 0 : volume;
-        await audioRef.current.play();
-        setIsPlaying(true);
-        return;
-      } catch {}
-    }
-
-    // Se tiver YouTube ID específico, toca o vídeo exato
     if (ytId && ytId !== 'ytQ5CYE1VZw') {
       song.youtubeId = ytId;
     } else if (song.youtubeId) {
@@ -625,10 +637,9 @@ export default function App() {
       ytId = 'ytQ5CYE1VZw';
     }
 
-    // Pausa qualquer áudio local anterior para não sobrepor
+    // Pausa qualquer áudio HTML5 para não sobrepor
     if (audioRef.current) {
       audioRef.current.pause();
-      // audioRef.current.removeAttribute('src');
     }
 
     // Reproduz áudio completo via YouTube Music Engine
@@ -652,7 +663,7 @@ export default function App() {
           height: '1',
           width: '1',
           videoId: ytId,
-          playerVars: { autoplay: 1, controls: 0, disablekb: 1, fs: 0, rel: 0, playsinline: 1, origin: window.location.origin },
+          playerVars: { autoplay: 1, controls: 0, disablekb: 1, fs: 0, rel: 0, playsinline: 1 },
           events: {
             onReady: (e: any) => {
               try {
@@ -899,27 +910,29 @@ export default function App() {
 
   // IMPORTAÇÃO UNIVERSAL POR LINK (SPOTIFY OU YOUTUBE)
   const handleImportByUrl = async () => {
-    if (!importLinkInput.trim()) return;
+    if (!importLinkInput.trim() || isImporting) return;
     setIsImporting(true);
-    setImportProgressText('Lendo metadados e faixas da playlist...');
+    setImportProgressText('Conectando ao Spotify / YouTube...');
 
     try {
+      setImportProgressText('Lendo metadados e faixas da playlist...');
       const extracted = await extractPlaylistFromUrl(importLinkInput.trim());
-      if (extracted && extracted.songs.length > 0) {
+      if (extracted && extracted.songs && extracted.songs.length > 0) {
         setPlaylists((prev) => [extracted, ...prev]);
-        setIsImporting(false);
         setIsImportModalOpen(false);
         setImportLinkInput('');
         setSelectedPlaylist(extracted);
-        showToast(`Playlist "${extracted.name}" importada na íntegra (${extracted.songs.length} faixas)!`);
+        showToast(`Playlist "${extracted.name}" importada com sucesso (${extracted.songs.length} faixas)!`);
         return;
+      } else {
+        showToast('Não foi possível importar faixas. Verifique se a playlist é pública.');
       }
-    } catch (e) {
+    } catch (e: any) {
       console.warn('Erro ao extrair playlist:', e);
+      showToast('Falha na importação. Tente novamente com o link público da playlist.');
+    } finally {
+      setIsImporting(false);
     }
-
-    setIsImporting(false);
-    showToast('Não foi possível importar a playlist pelo link. Verifique se o link é público.');
   };
 
   // BUSCA UNIVERSAL (Deezer + Piped + YouTube)
@@ -1177,27 +1190,54 @@ export default function App() {
               ))}
             </div>
 
-            {/* Seção Mais Tocadas */}
+            {/* Seção Mais Tocadas (Calculada pela Conta Logada) */}
             <div className="space-y-4 pt-4">
-              <h3 className="text-lg font-bold text-white">Músicas em Destaque</h3>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                    Músicas em Destaque
+                    <span className="text-xs font-normal text-white/50">(Mais tocadas no app)</span>
+                  </h3>
+                </div>
+                {currentUser && (
+                  <span className="text-xs text-[#1DB954] font-medium flex items-center gap-1">
+                    <UserIcon size={12} /> {currentUser.email?.split('@')[0]}
+                  </span>
+                )}
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                {playlists.flatMap((p) => p.songs).slice(0, 9).map((song, idx) => {
+                {featuredSongs.map((song, idx) => {
                   const isCurrent = currentSong.id === song.id;
+                  const plays = playCounts[song.id] || 0;
                   return (
                     <div
                       key={`${song.id}-${idx}`}
-                      onClick={() => playSong(song, playlists.flatMap((p) => p.songs))}
+                      onClick={() => playSong(song, featuredSongs)}
                       className={`flex items-center justify-between p-3 rounded-xl transition cursor-pointer group ${
                         isCurrent ? 'bg-white/10' : 'hover:bg-[#1e1e1e]'
                       }`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <img src={song.thumbnail} alt={song.name} className="h-11 w-11 rounded-lg object-cover" />
+                        <div className="relative">
+                          <img src={song.thumbnail} alt={song.name} className="h-11 w-11 rounded-lg object-cover" />
+                          {plays > 0 && (
+                            <span className="absolute -top-1.5 -right-1.5 bg-[#1DB954] text-black text-[9px] font-black px-1.5 py-0.2 rounded-full shadow">
+                              {plays}
+                            </span>
+                          )}
+                        </div>
                         <div className="min-w-0">
                           <p className={`text-sm font-bold truncate ${isCurrent ? 'text-[#1DB954]' : 'text-white'}`}>
                             {song.name}
                           </p>
-                          <p className="text-xs text-neutral-400 truncate">{song.artist}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs text-neutral-400 truncate">{song.artist}</p>
+                            {plays > 0 && (
+                              <span className="text-[10px] text-[#1DB954] font-semibold">
+                                • {plays} {plays === 1 ? 'play' : 'plays'}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-1">
@@ -1863,7 +1903,8 @@ export default function App() {
           <div className="w-full max-w-lg rounded-3xl bg-[#1e1e1e] border border-white/10 p-6 sm:p-8 space-y-6 shadow-2xl relative">
             <button
               onClick={() => {
-                if (!isImporting) setIsImportModalOpen(false);
+                setIsImporting(false);
+                setIsImportModalOpen(false);
               }}
               className="absolute top-5 right-5 text-neutral-400 hover:text-white p-1"
             >
@@ -1885,6 +1926,16 @@ export default function App() {
                 <Loader2 size={36} className="mx-auto text-[#1DB954] animate-spin" />
                 <p className="text-sm font-bold text-white">{importProgressText}</p>
                 <p className="text-xs text-neutral-400">Extraindo faixas reais e sincronizando com o player...</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsImporting(false);
+                    setIsImportModalOpen(false);
+                  }}
+                  className="mt-4 px-5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-semibold text-neutral-300 hover:text-white transition"
+                >
+                  Cancelar
+                </button>
               </div>
             ) : (
               <div className="space-y-4">
