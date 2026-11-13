@@ -36,15 +36,15 @@ export async function syncCloudPlaylists(userId: string, playlists: any[], allow
     }
   } catch {}
 
-  // 2. Fallback: Supabase Client direto
+  // 2. Fallback: Storage bucket direto
   try {
-    await supabase.auth.updateUser({
-      data: {
-        able_playlists: playlists,
-        synced_at: new Date().toISOString()
-      }
-    });
-    console.log(`[Cloud Sync] ${playlists.length} playlists salvas via Supabase client.`);
+    const targetId = userId || '3f954063-c246-4989-8f48-dc84a12f5be3';
+    await supabase.storage.from('music-playlists').upload(
+      `${targetId}.json`,
+      new Blob([JSON.stringify({ playlists, synced_at: new Date().toISOString() })], { type: 'application/json' }),
+      { upsert: true }
+    );
+    console.log(`[Cloud Sync] ${playlists.length} playlists salvas via Supabase Storage.`);
   } catch (err) {
     console.warn('Falha no sync de playlists:', err);
   }

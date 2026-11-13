@@ -61,7 +61,7 @@ export default async function handler(req, res) {
 
       const syncedAt = new Date().toISOString();
 
-      // Salva no Supabase Storage (sem limite de 64KB)
+      // Salva no Supabase Storage (sem limite de 64KB - armazenamento correto e isolado)
       const storageUpload = await fetch(`${SUPABASE_URL}/storage/v1/object/music-playlists/${USER_ID}.json`, {
         method: 'POST',
         headers: {
@@ -73,23 +73,9 @@ export default async function handler(req, res) {
         body: JSON.stringify({ playlists, synced_at: syncedAt })
       });
 
-      // Tenta atualizar user_metadata secundariamente
-      try {
-        await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${USER_ID}`, {
-          method: 'PUT',
-          headers: {
-            apikey: SUPABASE_SERVICE_ROLE_KEY,
-            Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            user_metadata: {
-              able_playlists: playlists.slice(0, 5),
-              synced_at: syncedAt
-            }
-          })
-        });
-      } catch {}
+      // NOTA CRÍTICA DE ARQUITETURA: NUNCA salvar playlists em user_metadata do Supabase Auth.
+      // O Supabase Auth embute todo o user_metadata no cabeçalho JWT (Authorization: Bearer <token>).
+      // Playlists pesadas excedem o limite de cabeçalho HTTP (100KB) e quebram todo o ecossistema.
 
       if (storageUpload.ok) {
         return res.status(200).json({ success: true, count: playlists.length, synced_at: syncedAt });
