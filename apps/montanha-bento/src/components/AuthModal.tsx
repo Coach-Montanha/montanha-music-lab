@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, User, Lock, Mail, CheckCircle, LogOut, Loader2, Sparkles } from 'lucide-react';
+import { X, User, Lock, Mail, CheckCircle, LogOut, Loader2, Sparkles, RefreshCw, KeyRound, ShieldCheck } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface AuthModalProps {
@@ -17,6 +17,11 @@ export function AuthModal({ isOpen, onClose, currentUser, onUserChange, onSyncPl
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  // Troca de Senha
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [isSyncing, setIsSyncing] = useState(false);
 
   if (!isOpen) return null;
 
@@ -65,6 +70,45 @@ export function AuthModal({ isOpen, onClose, currentUser, onUserChange, onSyncPl
     }
   };
 
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setSuccessMsg('');
+    if (!newPassword.trim() || newPassword.trim().length < 6) {
+      setErrorMsg('A nova senha deve ter no mínimo 6 dígitos.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword.trim()
+      });
+      if (error) throw error;
+      setSuccessMsg('Senha atualizada com sucesso! A nova senha protege sua conta.');
+      setNewPassword('');
+      setTimeout(() => setIsChangingPassword(false), 2000);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Erro ao atualizar a senha.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleManualSync = async () => {
+    setIsSyncing(true);
+    setErrorMsg('');
+    try {
+      await onSyncPlaylists();
+      setSuccessMsg('Playlists sincronizadas com sucesso da nuvem!');
+      setTimeout(() => setSuccessMsg(''), 3000);
+    } catch {
+      setErrorMsg('Erro ao sincronizar. Tente novamente.');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const handleLogout = async () => {
     setLoading(true);
     await supabase.auth.signOut();
@@ -84,7 +128,7 @@ export function AuthModal({ isOpen, onClose, currentUser, onUserChange, onSyncPl
         </button>
 
         {currentUser ? (
-          <div className="space-y-6 text-center">
+          <div className="space-y-5 text-center">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#1DB954]/20 border border-[#1DB954]/40 text-[#1DB954]">
               <CheckCircle size={32} />
             </div>
@@ -92,19 +136,91 @@ export function AuthModal({ isOpen, onClose, currentUser, onUserChange, onSyncPl
               <h3 className="text-xl font-black text-white">Conta Conectada</h3>
               <p className="text-xs text-neutral-400 mt-1">{currentUser.email}</p>
             </div>
+
+            {successMsg && (
+              <div className="rounded-xl bg-[#1DB954]/10 border border-[#1DB954]/30 p-3 text-xs text-[#1DB954] font-medium">
+                {successMsg}
+              </div>
+            )}
+            {errorMsg && (
+              <div className="rounded-xl bg-red-500/10 border border-red-500/30 p-3 text-xs text-red-400 font-medium">
+                {errorMsg}
+              </div>
+            )}
+
             <div className="rounded-2xl bg-white/5 p-4 border border-white/5 text-left text-xs text-neutral-300 space-y-2">
               <div className="flex items-center gap-2 text-[#1DB954] font-bold">
                 <Sparkles size={14} />
-                <span>Sincronização em Nuvem Ativa</span>
+                <span>Sincronização Ativa Multi-Aparelhos</span>
               </div>
-              <p>Todas as suas playlists, músicas salvas e favoritos estão linkados com esta conta e disponíveis em todos os seus celulares, computadores e tablets.</p>
+              <p className="text-[11px] text-neutral-400">
+                Playlists sincronizadas em tempo real entre PC, Telefone 1 e Telefone 2.
+              </p>
             </div>
+
+            {/* BOTÃO FORÇAR SINCRONIZAÇÃO */}
+            <button
+              onClick={handleManualSync}
+              disabled={isSyncing}
+              className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#1DB954] hover:bg-[#1ed760] active:scale-98 py-3 text-xs font-bold text-black shadow-lg transition"
+            >
+              <RefreshCw size={15} className={isSyncing ? "animate-spin" : ""} />
+              <span>{isSyncing ? "Sincronizando com a Nuvem..." : "Puxar Playlists Mais Recentes da Nuvem"}</span>
+            </button>
+
+            {/* FORMULÁRIO DE TROCA DE SENHA (RESOLVE O AVISO DO GOOGLE) */}
+            <div className="pt-2 border-t border-white/10">
+              {!isChangingPassword ? (
+                <button
+                  onClick={() => setIsChangingPassword(true)}
+                  className="w-full flex items-center justify-center gap-2 rounded-2xl bg-white/5 hover:bg-white/10 py-2.5 text-xs font-semibold text-neutral-300 hover:text-white transition"
+                >
+                  <KeyRound size={15} className="text-[#1DB954]" />
+                  <span>Alterar Minha Senha</span>
+                </button>
+              ) : (
+                <form onSubmit={handleUpdatePassword} className="space-y-3 bg-white/5 p-4 rounded-2xl border border-white/10 text-left">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <ShieldCheck size={14} className="text-[#1DB954]" /> Nova Senha Segura
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsChangingPassword(false)}
+                      className="text-[11px] text-neutral-400 hover:text-white"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                  <input
+                    type="password"
+                    required
+                    minLength={6}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Digite sua nova senha segura"
+                    className="h-10 w-full rounded-xl bg-[#121212] border border-white/10 px-3 text-xs text-white placeholder-neutral-500 outline-none focus:border-[#1DB954] transition"
+                  />
+                  <p className="text-[10px] text-neutral-400">
+                    Definir uma senha forte remove o aviso vermelho de "senha comprometida" do Google.
+                  </p>
+                  <button
+                    type="submit"
+                    disabled={loading || !newPassword.trim()}
+                    className="w-full py-2 rounded-xl bg-[#1DB954] hover:bg-[#1ed760] text-xs font-bold text-black transition disabled:opacity-50"
+                  >
+                    {loading ? "Salvando..." : "Salvar Nova Senha"}
+                  </button>
+                </form>
+              )}
+            </div>
+
             <button
               onClick={handleLogout}
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 rounded-2xl bg-white/10 hover:bg-red-500/20 hover:text-red-400 py-3 text-xs font-bold text-white transition"
+              className="w-full flex items-center justify-center gap-2 rounded-2xl bg-white/5 hover:bg-red-500/20 hover:text-red-400 py-2.5 text-xs font-bold text-neutral-400 transition"
             >
-              <LogOut size={16} />
+              <LogOut size={15} />
               <span>Encerrar Sessão</span>
             </button>
           </div>
@@ -148,8 +264,8 @@ export function AuthModal({ isOpen, onClose, currentUser, onUserChange, onSyncPl
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="seu-login ou email@exemplo.com"
-                    className="h-12 w-full rounded-2xl bg-[#121212] border border-white/10 pl-11 pr-4 text-xs text-white placeholder-neutral-500 outline-none focus:border-[#1DB954] transition"
+                    placeholder="albertosarly@gmail.com"
+                    className="h-11 w-full rounded-2xl bg-[#121212] border border-white/10 pl-11 pr-4 text-xs text-white placeholder-neutral-500 outline-none focus:border-[#1DB954] transition"
                   />
                 </div>
               </div>
@@ -167,7 +283,7 @@ export function AuthModal({ isOpen, onClose, currentUser, onUserChange, onSyncPl
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="h-12 w-full rounded-2xl bg-[#121212] border border-white/10 pl-11 pr-4 text-xs text-white placeholder-neutral-500 outline-none focus:border-[#1DB954] transition"
+                    className="h-11 w-full rounded-2xl bg-[#121212] border border-white/10 pl-11 pr-4 text-xs text-white placeholder-neutral-500 outline-none focus:border-[#1DB954] transition"
                   />
                 </div>
               </div>
@@ -175,14 +291,13 @@ export function AuthModal({ isOpen, onClose, currentUser, onUserChange, onSyncPl
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#1DB954] hover:bg-[#1ed760] active:scale-98 py-3.5 text-xs font-bold text-black shadow-lg transition disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#1DB954] hover:bg-[#1ed760] py-3.5 text-xs font-bold text-black shadow-lg disabled:opacity-40 transition"
               >
-                {loading && <Loader2 size={16} className="animate-spin" />}
-                <span>{isRegister ? 'Criar Conta e Sincronizar' : 'Entrar e Sincronizar'}</span>
+                {loading ? <Loader2 size={16} className="animate-spin" /> : <span>{isRegister ? 'Criar Conta' : 'Entrar'}</span>}
               </button>
             </form>
 
-            <div className="text-center pt-2">
+            <div className="text-center">
               <button
                 onClick={() => {
                   setIsRegister(!isRegister);
@@ -190,9 +305,7 @@ export function AuthModal({ isOpen, onClose, currentUser, onUserChange, onSyncPl
                 }}
                 className="text-xs text-neutral-400 hover:text-white transition"
               >
-                {isRegister
-                  ? 'Já tem uma conta? Clique aqui para entrar'
-                  : 'Não tem conta? Clique aqui para criar'}
+                {isRegister ? 'Já possui conta? Clique para entrar' : 'Não tem conta? Clique para criar uma'}
               </button>
             </div>
           </div>

@@ -32,7 +32,8 @@ import {
   User as UserIcon,
   Cloud,
   CheckCircle2,
-  Smartphone
+  Smartphone,
+  RefreshCw
 } from 'lucide-react';
 
 import { Song, Playlist } from './types';
@@ -178,6 +179,9 @@ export default function App() {
     }
   });
 
+  const isCloudLoadedRef = useRef(false);
+  const [isSyncingCloud, setIsSyncingCloud] = useState(false);
+
   // Modal: Criar Playlist
   const [isCreatePlaylistModalOpen, setIsCreatePlaylistModalOpen] = useState<boolean>(false);
   const [newPlaylistTitle, setNewPlaylistTitle] = useState<string>('');
@@ -231,46 +235,53 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-    // SUCESSO DE LOGIN / CADASTRO: FUSÃO INTELIGENTE DE PLAYLISTS ENTRE APARELHOS
+    // SUCESSO DE LOGIN / CADASTRO: SINCRONIZAÇÃO COMPLETA DA NUVEM
   const handleAuthSuccess = async (user: any) => {
     setCurrentUser(user);
     showToast(`Conectado como ${user.email}!`);
 
     try {
+      const metaPlaylists = user.user_metadata?.able_playlists;
+      if (Array.isArray(metaPlaylists) && metaPlaylists.length > 0) {
+        setPlaylists(metaPlaylists);
+        isCloudLoadedRef.current = true;
+        try { localStorage.setItem('able_playlists_v2', JSON.stringify(metaPlaylists)); } catch {}
+        return;
+      }
+
       const cloudPls = await fetchCloudPlaylists(user.id);
-      setPlaylists((prevLocal) => {
-        const map = new Map<string, Playlist>();
-        
-        // 1. Inclui playlists da nuvem
-        if (cloudPls && Array.isArray(cloudPls)) {
-          cloudPls.forEach((p) => {
-            if (p && p.id) map.set(p.id, p);
-          });
-        }
-
-        // 2. Funde as playlists locais deste aparelho (sem duplicar)
-        prevLocal.forEach((p) => {
-          if (p && p.id) {
-            if (!map.has(p.id)) {
-              map.set(p.id, p);
-            } else {
-              const existing = map.get(p.id)!;
-              if ((p.songs?.length || 0) > (existing.songs?.length || 0)) {
-                map.set(p.id, p);
-              }
-            }
-          }
-        });
-
-        const merged = Array.from(map.values());
-        try {
-          localStorage.setItem('able_playlists_v2', JSON.stringify(merged));
-        } catch {}
-        syncCloudPlaylists(user.id, merged);
-        return merged;
-      });
+      if (cloudPls && Array.isArray(cloudPls) && cloudPls.length > 0) {
+        setPlaylists(cloudPls);
+        isCloudLoadedRef.current = true;
+        try { localStorage.setItem('able_playlists_v2', JSON.stringify(cloudPls)); } catch {}
+      } else {
+        isCloudLoadedRef.current = true;
+        syncCloudPlaylists(user.id, playlists);
+      }
     } catch (err) {
-      console.warn('Erro ao fundir playlists:', err);
+      console.warn('Erro ao carregar playlists da nuvem:', err);
+    }
+  };
+
+  // Forçar atualização manual da nuvem (1-Click Cloud Pull)
+  const handleForceCloudSync = async () => {
+    if (!currentUser?.id) return;
+    setIsSyncingCloud(true);
+    showToast('Buscando playlists mais recentes da nuvem...');
+    try {
+      const cloudPls = await fetchCloudPlaylists(currentUser.id);
+      if (cloudPls && Array.isArray(cloudPls) && cloudPls.length > 0) {
+        setPlaylists(cloudPls);
+        isCloudLoadedRef.current = true;
+        try { localStorage.setItem('able_playlists_v2', JSON.stringify(cloudPls)); } catch {}
+        showToast(`Biblioteca sincronizada! (${cloudPls.length} playlists carregadas)`);
+      } else {
+        showToast('Nenhuma playlist nova encontrada na nuvem.');
+      }
+    } catch {
+      showToast('Erro ao sincronizar da nuvem. Verifique a conexão.');
+    } finally {
+      setIsSyncingCloud(false);
     }
   };
 
@@ -282,17 +293,23 @@ export default function App() {
         if (session.user.user_metadata?.able_play_counts) {
           setPlayCounts((prev) => ({ ...prev, ...session.user.user_metadata.able_play_counts }));
         }
-        // Carrega playlists da nuvem vinculadas a esta conta
-        fetchCloudPlaylists(session.user.id).then((cloudPls) => {
-          if (cloudPls && Array.isArray(cloudPls) && cloudPls.length > 0) {
-            // Garante que playlists tenham faixas válidas e não apague tudo
-            const hasSongs = cloudPls.some(p => p.songs && p.songs.length > 0);
-            if (hasSongs) {
+
+        // Se a sessão já possui playlists salvas no metadata, aplica instantaneamente
+        const metaPlaylists = session.user.user_metadata?.able_playlists;
+        if (Array.isArray(metaPlaylists) && metaPlaylists.length > 0) {
+          setPlaylists(metaPlaylists);
+          isCloudLoadedRef.current = true;
+          try { localStorage.setItem('able_playlists_v2', JSON.stringify(metaPlaylists)); } catch {}
+        } else {
+          // Busca via network
+          fetchCloudPlaylists(session.user.id).then((cloudPls) => {
+            if (cloudPls && Array.isArray(cloudPls) && cloudPls.length > 0) {
               setPlaylists(cloudPls);
+              isCloudLoadedRef.current = true;
               try { localStorage.setItem('able_playlists_v2', JSON.stringify(cloudPls)); } catch {}
             }
-          }
-        });
+          });
+        }
       }
     });
 
@@ -302,16 +319,20 @@ export default function App() {
         if (session.user.user_metadata?.able_play_counts) {
           setPlayCounts((prev) => ({ ...prev, ...session.user.user_metadata.able_play_counts }));
         }
-        fetchCloudPlaylists(session.user.id).then((cloudPls) => {
-          if (cloudPls && Array.isArray(cloudPls) && cloudPls.length > 0) {
-            // Garante que playlists tenham faixas válidas e não apague tudo
-            const hasSongs = cloudPls.some(p => p.songs && p.songs.length > 0);
-            if (hasSongs) {
+        const metaPlaylists = session.user.user_metadata?.able_playlists;
+        if (Array.isArray(metaPlaylists) && metaPlaylists.length > 0) {
+          setPlaylists(metaPlaylists);
+          isCloudLoadedRef.current = true;
+          try { localStorage.setItem('able_playlists_v2', JSON.stringify(metaPlaylists)); } catch {}
+        } else {
+          fetchCloudPlaylists(session.user.id).then((cloudPls) => {
+            if (cloudPls && Array.isArray(cloudPls) && cloudPls.length > 0) {
               setPlaylists(cloudPls);
+              isCloudLoadedRef.current = true;
               try { localStorage.setItem('able_playlists_v2', JSON.stringify(cloudPls)); } catch {}
             }
-          }
-        });
+          });
+        }
       }
     });
 
@@ -333,13 +354,13 @@ export default function App() {
     return all.slice(0, 9);
   }, [playlists, playCounts]);
 
-  // Persistência Imediata de Playlists no LocalStorage e Nuvem
+  // Persistência Imediata de Playlists no LocalStorage e Nuvem (Apenas quando já carregou da nuvem)
   useEffect(() => {
     try {
       localStorage.setItem('able_playlists_v2', JSON.stringify(playlists));
     } catch {}
 
-    if (currentUser?.id) {
+    if (currentUser?.id && isCloudLoadedRef.current) {
       syncCloudPlaylists(currentUser.id, playlists);
     }
   }, [playlists, currentUser]);
@@ -1088,7 +1109,19 @@ export default function App() {
             <span className="hidden sm:inline">Instalar App</span>
           </button>
 
-          {/* Botão de Conta / Sincronização em Nuvem */}
+          {/* Botão de Conta & Sincronização em Nuvem */}
+          {currentUser && (
+            <button
+              onClick={handleForceCloudSync}
+              disabled={isSyncingCloud}
+              className="flex items-center gap-1.5 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 px-3 py-2 text-xs font-bold text-white transition border border-white/10"
+              title="Puxar as playlists mais recentes da nuvem"
+            >
+              <RefreshCw size={13} className={isSyncingCloud ? "animate-spin text-[#1DB954]" : "text-[#1DB954]"} />
+              <span className="hidden sm:inline">Sincronizar</span>
+            </button>
+          )}
+
           <button
             onClick={() => setIsAuthModalOpen(true)}
             className={`flex h-9 w-9 items-center justify-center rounded-full border transition ${
@@ -1976,11 +2009,7 @@ export default function App() {
         onClose={() => setIsAuthModalOpen(false)}
         currentUser={currentUser}
         onUserChange={(user) => setCurrentUser(user)}
-        onSyncPlaylists={() => {
-          if (currentUser?.id) {
-            syncCloudPlaylists(currentUser.id, playlists);
-          }
-        }}
+        onSyncPlaylists={handleForceCloudSync}
       />
 
       {/* MINI-PLAYER INFERIOR */}

@@ -1,5 +1,5 @@
 // Service Worker para Able Music Player PWA - Network First com Cache de Contingência
-const CACHE_NAME = 'able-music-v3';
+const CACHE_NAME = 'able-music-v4';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
