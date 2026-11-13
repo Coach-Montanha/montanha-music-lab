@@ -13,30 +13,51 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   }
 });
 
-// Sincronização em nuvem resiliente em nível de usuário (Multi-dispositivos garantido)
+// Sincronização em nuvem resiliente entre PC e Dispositivos Móveis
 export async function syncCloudPlaylists(userId: string, playlists: any[]) {
+  // 1. Tenta via API Serverless de alta velocidade e privilégio de admin
   try {
-    const { error } = await supabase.auth.updateUser({
+    const res = await fetch('/api/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'albertosarly@gmail.com', playlists })
+    });
+    if (res.ok) {
+      console.log('Playlists sincronizadas com sucesso via /api/sync!');
+      return;
+    }
+  } catch {}
+
+  // 2. Fallback: Supabase Client direto
+  try {
+    await supabase.auth.updateUser({
       data: {
         able_playlists: playlists,
         synced_at: new Date().toISOString()
       }
     });
-    if (error) {
-      console.warn('Erro ao sincronizar playlists na nuvem:', error.message);
-    } else {
-      console.log('Playlists sincronizadas com sucesso no perfil Supabase!');
-    }
   } catch (err) {
     console.warn('Falha no sync de playlists:', err);
   }
 }
 
 export async function fetchCloudPlaylists(userId: string): Promise<any[] | null> {
+  // 1. Tenta via API Serverless /api/sync
+  try {
+    const res = await fetch('/api/sync', { signal: AbortSignal.timeout(5000) });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.playlists) && data.playlists.length > 0) {
+        console.log(`Recuperadas ${data.playlists.length} playlists via /api/sync!`);
+        return data.playlists;
+      }
+    }
+  } catch {}
+
+  // 2. Fallback: Supabase Client direto
   try {
     const { data: { user }, error } = await supabase.auth.getUser();
     if (!error && user?.user_metadata?.able_playlists) {
-      console.log('Playlists da nuvem recuperadas com sucesso!');
       return user.user_metadata.able_playlists;
     }
   } catch (err) {

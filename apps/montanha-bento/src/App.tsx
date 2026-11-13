@@ -165,6 +165,8 @@ export default function App() {
   const [queue, setQueue] = useState<Song[]>(() => playlists[0]?.songs || INITIAL_PLAYLISTS[0].songs);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const handleNextSongRef = useRef<() => void>(() => {});
+  const originalQueueRef = useRef<Song[]>([]);
 
   // Full Screen Player Sheet
   const [isFullScreenPlayer, setIsFullScreenPlayer] = useState<boolean>(false);
@@ -369,7 +371,7 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Músicas em Destaque (Mais Tocadas da Conta do Usuário)
+  // Músicas em Destaque (Lista de Referência Estável do Acervo Montanha)
   const featuredSongs = useMemo(() => {
     const allSongsMap = new Map<string, Song>();
     playlists.forEach((p) => {
@@ -379,10 +381,8 @@ export default function App() {
         }
       });
     });
-    const all = Array.from(allSongsMap.values());
-    all.sort((a, b) => (playCounts[b.id] || 0) - (playCounts[a.id] || 0));
-    return all.slice(0, 9);
-  }, [playlists, playCounts]);
+    return Array.from(allSongsMap.values()).slice(0, 9);
+  }, [playlists]);
 
   // Persistência Imediata de Playlists no LocalStorage e Nuvem (Apenas quando já carregou da nuvem)
   useEffect(() => {
@@ -450,7 +450,8 @@ export default function App() {
                 } else if (event.data === 2) {
                   setIsPlaying(false);
                 } else if (event.data === 0) {
-                  handleNextSong();
+                  // Fim da música no YouTube: aciona o handler mais recente
+                  handleNextSongRef.current();
                 }
               }
             }
@@ -468,7 +469,7 @@ export default function App() {
     }
   }, []);
 
-  // Sincronização em Tempo Real do Progresso de Áudio
+  // Sincronização em Tempo Real do Progresso de Áudio & Auto-Avanço Contínuo
   useEffect(() => {
     let interval: any = null;
     if (isPlaying) {
@@ -487,6 +488,11 @@ export default function App() {
               setCurrentTime(Math.floor(cur));
               if (dur > 0 && Math.floor(dur) !== duration) {
                 setDuration(Math.floor(dur));
+              }
+
+              // Auto-avanço determinístico: se o vídeo chegou ao fim no mobile
+              if (dur > 10 && cur >= dur - 1) {
+                handleNextSongRef.current();
               }
             }
           } catch {}
@@ -656,18 +662,32 @@ export default function App() {
       }
     }
 
-    // 2. MOTOR YOUTUBE MUSIC (ÁUDIO INTEGRAL COMPLETO DE 3 A 6+ MINUTOS)
+    // 2. MOTOR YOUTUBE MUSIC (ÁUDIO INTEGRAL VIA BACKEND SERVERLESS SEM ERROS DE CORS)
     let ytId = song.youtubeId;
     if (!ytId) {
       try {
         const query = `${song.name} ${song.artist}`;
-        const piped = await fetch(`https://api.piped.private.coffee/search?q=${encodeURIComponent(query)}&filter=music_songs`, { signal: AbortSignal.timeout(3000) });
-        if (piped.ok) {
-          const pData = await piped.json();
-          const first = pData.items?.find((i: any) => i.type === 'stream');
-          if (first?.url) ytId = first.url.replace('/watch?v=', '').split('&')[0];
+        // 1ª Tentativa: nossa API Serverless interna (Zero CORS, 100% estável)
+        const apiRes = await fetch(`/api/youtube-search?q=${encodeURIComponent(query)}`, {
+          signal: AbortSignal.timeout(4000)
+        });
+        if (apiRes.ok) {
+          const apiData = await apiRes.json();
+          if (apiData?.videoId) ytId = apiData.videoId;
         }
       } catch {}
+
+      // 2ª Tentativa: Instâncias Piped / Invidious públicas como contingência
+      if (!ytId) {
+        try {
+          const piped = await fetch(`https://api.piped.private.coffee/search?q=${encodeURIComponent(`${song.name} ${song.artist}`)}&filter=music_songs`, { signal: AbortSignal.timeout(3000) });
+          if (piped.ok) {
+            const pData = await piped.json();
+            const first = pData.items?.find((i: any) => i.type === 'stream');
+            if (first?.url) ytId = first.url.replace('/watch?v=', '').split('&')[0];
+          }
+        } catch {}
+      }
 
       if (!ytId) {
         try {
@@ -680,12 +700,10 @@ export default function App() {
       }
     }
 
-    if (ytId && ytId !== 'ytQ5CYE1VZw') {
+    if (ytId) {
       song.youtubeId = ytId;
-    } else if (song.youtubeId) {
-      ytId = song.youtubeId;
     } else {
-      ytId = 'ytQ5CYE1VZw';
+      ytId = song.youtubeId || 'ytQ5CYE1VZw';
     }
 
     // Pausa qualquer áudio HTML5 para não sobrepor
@@ -726,7 +744,7 @@ export default function App() {
             onStateChange: (e: any) => {
               if (e.data === 1) setIsPlaying(true);
               else if (e.data === 2) setIsPlaying(false);
-              else if (e.data === 0) handleNextSong();
+              else if (e.data === 0) handleNextSongRef.current();
             }
           }
         });
@@ -751,10 +769,12 @@ export default function App() {
     if (queue.length === 0) return;
     const currentIdx = queue.findIndex((s) => s.id === currentSong.id);
     let nextIdx = currentIdx + 1;
-    if (nextIdx >= queue.length) nextIdx = 0;
-    if (isShuffle) nextIdx = Math.floor(Math.random() * queue.length);
+    if (nextIdx >= queue.length || nextIdx < 0) nextIdx = 0;
     playSong(queue[nextIdx]);
   };
+
+  // Mantém a referência de handleNextSong sempre atualizada para YouTube Player e timers
+  handleNextSongRef.current = handleNextSong;
 
   const handlePrevSong = () => {
     if (queue.length === 0) return;
@@ -762,6 +782,30 @@ export default function App() {
     let prevIdx = currentIdx - 1;
     if (prevIdx < 0) prevIdx = queue.length - 1;
     playSong(queue[prevIdx]);
+  };
+
+  // BOTÃO SHUFFLE REAL: Embaralha imediatamente a fila de execução visível
+  const toggleShuffle = () => {
+    const nextShuffle = !isShuffle;
+    setIsShuffle(nextShuffle);
+
+    if (nextShuffle) {
+      originalQueueRef.current = [...queue];
+      const current = currentSong;
+      const rest = queue.filter((s) => s.id !== current.id);
+      for (let i = rest.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [rest[i], rest[j]] = [rest[j], rest[i]];
+      }
+      const shuffledQueue = [current, ...rest];
+      setQueue(shuffledQueue);
+      showToast('Modo aleatório ativado: fila embaralhada!');
+    } else {
+      if (originalQueueRef.current.length > 0) {
+        setQueue(originalQueueRef.current);
+      }
+      showToast('Ordem sequencial restaurada.');
+    }
   };
 
   // Gerenciamento da Fila de Reprodução (Queue)
@@ -1285,20 +1329,15 @@ export default function App() {
               ))}
             </div>
 
-            {/* Seção Mais Tocadas (Calculada pela Conta Logada) */}
+            {/* Seção Músicas em Destaque (Referência Rápida) */}
             <div className="space-y-4 pt-4">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-lg font-bold text-white flex items-center gap-2">
                     Músicas em Destaque
-                    <span className="text-xs font-normal text-white/50">(Mais tocadas no app)</span>
+                    <span className="text-xs font-normal text-neutral-400">(Referência)</span>
                   </h3>
                 </div>
-                {currentUser && (
-                  <span className="text-xs text-[#1DB954] font-medium flex items-center gap-1">
-                    <UserIcon size={12} /> {currentUser.email?.split('@')[0]}
-                  </span>
-                )}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                 {featuredSongs.map((song, idx) => {
@@ -1686,12 +1725,13 @@ export default function App() {
                   {/* BOTÃO SHUFFLE NA PLAYLIST */}
                   <button
                     onClick={() => {
-                      const nextShuffle = !isShuffle;
-                      setIsShuffle(nextShuffle);
-                      showToast(nextShuffle ? 'Modo aleatório ativado na playlist' : 'Modo sequencial ativado');
-                      if (nextShuffle && selectedPlaylist.songs.length > 0) {
+                      if (selectedPlaylist.songs.length === 0) return;
+                      if (!selectedPlaylist.songs.some(s => s.id === currentSong.id)) {
                         const randomIdx = Math.floor(Math.random() * selectedPlaylist.songs.length);
                         playSong(selectedPlaylist.songs[randomIdx], selectedPlaylist.songs);
+                        if (!isShuffle) toggleShuffle();
+                      } else {
+                        toggleShuffle();
                       }
                     }}
                     className={`flex h-10 w-10 items-center justify-center rounded-full border transition active:scale-95 ${
@@ -2285,10 +2325,9 @@ export default function App() {
           <div className="flex items-center gap-3 sm:gap-4">
             {/* BOTÃO SHUFFLE NO MINI PLAYER */}
             <button
-              onClick={() => {
-                const nextShuf = !isShuffle;
-                setIsShuffle(nextShuf);
-                showToast(nextShuf ? 'Ordem aleatória ativada' : 'Ordem sequencial');
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleShuffle();
               }}
               className={`p-1.5 rounded-full transition ${
                 isShuffle ? 'text-[#1DB954] bg-[#1DB954]/15' : 'text-neutral-400 hover:text-white'
@@ -2466,8 +2505,9 @@ export default function App() {
 
             <div className="flex items-center justify-between pt-2">
               <button
-                onClick={() => setIsShuffle(!isShuffle)}
+                onClick={toggleShuffle}
                 className={`p-2 transition ${isShuffle ? 'text-[#1DB954]' : 'text-neutral-400 hover:text-white'}`}
+                title={isShuffle ? 'Modo Aleatório Ativado' : 'Ativar Modo Aleatório'}
               >
                 <Shuffle size={20} />
               </button>

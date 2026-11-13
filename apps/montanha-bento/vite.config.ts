@@ -1,13 +1,134 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
+const SUPABASE_URL = 'https://muryznvaxzszcffrbxpv.supabase.co';
+const SUPABASE_SERVICE_ROLE_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11cnl6bnZheHpzemNmZnJieHB2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NDQ0MTE2OSwiZXhwIjoyMTAwMDE3MTY5fQ.SpYzAP5ej1jUKyIPGSowyZrG_eeox50HmKnP1r81a24';
+const USER_ID = '3f954063-c246-4989-8f48-dc84a12f5be3';
+
 export default defineConfig({
   plugins: [
     react(),
     {
-      name: 'spotify-api-middleware',
+      name: 'api-serverless-dev-middleware',
       configureServer(server) {
-        server.middlewares.use('/api/spotify', async (req, res) => {
+        // 1. /api/sync middleware
+        server.middlewares.use(async (req, res, next) => {
+          if (!req.url?.startsWith('/api/sync')) return next();
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+
+          if (req.method === 'GET') {
+            try {
+              const resp = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${USER_ID}`, {
+                headers: {
+                  apikey: SUPABASE_SERVICE_ROLE_KEY,
+                  Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
+                }
+              });
+              if (resp.ok) {
+                const data = await resp.json();
+                const playlists = data.user_metadata?.able_playlists || [];
+                res.statusCode = 200;
+                res.end(JSON.stringify({ playlists, synced_at: data.user_metadata?.synced_at }));
+                return;
+              }
+            } catch (e: any) {
+              res.statusCode = 500;
+              res.end(JSON.stringify({ error: e.message }));
+              return;
+            }
+          }
+
+          if (req.method === 'POST') {
+            let body = '';
+            req.on('data', chunk => { body += chunk; });
+            req.on('end', async () => {
+              try {
+                const parsed = JSON.parse(body || '{}');
+                const playlists = parsed.playlists || [];
+                const updateResp = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${USER_ID}`, {
+                  method: 'PUT',
+                  headers: {
+                    apikey: SUPABASE_SERVICE_ROLE_KEY,
+                    Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({
+                    user_metadata: { able_playlists: playlists, synced_at: new Date().toISOString() }
+                  })
+                });
+                if (updateResp.ok) {
+                  res.statusCode = 200;
+                  res.end(JSON.stringify({ success: true, count: playlists.length }));
+                  return;
+                }
+              } catch (e: any) {
+                res.statusCode = 500;
+                res.end(JSON.stringify({ error: e.message }));
+                return;
+              }
+            });
+            return;
+          }
+
+          next();
+        });
+
+        // 2. /api/youtube-search middleware
+        server.middlewares.use(async (req, res, next) => {
+          if (!req.url?.startsWith('/api/youtube-search')) return next();
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+
+          const urlObj = new URL(req.url, 'http://localhost');
+          const query = (urlObj.searchParams.get('q') || '').trim();
+
+          if (!query) {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ error: 'Parâmetro q obrigatório' }));
+            return;
+          }
+
+          // Busca no YouTube / Piped
+          try {
+            const ytResp = await fetch(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`, {
+              headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+            });
+            if (ytResp.ok) {
+              const html = await ytResp.text();
+              const match = html.match(/"videoId":"([a-zA-Z0-9_-]{11})"/);
+              if (match && match[1]) {
+                res.statusCode = 200;
+                res.end(JSON.stringify({ videoId: match[1], source: 'youtube' }));
+                return;
+              }
+            }
+          } catch {}
+
+          try {
+            const pipedResp = await fetch(`https://api.piped.private.coffee/search?q=${encodeURIComponent(query)}&filter=music_songs`);
+            if (pipedResp.ok) {
+              const data = await pipedResp.json();
+              const item = data.items?.find((i: any) => i.type === 'stream');
+              if (item?.url) {
+                const vid = item.url.replace('/watch?v=', '').split('&')[0];
+                if (vid) {
+                  res.statusCode = 200;
+                  res.end(JSON.stringify({ videoId: vid, source: 'piped' }));
+                  return;
+                }
+              }
+            }
+          } catch {}
+
+          res.statusCode = 404;
+          res.end(JSON.stringify({ error: 'Vídeo não encontrado' }));
+        });
+
+        // 3. /api/spotify middleware
+        server.middlewares.use(async (req, res, next) => {
+          if (!req.url?.startsWith('/api/spotify')) return next();
           res.setHeader('Content-Type', 'application/json');
           res.setHeader('Access-Control-Allow-Origin', '*');
 
