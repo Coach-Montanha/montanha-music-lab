@@ -63,7 +63,22 @@ export async function fetchCloudPlaylists(userId?: string): Promise<any[] | null
     }
   } catch {}
 
-  // 2. Fallback: Supabase Client direto
+  // 2. Tenta diretamente do Supabase Storage Público (Sem limites e super rápido)
+  try {
+    const targetUid = userId || '3f954063-c246-4989-8f48-dc84a12f5be3';
+    const storageRes = await fetch(`${SUPABASE_URL}/storage/v1/object/public/music-playlists/${targetUid}.json?t=${Date.now()}`, {
+      signal: AbortSignal.timeout(5000)
+    });
+    if (storageRes.ok) {
+      const sData = await storageRes.json();
+      if (Array.isArray(sData.playlists) && sData.playlists.length > 0) {
+        console.log(`[Cloud Pull] ${sData.playlists.length} playlists recuperadas do Supabase Storage!`);
+        return sData.playlists;
+      }
+    }
+  } catch {}
+
+  // 3. Fallback: Supabase Client direto
   try {
     const { data: { user }, error } = await supabase.auth.getUser();
     if (!error && user?.user_metadata?.able_playlists && Array.isArray(user.user_metadata.able_playlists) && user.user_metadata.able_playlists.length > 0) {

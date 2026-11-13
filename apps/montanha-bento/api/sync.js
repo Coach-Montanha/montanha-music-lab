@@ -16,6 +16,21 @@ export default async function handler(req, res) {
   // GET: Recupera playlists atualizadas da nuvem
   if (req.method === 'GET') {
     try {
+      // 1. Tenta buscar do Storage (sem limite de tamanho 64KB)
+      const storageResp = await fetch(
+        `${SUPABASE_URL}/storage/v1/object/public/music-playlists/${USER_ID}.json?t=${Date.now()}`,
+        {
+          headers: { apikey: SUPABASE_SERVICE_ROLE_KEY }
+        }
+      );
+      if (storageResp.ok) {
+        const sData = await storageResp.json();
+        if (sData?.playlists && sData.playlists.length > 0) {
+          return res.status(200).json({ playlists: sData.playlists, synced_at: sData.synced_at });
+        }
+      }
+
+      // 2. Fallback para user_metadata
       const resp = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${USER_ID}`, {
         headers: {
           apikey: SUPABASE_SERVICE_ROLE_KEY,
@@ -44,26 +59,43 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Playlists deve ser um array' });
       }
 
-      const updateResp = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${USER_ID}`, {
-        method: 'PUT',
+      const syncedAt = new Date().toISOString();
+
+      // Salva no Supabase Storage (sem limite de 64KB)
+      const storageUpload = await fetch(`${SUPABASE_URL}/storage/v1/object/music-playlists/${USER_ID}.json`, {
+        method: 'POST',
         headers: {
           apikey: SUPABASE_SERVICE_ROLE_KEY,
           Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'x-upsert': 'true'
         },
-        body: JSON.stringify({
-          user_metadata: {
-            able_playlists: playlists,
-            synced_at: new Date().toISOString()
-          }
-        })
+        body: JSON.stringify({ playlists, synced_at: syncedAt })
       });
 
-      if (updateResp.ok) {
-        return res.status(200).json({ success: true, count: playlists.length });
+      // Tenta atualizar user_metadata secundariamente
+      try {
+        await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${USER_ID}`, {
+          method: 'PUT',
+          headers: {
+            apikey: SUPABASE_SERVICE_ROLE_KEY,
+            Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            user_metadata: {
+              able_playlists: playlists.slice(0, 5),
+              synced_at: syncedAt
+            }
+          })
+        });
+      } catch {}
+
+      if (storageUpload.ok) {
+        return res.status(200).json({ success: true, count: playlists.length, synced_at: syncedAt });
       } else {
-        const errText = await updateResp.text();
-        return res.status(updateResp.status).json({ error: errText });
+        const errText = await storageUpload.text();
+        return res.status(storageUpload.status).json({ error: errText });
       }
     } catch (e) {
       return res.status(500).json({ error: e.message });

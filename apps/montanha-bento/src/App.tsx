@@ -45,6 +45,7 @@ import { universalSearch } from './lib/searchEngine';
 import { AuthModal } from './components/AuthModal';
 import { AuthGateway } from './components/AuthGateway';
 import { mediaSessionController } from './lib/mediaSession';
+import { fetchRealTrackCover, cacheImageLocally, downloadImageFile, enrichPlaylistTracks } from './lib/coverEngine';
 
 declare global {
   interface Window {
@@ -1004,6 +1005,35 @@ export default function App() {
     showToast('Playlist excluída com sucesso.');
   };
 
+  // ENRIQUECER E ATUALIZAR CAPAS DAS MÚSICAS DA PLAYLIST COM CAPAS REAIS DE SINGLE/ÁLBUM EM HD
+  const [isEnrichingCovers, setIsEnrichingCovers] = useState(false);
+  const handleEnrichCurrentPlaylistCovers = async () => {
+    if (!selectedPlaylist || selectedPlaylist.songs.length === 0) return;
+    setIsEnrichingCovers(true);
+    showToast('Buscando capas oficiais em HD para cada música...');
+
+    try {
+      const enriched = await enrichPlaylistTracks(selectedPlaylist, (done, total) => {
+        if (done % 5 === 0 || done === total) {
+          showToast(`Atualizando capas: ${done}/${total}...`);
+        }
+      });
+
+      setSelectedPlaylist(enriched);
+      const nextPlaylists = playlists.map((p) => (p.id === enriched.id ? enriched : p));
+      setPlaylists(nextPlaylists);
+      try {
+        localStorage.setItem('able_playlists_v2', JSON.stringify(nextPlaylists));
+      } catch {}
+      await syncCloudPlaylists(currentUser?.id || 'master', nextPlaylists);
+      showToast(`🎉 Capas oficiais atualizadas para ${enriched.songs.length} faixas!`);
+    } catch {
+      showToast('Erro ao atualizar capas. Tente novamente.');
+    } finally {
+      setIsEnrichingCovers(false);
+    }
+  };
+
   // ADICIONAR MÚSICA A UMA PLAYLIST
   const handleAddSongToTargetPlaylist = (targetPlaylistId: string) => {
     if (!songToAddToPlaylist) return;
@@ -1702,7 +1732,28 @@ export default function App() {
                 <span>Voltar</span>
               </button>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                {/* Botão Baixar Capa da Playlist */}
+                <button
+                  onClick={() => downloadImageFile(selectedPlaylist.cover, selectedPlaylist.name)}
+                  className="flex items-center gap-1.5 text-xs text-neutral-300 hover:text-white transition px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10"
+                  title="Baixar Capa da Playlist em Alta Resolução"
+                >
+                  <Download size={14} className="text-[#1DB954]" />
+                  <span className="hidden sm:inline">Baixar Capa</span>
+                </button>
+
+                {/* Botão Atualizar Capas das Músicas com Capas Oficiais */}
+                <button
+                  onClick={handleEnrichCurrentPlaylistCovers}
+                  disabled={isEnrichingCovers}
+                  className="flex items-center gap-1.5 text-xs text-neutral-300 hover:text-white transition px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10"
+                  title="Buscar capas oficiais individuais para cada música da playlist"
+                >
+                  <Sparkles size={14} className={isEnrichingCovers ? "animate-spin text-[#1DB954]" : "text-[#1DB954]"} />
+                  <span>{isEnrichingCovers ? "Buscando..." : "Atualizar Capas"}</span>
+                </button>
+
                 <button
                   onClick={() => handleOpenEditPlaylist(selectedPlaylist)}
                   className="flex items-center gap-1.5 text-xs text-neutral-400 hover:text-white transition p-2 rounded-lg hover:bg-white/10"
@@ -1827,7 +1878,20 @@ export default function App() {
                         <p className="text-xs text-neutral-400 truncate">{song.artist}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                      {/* BAIXAR CAPA DA MÚSICA */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          downloadImageFile(song.thumbnail, song.name);
+                          showToast(`Capa de "${song.name}" baixada!`);
+                        }}
+                        className="p-1.5 sm:p-2 text-neutral-400 hover:text-white hover:bg-white/10 rounded-lg transition"
+                        title="Baixar capa desta faixa"
+                      >
+                        <ImageIcon size={15} />
+                      </button>
+
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
