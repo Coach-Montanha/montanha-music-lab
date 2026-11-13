@@ -33,7 +33,8 @@ import {
   Cloud,
   CheckCircle2,
   Smartphone,
-  RefreshCw
+  RefreshCw,
+  ListMusic
 } from 'lucide-react';
 
 import { Song, Playlist } from './types';
@@ -131,9 +132,19 @@ export default function App() {
 
   const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
 
-  // Usuário Conectado via Supabase
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  // Usuário Conectado via Supabase (Persistência Imediata no Dispositivo para Zero Deslogamentos)
+  const [currentUser, setCurrentUser] = useState<any>(() => {
+    try {
+      const stored = localStorage.getItem('montanha_music_user');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed?.id) return parsed;
+      }
+    } catch {}
+    return null;
+  });
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isQueueOpen, setIsQueueOpen] = useState(false);
 
   // Audio State
   const [currentSong, setCurrentSong] = useState<Song>(() => playlists[0]?.songs[0] || INITIAL_PLAYLISTS[0].songs[0]);
@@ -238,6 +249,9 @@ export default function App() {
     // SUCESSO DE LOGIN / CADASTRO: SINCRONIZAÇÃO COMPLETA DA NUVEM
   const handleAuthSuccess = async (user: any) => {
     setCurrentUser(user);
+    try {
+      localStorage.setItem('montanha_music_user', JSON.stringify(user));
+    } catch {}
     showToast(`Conectado como ${user.email}!`);
 
     try {
@@ -263,20 +277,31 @@ export default function App() {
     }
   };
 
-  // Forçar atualização manual da nuvem (1-Click Cloud Pull)
+  // Forçar atualização manual da nuvem (1-Click Cloud Pull com Merge Inteligente Anti-Perda)
   const handleForceCloudSync = async () => {
     if (!currentUser?.id) return;
     setIsSyncingCloud(true);
-    showToast('Buscando playlists mais recentes da nuvem...');
+    showToast('Sincronizando playlists com a nuvem...');
     try {
       const cloudPls = await fetchCloudPlaylists(currentUser.id);
-      if (cloudPls && Array.isArray(cloudPls) && cloudPls.length > 0) {
-        setPlaylists(cloudPls);
+      if (cloudPls && Array.isArray(cloudPls)) {
+        // Merge inteligente: junta as da nuvem com as locais sem apagar as novas
+        const cloudMap = new Map<string, Playlist>(cloudPls.map(p => [p.id, p]));
+        playlists.forEach((localPl) => {
+          if (!cloudMap.has(localPl.id)) {
+            cloudMap.set(localPl.id, localPl);
+          }
+        });
+        const merged = Array.from(cloudMap.values());
+        setPlaylists(merged);
         isCloudLoadedRef.current = true;
-        try { localStorage.setItem('able_playlists_v2', JSON.stringify(cloudPls)); } catch {}
-        showToast(`Biblioteca sincronizada! (${cloudPls.length} playlists carregadas)`);
+        try { localStorage.setItem('able_playlists_v2', JSON.stringify(merged)); } catch {}
+        await syncCloudPlaylists(currentUser.id, merged);
+        showToast(`Biblioteca sincronizada! (${merged.length} playlists salvas)`);
       } else {
-        showToast('Nenhuma playlist nova encontrada na nuvem.');
+        // Se a nuvem estiver vazia, sobe as playlists locais
+        await syncCloudPlaylists(currentUser.id, playlists);
+        showToast(`Playlists locais enviadas para a nuvem! (${playlists.length} playlists)`);
       }
     } catch {
       showToast('Erro ao sincronizar da nuvem. Verifique a conexão.');
@@ -285,11 +310,12 @@ export default function App() {
     }
   };
 
-  // Inicialização de Sessão Supabase
+  // Inicialização de Sessão Supabase com Persistência Robusta
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setCurrentUser(session.user);
+        try { localStorage.setItem('montanha_music_user', JSON.stringify(session.user)); } catch {}
         if (session.user.user_metadata?.able_play_counts) {
           setPlayCounts((prev) => ({ ...prev, ...session.user.user_metadata.able_play_counts }));
         }
@@ -311,11 +337,15 @@ export default function App() {
           });
         }
       }
-    });
+    }).catch(console.warn);
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setCurrentUser(session?.user || null);
-      if (session?.user) {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        setCurrentUser(null);
+        try { localStorage.removeItem('montanha_music_user'); } catch {}
+      } else if (session?.user) {
+        setCurrentUser(session.user);
+        try { localStorage.setItem('montanha_music_user', JSON.stringify(session.user)); } catch {}
         if (session.user.user_metadata?.able_play_counts) {
           setPlayCounts((prev) => ({ ...prev, ...session.user.user_metadata.able_play_counts }));
         }
@@ -714,6 +744,10 @@ export default function App() {
   };
 
   const handleNextSong = () => {
+    if (isRepeat && currentSong) {
+      playSong(currentSong);
+      return;
+    }
     if (queue.length === 0) return;
     const currentIdx = queue.findIndex((s) => s.id === currentSong.id);
     let nextIdx = currentIdx + 1;
@@ -728,6 +762,23 @@ export default function App() {
     let prevIdx = currentIdx - 1;
     if (prevIdx < 0) prevIdx = queue.length - 1;
     playSong(queue[prevIdx]);
+  };
+
+  // Gerenciamento da Fila de Reprodução (Queue)
+  const handleAddToQueue = (song: Song) => {
+    setQueue((prev) => [...prev, song]);
+    showToast(`"${song.name}" adicionada à fila!`);
+  };
+
+  const handleRemoveFromQueue = (indexToRemove: number) => {
+    setQueue((prev) => prev.filter((_, idx) => idx !== indexToRemove));
+  };
+
+  const handleClearQueue = () => {
+    if (currentSong) {
+      setQueue([currentSong]);
+      showToast('Fila limpa.');
+    }
   };
 
   const toggleFavorite = (songId: string) => {
@@ -939,7 +990,15 @@ export default function App() {
       setImportProgressText('Lendo metadados e faixas da playlist...');
       const extracted = await extractPlaylistFromUrl(importLinkInput.trim());
       if (extracted && extracted.songs && extracted.songs.length > 0) {
-        setPlaylists((prev) => [extracted, ...prev]);
+        const nextPlaylists = [extracted, ...playlists];
+        setPlaylists(nextPlaylists);
+        try {
+          localStorage.setItem('able_playlists_v2', JSON.stringify(nextPlaylists));
+        } catch {}
+        if (currentUser?.id) {
+          isCloudLoadedRef.current = true;
+          syncCloudPlaylists(currentUser.id, nextPlaylists);
+        }
         setIsImportModalOpen(false);
         setImportLinkInput('');
         setSelectedPlaylist(extracted);
@@ -1040,11 +1099,14 @@ export default function App() {
             </button>
           )}
 
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#1DB954] text-black shadow-lg">
-            <Music size={20} strokeWidth={2.5} />
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#1DB954] text-black shadow-lg p-1.5 flex-shrink-0">
+            <img src="/music.svg" alt="Montanha Music Lab" className="w-full h-full object-contain" />
           </div>
-          <div>
-            <h1 className="text-xl font-black tracking-tight text-[#fbfbfb]">Able</h1>
+          <div className="flex items-center gap-1.5">
+            <h1 className="text-base sm:text-lg font-black tracking-tight text-white flex items-center gap-1.5">
+              <span>Montanha</span>
+              <span className="text-[#1DB954] text-[11px] sm:text-xs font-black uppercase px-2 py-0.5 rounded-md bg-[#1DB954]/10 border border-[#1DB954]/30">Music Lab</span>
+            </h1>
           </div>
         </div>
 
@@ -1599,7 +1661,7 @@ export default function App() {
                   Criada por <span className="text-white font-semibold">{selectedPlaylist.creator}</span> • {selectedPlaylist.songs.length} faixas
                 </p>
                 
-                {/* BOTÕES: TOCAR E BAIXAR PLAYLIST COMPLETA */}
+                {/* BOTÕES: TOCAR, SHUFFLE, REPEAT E BAIXAR PLAYLIST COMPLETA */}
                 <div className="pt-3 flex items-center justify-center sm:justify-start gap-3">
                   <button
                     onClick={() => {
@@ -1612,6 +1674,7 @@ export default function App() {
                       }
                     }}
                     className="flex h-12 w-12 items-center justify-center rounded-full bg-[#1DB954] text-black shadow-lg hover:scale-105 active:scale-95 transition"
+                    title="Tocar Playlist"
                   >
                     {isPlaying && selectedPlaylist.songs.some(s => s.id === currentSong.id) ? (
                       <Pause size={20} fill="currentColor" />
@@ -1620,13 +1683,51 @@ export default function App() {
                     )}
                   </button>
 
+                  {/* BOTÃO SHUFFLE NA PLAYLIST */}
+                  <button
+                    onClick={() => {
+                      const nextShuffle = !isShuffle;
+                      setIsShuffle(nextShuffle);
+                      showToast(nextShuffle ? 'Modo aleatório ativado na playlist' : 'Modo sequencial ativado');
+                      if (nextShuffle && selectedPlaylist.songs.length > 0) {
+                        const randomIdx = Math.floor(Math.random() * selectedPlaylist.songs.length);
+                        playSong(selectedPlaylist.songs[randomIdx], selectedPlaylist.songs);
+                      }
+                    }}
+                    className={`flex h-10 w-10 items-center justify-center rounded-full border transition active:scale-95 ${
+                      isShuffle
+                        ? 'bg-[#1DB954]/20 border-[#1DB954] text-[#1DB954]'
+                        : 'bg-white/5 border-white/10 text-neutral-300 hover:text-white hover:bg-white/10'
+                    }`}
+                    title={isShuffle ? 'Modo Aleatório Ativado' : 'Tocar em Ordem Aleatória'}
+                  >
+                    <Shuffle size={18} />
+                  </button>
+
+                  {/* BOTÃO REPEAT NA PLAYLIST */}
+                  <button
+                    onClick={() => {
+                      const nextRepeat = !isRepeat;
+                      setIsRepeat(nextRepeat);
+                      showToast(nextRepeat ? 'Repetir música ativado' : 'Repetição desativada');
+                    }}
+                    className={`flex h-10 w-10 items-center justify-center rounded-full border transition active:scale-95 ${
+                      isRepeat
+                        ? 'bg-[#1DB954]/20 border-[#1DB954] text-[#1DB954]'
+                        : 'bg-white/5 border-white/10 text-neutral-300 hover:text-white hover:bg-white/10'
+                    }`}
+                    title={isRepeat ? 'Repetição Ativada' : 'Ativar Repetição'}
+                  >
+                    <Repeat size={18} />
+                  </button>
+
                   <button
                     onClick={() => handleDownloadPlaylist(selectedPlaylist)}
-                    className="flex h-12 items-center gap-2 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 px-5 text-xs font-bold text-white border border-white/10 transition shadow-lg"
+                    className="flex h-10 items-center gap-2 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 px-4 text-xs font-bold text-white border border-white/10 transition shadow-lg"
                     title="Baixar todas as faixas desta playlist para offline"
                   >
-                    <Download size={18} />
-                    <span>Baixar Playlist</span>
+                    <Download size={16} />
+                    <span>Baixar</span>
                   </button>
                 </div>
               </div>
@@ -2012,6 +2113,152 @@ export default function App() {
         onSyncPlaylists={handleForceCloudSync}
       />
 
+      {/* PAINEL LATERAL: FILA DE REPRODUÇÃO (QUEUE DRAWER) */}
+      {isQueueOpen && (
+        <aside className="fixed top-16 bottom-20 sm:bottom-20 right-0 w-full sm:w-96 bg-[#181818]/95 backdrop-blur-2xl border-l border-white/10 z-40 p-5 flex flex-col shadow-[-20px_0_50px_rgba(0,0,0,0.85)] animate-fade-in select-none">
+          {/* CABEÇALHO DA FILA */}
+          <div className="flex items-center justify-between pb-4 border-b border-white/10">
+            <div className="flex items-center gap-2">
+              <ListMusic size={20} className="text-[#1DB954]" />
+              <h3 className="text-base font-black text-white tracking-tight">Fila de Reprodução</h3>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/10 text-neutral-300">
+                {queue.length}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              {queue.length > 1 && (
+                <button
+                  onClick={handleClearQueue}
+                  className="text-[11px] font-semibold text-neutral-400 hover:text-white px-2 py-1 rounded-lg hover:bg-white/5 transition"
+                >
+                  Limpar
+                </button>
+              )}
+              <button
+                onClick={() => setIsQueueOpen(false)}
+                className="rounded-full p-1.5 text-neutral-400 hover:text-white hover:bg-white/10 transition"
+                title="Fechar Fila"
+              >
+                <X size={18} />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto space-y-6 pt-4 pr-1">
+            {/* SEÇÃO: TOCANDO AGORA */}
+            <div className="space-y-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">
+                Tocando Agora
+              </span>
+              <div className="flex items-center gap-3 p-3 rounded-2xl bg-white/5 border border-[#1DB954]/20 shadow-md">
+                <img
+                  src={activeSong.thumbnail}
+                  alt={activeSong.name}
+                  className="h-12 w-12 rounded-xl object-cover shadow flex-shrink-0"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-bold text-[#1DB954] truncate flex items-center gap-1.5">
+                    <span>{activeSong.name}</span>
+                    <span className="inline-block h-2 w-2 rounded-full bg-[#1DB954] animate-pulse" />
+                  </p>
+                  <p className="text-xs text-neutral-400 truncate">{activeSong.artist}</p>
+                </div>
+                <span className="text-xs font-mono text-neutral-400 tabular-nums">
+                  {formatTime(activeSong.duration || duration)}
+                </span>
+              </div>
+            </div>
+
+            {/* SEÇÃO: A SEGUIR NA FILA */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">
+                  A Seguir ({Math.max(0, queue.length - 1)})
+                </span>
+                {queue.length > 2 && (
+                  <button
+                    onClick={() => {
+                      const nextQ = [...queue];
+                      // Embaralha apenas as próximas faixas da fila
+                      const rest = nextQ.filter(s => s.id !== activeSong.id);
+                      for (let i = rest.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [rest[i], rest[j]] = [rest[j], rest[i]];
+                      }
+                      setQueue([activeSong, ...rest]);
+                      showToast('Fila embaralhada!');
+                    }}
+                    className="flex items-center gap-1 text-[11px] font-semibold text-neutral-400 hover:text-[#1DB954] transition"
+                  >
+                    <Shuffle size={12} />
+                    <span>Embaralhar</span>
+                  </button>
+                )}
+              </div>
+
+              {queue.length > 1 ? (
+                <div className="space-y-1">
+                  {queue
+                    .filter((s, idx) => !(s.id === activeSong.id && idx === 0))
+                    .map((song, qIdx) => (
+                      <div
+                        key={`queue-${song.id}-${qIdx}`}
+                        onClick={() => playSong(song)}
+                        className="flex items-center justify-between p-2.5 rounded-xl hover:bg-white/5 transition cursor-pointer group"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="text-xs font-mono text-neutral-500 w-4 tabular-nums">
+                            {qIdx + 1}
+                          </span>
+                          <img
+                            src={song.thumbnail}
+                            alt={song.name}
+                            className="h-9 w-9 rounded-lg object-cover flex-shrink-0"
+                          />
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-white truncate group-hover:text-[#1DB954]">
+                              {song.name}
+                            </p>
+                            <p className="text-[11px] text-neutral-400 truncate">{song.artist}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-mono text-neutral-500 tabular-nums">
+                            {formatTime(song.duration || 210)}
+                          </span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveFromQueue(qIdx + 1);
+                            }}
+                            className="p-1.5 text-neutral-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition"
+                            title="Remover da fila"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              ) : (
+                <div className="p-6 rounded-2xl bg-white/5 border border-dashed border-white/10 text-center space-y-3">
+                  <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-white/5 text-neutral-400">
+                    <ListMusic size={20} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-white">Fila vazia</p>
+                    <p className="text-[11px] text-neutral-400 mt-1">
+                      Adicione músicas clicando no ícone <ListPlus size={12} className="inline mx-0.5" /> em qualquer playlist.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </aside>
+      )}
+
       {/* MINI-PLAYER INFERIOR */}
       <div
         onClick={() => setIsFullScreenPlayer(true)}
@@ -2035,7 +2282,22 @@ export default function App() {
         </div>
 
         <div className="flex flex-col items-center gap-1.5 w-1/3" onClick={(e) => e.stopPropagation()}>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 sm:gap-4">
+            {/* BOTÃO SHUFFLE NO MINI PLAYER */}
+            <button
+              onClick={() => {
+                const nextShuf = !isShuffle;
+                setIsShuffle(nextShuf);
+                showToast(nextShuf ? 'Ordem aleatória ativada' : 'Ordem sequencial');
+              }}
+              className={`p-1.5 rounded-full transition ${
+                isShuffle ? 'text-[#1DB954] bg-[#1DB954]/15' : 'text-neutral-400 hover:text-white'
+              }`}
+              title={isShuffle ? 'Modo Aleatório Ativado' : 'Ativar Modo Aleatório'}
+            >
+              <Shuffle size={16} />
+            </button>
+
             <button onClick={handlePrevSong} className="text-neutral-400 hover:text-white transition">
               <SkipBack size={18} fill="currentColor" />
             </button>
@@ -2047,6 +2309,21 @@ export default function App() {
             </button>
             <button onClick={handleNextSong} className="text-neutral-400 hover:text-white transition">
               <SkipForward size={18} fill="currentColor" />
+            </button>
+
+            {/* BOTÃO REPEAT NO MINI PLAYER */}
+            <button
+              onClick={() => {
+                const nextRep = !isRepeat;
+                setIsRepeat(nextRep);
+                showToast(nextRep ? 'Repetir música ativado' : 'Repetição desativada');
+              }}
+              className={`p-1.5 rounded-full transition ${
+                isRepeat ? 'text-[#1DB954] bg-[#1DB954]/15' : 'text-neutral-400 hover:text-white'
+              }`}
+              title={isRepeat ? 'Repetir Música Ativado' : 'Ativar Repetição'}
+            >
+              <Repeat size={16} />
             </button>
           </div>
 
@@ -2066,7 +2343,25 @@ export default function App() {
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-3 w-1/3" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-end gap-2 sm:gap-3 w-1/3" onClick={(e) => e.stopPropagation()}>
+          {/* BOTÃO DA FILA DE EXECUÇÃO */}
+          <button
+            onClick={() => setIsQueueOpen(!isQueueOpen)}
+            className={`p-2 rounded-xl transition relative ${
+              isQueueOpen
+                ? 'bg-[#1DB954]/20 text-[#1DB954] border border-[#1DB954]/40'
+                : 'text-neutral-400 hover:text-white hover:bg-white/5'
+            }`}
+            title="Abrir Fila de Reprodução"
+          >
+            <ListMusic size={18} />
+            {queue.length > 0 && (
+              <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-[#1DB954] text-[9px] font-black text-black shadow">
+                {queue.length}
+              </span>
+            )}
+          </button>
+
           <button
             onClick={() => {
               setSongToAddToPlaylist(activeSong);

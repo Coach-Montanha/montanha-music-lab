@@ -54,14 +54,25 @@ export default async function handler(req, res) {
         const cover = entity.coverArt?.sources?.[0]?.url || entity.visualIdentity?.image?.[0]?.url || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80';
         const rawTracks = entity.trackList || entity.tracks || [];
 
-        const songs = rawTracks.map((t, idx) => ({
-          id: `sp-${t.id || idx}-${Date.now()}`,
-          name: t.title || t.name || 'Música',
-          artist: t.subtitle || (Array.isArray(t.artists) ? t.artists.map((a) => a.name).join(', ') : 'Artista'),
-          album: t.album?.name || name,
-          thumbnail: t.coverArt?.sources?.[0]?.url || cover,
-          duration: Math.round((t.duration || 180000) / 1000)
-        }));
+        const songs = rawTracks.map((t, idx) => {
+          const trackThumb =
+            t.album?.coverArt?.sources?.[0]?.url ||
+            t.album?.images?.[0]?.url ||
+            t.coverArt?.sources?.[0]?.url ||
+            t.visualIdentity?.image?.[0]?.url ||
+            t.images?.[0]?.url ||
+            (t.album?.id ? `https://i.scdn.co/image/${t.album.id}` : null) ||
+            cover;
+
+          return {
+            id: `sp-${t.id || idx}-${Date.now()}`,
+            name: t.title || t.name || 'Música',
+            artist: t.subtitle || (Array.isArray(t.artists) ? t.artists.map((a) => a.name).join(', ') : 'Artista'),
+            album: t.album?.name || name,
+            thumbnail: trackThumb,
+            duration: Math.round((t.duration || 180000) / 1000)
+          };
+        });
 
         if (songs.length > 0) {
           return res.status(200).json({

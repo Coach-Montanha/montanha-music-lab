@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <defs>
+    <linearGradient id="montanhaGreen" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1ed760" />
+      <stop offset="100%" stop-color="#107a34" />
+    </linearGradient>
+    <linearGradient id="montanhaAccent" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1DB954" />
+      <stop offset="100%" stop-color="#2bf573" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Base Circular Suave -->
+  <rect width="100" height="100" rx="28" fill="#121212" />
+  <rect x="2" y="2" width="96" height="96" rx="26" stroke="#1DB954" stroke-opacity="0.3" stroke-width="2" />
+  
+  <!-- Pico Esquerdo / Menor (Montanha) -->
+  <path d="M18 72 L38 36 L52 60 L44 72 Z" fill="url(#montanhaGreen)" opacity="0.85" />
+  
+  <!-- Pico Principal / Central (Montanha) -->
+  <path d="M36 72 L58 22 L84 72 Z" fill="url(#montanhaAccent)" />
+  
+  <!-- Linhas de Equalizador Sonoro (Music Lab Waves) -->
+  <rect x="30" y="56" width="4" height="12" rx="2" fill="#ffffff" opacity="0.9" />
+  <rect x="40" y="46" width="4" height="22" rx="2" fill="#ffffff" opacity="0.95" />
+  <rect x="50" y="38" width="4" height="30" rx="2" fill="#ffffff" />
+  <rect x="60" y="44" width="4" height="24" rx="2" fill="#ffffff" opacity="0.95" />
+  <rect x="70" y="54" width="4" height="14" rx="2" fill="#ffffff" opacity="0.9" />
+</svg>

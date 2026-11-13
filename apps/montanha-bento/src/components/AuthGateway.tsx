@@ -79,14 +79,17 @@ export function AuthGateway({ onSuccess }: AuthGatewayProps) {
         
         {/* CABEÇALHO DO GATEWAY */}
         <div className="text-center space-y-3">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-[#1DB954] text-black shadow-[0_10px_30px_rgba(29,185,84,0.4)]">
-            <Music2 size={32} strokeWidth={2.5} />
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-[#1DB954] text-black shadow-[0_10px_30px_rgba(29,185,84,0.4)] p-3">
+            <img src="/music.svg" alt="Montanha Music Lab" className="w-full h-full object-contain" />
           </div>
           <div>
-            <h2 className="text-2xl font-black text-white tracking-tight">Able Music Player</h2>
+            <h2 className="text-2xl font-black text-white tracking-tight flex items-center justify-center gap-2">
+              <span>Montanha</span>
+              <span className="text-[#1DB954]">Music Lab</span>
+            </h2>
             <p className="text-xs text-neutral-400 mt-1 max-w-xs mx-auto leading-relaxed">
               {isRegister
-                ? 'Crie sua conta para salvar e sincronizar todas as suas playlists em todos os aparelhos.'
+                ? 'Crie sua conta para salvar e sincronizar suas playlists no PC, Celular e PWA.'
                 : 'Acesse para sincronizar automaticamente suas playlists entre seu celular e computador.'}
             </p>
           </div>
@@ -180,7 +183,7 @@ export function AuthGateway({ onSuccess }: AuthGatewayProps) {
               <Loader2 size={18} className="animate-spin" />
             ) : (
               <>
-                <span>{isRegister ? 'Criar Conta e Entrar' : 'Entrar no Able Music'}</span>
+                <span>{isRegister ? 'Criar Conta e Entrar' : 'Entrar no Montanha Music Lab'}</span>
                 <ArrowRight size={16} />
               </>
             )}

@@ -1,12 +1,18 @@
 {
-  "name": "Able Music Player",
-  "short_name": "Able",
-  "description": "A YouTube Music like app with a Spotify like design - ad free, open source",
+  "name": "Montanha Music Lab",
+  "short_name": "Montanha Music",
+  "description": "Montanha Music Lab • Streaming & Playlists sem limites, integrado ao Ecossistema Montanha",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#121212",
   "theme_color": "#121212",
   "icons": [
+    {
+      "src": "/music.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
     {
       "src": "/icon-192.png",
       "sizes": "192x192",
