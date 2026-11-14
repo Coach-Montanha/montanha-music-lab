@@ -610,13 +610,15 @@ export default function App() {
                   userInitiatedPauseRef.current = false;
                   audioAnchor.play();
                 } else if (event.data === 2) {
+                  setIsPlaying(false);
+                  isPlayingRef.current = false;
+                  mediaSessionController.updatePlaybackState(false);
                   if (userInitiatedPauseRef.current) {
-                    setIsPlaying(false);
-                    isPlayingRef.current = false;
                     audioAnchor.pause();
                   } else {
                     // Pausa involuntária (tela apagada, troca de app ou tela de bloqueio)
                     // NÃO aceita a pausa: retoma imediatamente a reprodução contínua com som
+                    audioAnchor.play();
                     setTimeout(() => {
                       if (!userInitiatedPauseRef.current && window.ytPlayer && typeof window.ytPlayer.playVideo === 'function') {
                         try {
@@ -738,98 +740,68 @@ export default function App() {
     }
   }, [currentSong]);
 
+  const handlePlay = () => {
+    userInitiatedPauseRef.current = false;
+    audioAnchor.play();
+    setIsPlaying(true);
+    isPlayingRef.current = true;
+    mediaSessionController.updatePlaybackState(true);
+
+    if (window.ytPlayer && typeof window.ytPlayer.playVideo === 'function') {
+      try {
+        if (typeof window.ytPlayer.unMute === 'function' && !isMuted) {
+          window.ytPlayer.unMute();
+        }
+        if (typeof window.ytPlayer.setVolume === 'function') {
+          window.ytPlayer.setVolume(Math.round(volume * 100));
+        }
+        window.ytPlayer.playVideo();
+        return;
+      } catch {}
+    }
+    if (audioRef.current && audioRef.current.src) {
+      audioRef.current.play().catch(() => {
+        if (currentSong) playSong(currentSong);
+      });
+    } else if (currentSong) {
+      playSong(currentSong);
+    }
+  };
+
+  const handlePause = () => {
+    userInitiatedPauseRef.current = true;
+    audioAnchor.pause();
+    setIsPlaying(false);
+    isPlayingRef.current = false;
+    mediaSessionController.updatePlaybackState(false);
+
+    if (window.ytPlayer && typeof window.ytPlayer.pauseVideo === 'function') {
+      try { window.ytPlayer.pauseVideo(); } catch {}
+    }
+    if (audioRef.current) {
+      try { audioRef.current.pause(); } catch {}
+    }
+  };
+
+  const togglePlay = () => {
+    if (isPlaying) {
+      handlePause();
+    } else {
+      handlePlay();
+    }
+  };
+
   useEffect(() => {
     mediaSessionController.setupActionHandlers({
-      onPlay: () => {
-        userInitiatedPauseRef.current = false;
-        audioAnchor.play();
-        togglePlay();
-      },
-      onPause: () => {
-        userInitiatedPauseRef.current = true;
-        audioAnchor.pause();
-        togglePlay();
-      },
+      onPlay: () => handlePlay(),
+      onPause: () => handlePause(),
       onPrevious: () => handlePrevSong(),
       onNext: () => handleNextSong(),
       onSeekTo: (details) => {
         if (details.seekTime !== undefined) handleSeek(details.seekTime);
       }
     });
-  }, [queue, currentSong, isPlaying]);
-
-  useEffect(() => {
-    mediaSessionController.updatePlaybackState(isPlaying);
-  }, [isPlaying]);
-
-  useEffect(() => {
-    if (isPlaying && duration > 0) {
-      mediaSessionController.updatePositionState({
-        duration,
-        position: currentTime,
-        playbackRate: 1
-      });
-    }
-  }, [currentTime, duration, isPlaying]);
-
-  // Volume
-  useEffect(() => {
-    const vol100 = isMuted ? 0 : Math.round(volume * 100);
-    if (window.ytPlayer && typeof window.ytPlayer.setVolume === 'function') {
-      try {
-        window.ytPlayer.setVolume(vol100);
-        if (isMuted && typeof window.ytPlayer.mute === 'function') {
-          window.ytPlayer.mute();
-        } else if (!isMuted && typeof window.ytPlayer.unMute === 'function') {
-          window.ytPlayer.unMute();
-        }
-      } catch {}
-    }
-    if (audioRef.current) {
-      audioRef.current.volume = isMuted ? 0 : volume;
-    }
-  }, [volume, isMuted]);
-
-  const togglePlay = () => {
-    if (isPlaying) {
-      userInitiatedPauseRef.current = true;
-      audioAnchor.pause();
-      if (audioRef.current) audioRef.current.pause();
-      if (window.ytPlayer && typeof window.ytPlayer.pauseVideo === 'function') {
-        window.ytPlayer.pauseVideo();
-      }
-      setIsPlaying(false);
-      isPlayingRef.current = false;
-    } else {
-      userInitiatedPauseRef.current = false;
-      audioAnchor.play();
-      // Se houver YouTube Player ativo, despausa o vídeo completo
-      if (window.ytPlayer && typeof window.ytPlayer.playVideo === 'function') {
-        try {
-          if (typeof window.ytPlayer.unMute === 'function' && !isMuted) {
-            window.ytPlayer.unMute();
-          }
-          if (typeof window.ytPlayer.setVolume === 'function') {
-            window.ytPlayer.setVolume(Math.round(volume * 100));
-          }
-          window.ytPlayer.playVideo();
-          setIsPlaying(true);
-          isPlayingRef.current = true;
-          return;
-        } catch {}
-      }
-      if (audioRef.current && audioRef.current.src) {
-        audioRef.current.play().then(() => {
-          setIsPlaying(true);
-          isPlayingRef.current = true;
-        }).catch(() => {
-          if (currentSong) playSong(currentSong);
-        });
-      } else if (currentSong) {
-        playSong(currentSong);
-      }
-    }
-  };
+  }, [queue, currentSong, isPlaying, volume, isMuted]);
 
   const handleSeek = (newTime: number) => {
     setCurrentTime(newTime);
@@ -978,12 +950,14 @@ export default function App() {
                 userInitiatedPauseRef.current = false;
                 audioAnchor.play();
               } else if (e.data === 2) {
+                setIsPlaying(false);
+                isPlayingRef.current = false;
+                mediaSessionController.updatePlaybackState(false);
                 if (userInitiatedPauseRef.current) {
-                  setIsPlaying(false);
-                  isPlayingRef.current = false;
                   audioAnchor.pause();
                 } else {
                   // Pausa involuntária (tela apagada, troca de app ou tela de bloqueio)
+                  audioAnchor.play();
                   setTimeout(() => {
                     if (!userInitiatedPauseRef.current && window.ytPlayer && typeof window.ytPlayer.playVideo === 'function') {
                       try {

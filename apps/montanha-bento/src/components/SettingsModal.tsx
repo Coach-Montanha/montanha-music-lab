@@ -579,6 +579,25 @@ export function SettingsModal({
                     ))}
                   </div>
                 </div>
+
+                {/* Guia de Reprodução Contínua com Tela Apagada no Microsoft Edge / Celular */}
+                <div className="p-3.5 rounded-2xl bg-[#1DB954]/10 border border-[#1DB954]/25 space-y-2">
+                  <div className="flex items-center gap-2 text-white font-bold text-xs">
+                    <Sparkles size={15} className="text-[#1DB954]" />
+                    <span>Reprodução com Tela Apagada no Microsoft Edge</span>
+                  </div>
+                  <p className="text-[11px] text-neutral-300 leading-relaxed">
+                    No navegador Edge do celular, para que a música continue tocando sem parar ao desligar a tela:
+                  </p>
+                  <ol className="text-[11px] text-neutral-300 list-decimal list-inside space-y-1 bg-black/30 p-2.5 rounded-xl border border-white/5">
+                    <li>Abra o menu <strong className="text-white">...</strong> do Edge &gt; <strong className="text-white">Configurações</strong></li>
+                    <li>Toque em <strong className="text-white">Configurações do site</strong></li>
+                    <li>Ative a opção <strong className="text-[#1DB954]">Reprodução de vídeo em segundo plano</strong></li>
+                  </ol>
+                  <span className="block text-[10px] text-neutral-400">
+                    💡 Controle no Bloqueio: Você também pode usar os botões ▶ (Play) / ⏸ (Pause) direto no widget da tela de bloqueio e da barra de notificações.
+                  </span>
+                </div>
               </div>
             </div>
           )}
