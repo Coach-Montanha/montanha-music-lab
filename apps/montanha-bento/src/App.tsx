@@ -208,7 +208,6 @@ export default function App() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const isPlayingRef = useRef<boolean>(false);
   const userInitiatedPauseRef = useRef<boolean>(false);
-  const lastBackgroundResumeRef = useRef<number>(0);
   const handleNextSongRef = useRef<() => void>(() => {});
   const originalQueueRef = useRef<Song[]>([]);
 
@@ -494,6 +493,34 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isQueueOpen, isFullScreenPlayer, isAuthModalOpen]);
 
+  // Screen Wake Lock API (Evita que a tela do celular apague sozinha durante o treino / reprodução)
+  useEffect(() => {
+    let wakeLockSentinel: any = null;
+
+    const requestWakeLock = async () => {
+      if ('wakeLock' in navigator && isPlaying) {
+        try {
+          wakeLockSentinel = await (navigator as any).wakeLock.request('screen');
+        } catch {}
+      }
+    };
+
+    if (isPlaying) {
+      requestWakeLock();
+    } else if (wakeLockSentinel) {
+      try {
+        wakeLockSentinel.release();
+        wakeLockSentinel = null;
+      } catch {}
+    }
+
+    return () => {
+      if (wakeLockSentinel) {
+        try { wakeLockSentinel.release(); } catch {}
+      }
+    };
+  }, [isPlaying]);
+
   // Manutenção Limpa e Contínua de Áudio em Background ao Travar a Tela do Celular (Android / iOS)
   useEffect(() => {
     audioAnchor.init();
@@ -560,28 +587,14 @@ export default function App() {
                   userInitiatedPauseRef.current = false;
                   audioAnchor.play();
                 } else if (event.data === 2) {
-                  // Se o usuário NÃO pausou intencionalmente e a tela está travada (hidden) ou app em background
-                  if (!userInitiatedPauseRef.current && (document.hidden || !document.hasFocus())) {
-                    audioAnchor.play();
-                    const now = Date.now();
-                    if (now - lastBackgroundResumeRef.current > 1200) {
-                      lastBackgroundResumeRef.current = now;
-                      setTimeout(() => {
-                        if (!userInitiatedPauseRef.current && (document.hidden || !document.hasFocus())) {
-                          try {
-                            if (window.ytPlayer && typeof window.ytPlayer.playVideo === 'function') {
-                              window.ytPlayer.playVideo();
-                            }
-                          } catch {}
-                        }
-                      }, 180);
-                    }
-                    return;
-                  }
                   if (userInitiatedPauseRef.current) {
                     setIsPlaying(false);
                     isPlayingRef.current = false;
                     audioAnchor.pause();
+                  } else {
+                    // Pausa externa (sistema operacional ou fone): atualiza o estado para permitir toque em Play na tela bloqueada
+                    setIsPlaying(false);
+                    isPlayingRef.current = false;
                   }
                 } else if (event.data === 0) {
                   // Fim da música no YouTube: aciona o handler mais recente
@@ -902,27 +915,13 @@ export default function App() {
                 userInitiatedPauseRef.current = false;
                 audioAnchor.play();
               } else if (e.data === 2) {
-                if (!userInitiatedPauseRef.current && (document.hidden || !document.hasFocus())) {
-                  audioAnchor.play();
-                  const now = Date.now();
-                  if (now - lastBackgroundResumeRef.current > 1200) {
-                    lastBackgroundResumeRef.current = now;
-                    setTimeout(() => {
-                      if (!userInitiatedPauseRef.current && (document.hidden || !document.hasFocus())) {
-                        try {
-                          if (window.ytPlayer && typeof window.ytPlayer.playVideo === 'function') {
-                            window.ytPlayer.playVideo();
-                          }
-                        } catch {}
-                      }
-                    }, 180);
-                  }
-                  return;
-                }
                 if (userInitiatedPauseRef.current) {
                   setIsPlaying(false);
                   isPlayingRef.current = false;
                   audioAnchor.pause();
+                } else {
+                  setIsPlaying(false);
+                  isPlayingRef.current = false;
                 }
               } else if (e.data === 0) {
                 handleNextSongRef.current();

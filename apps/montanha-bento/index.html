@@ -10,6 +10,30 @@
     <meta name="apple-mobile-web-app-title" content="Montanha Music" />
     <link rel="manifest" href="/manifest.json" />
     <title>Montanha Music Lab • Streaming & Playlists</title>
+    <!-- GUARDIÃO DE REPRODUÇÃO EM BACKGROUND & TELA BLOQUEADA -->
+    <script>
+      (function() {
+        try {
+          // 1. Engana o Page Visibility API para que o player do YouTube acredite que a tela está sempre ligada e visível
+          Object.defineProperty(document, 'hidden', { get: () => false, configurable: true });
+          Object.defineProperty(document, 'visibilityState', { get: () => 'visible', configurable: true });
+          if ('webkitHidden' in document) {
+            Object.defineProperty(document, 'webkitHidden', { get: () => false, configurable: true });
+            Object.defineProperty(document, 'webkitVisibilityState', { get: () => 'visible', configurable: true });
+          }
+          // 2. Bloqueia eventos de blur e visibilitychange para que scripts internos não pausem o áudio
+          const blockedEvents = ['visibilitychange', 'webkitvisibilitychange', 'blur'];
+          blockedEvents.forEach(function(evt) {
+            window.addEventListener(evt, function(e) { e.stopImmediatePropagation(); }, true);
+            document.addEventListener(evt, function(e) { e.stopImmediatePropagation(); }, true);
+          });
+          // 3. Configura a sessão de áudio nativa do WebKit / Safari (iOS 16.4+)
+          if ('audioSession' in navigator) {
+            navigator.audioSession.type = 'playback';
+          }
+        } catch (e) {}
+      })();
+    </script>
     <script src="https://www.youtube.com/iframe_api"></script>
   </head>
   <body class="bg-[#121212] text-white antialiased selection:bg-[#1DB954] selection:text-black overscroll-none">
