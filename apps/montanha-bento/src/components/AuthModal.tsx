@@ -264,7 +264,8 @@ export function AuthModal({ isOpen, onClose, currentUser, onUserChange, onSyncPl
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="albertosarly@gmail.com"
+                    placeholder="seu-email@exemplo.com"
+                    autoComplete="username"
                     className="h-11 w-full rounded-2xl bg-[#121212] border border-white/10 pl-11 pr-4 text-xs text-white placeholder-neutral-500 outline-none focus:border-[#1DB954] transition"
                   />
                 </div>
@@ -283,6 +284,7 @@ export function AuthModal({ isOpen, onClose, currentUser, onUserChange, onSyncPl
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
+                    autoComplete={isRegister ? "new-password" : "current-password"}
                     className="h-11 w-full rounded-2xl bg-[#121212] border border-white/10 pl-11 pr-4 text-xs text-white placeholder-neutral-500 outline-none focus:border-[#1DB954] transition"
                   />
                 </div>
