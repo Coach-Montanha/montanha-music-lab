@@ -168,6 +168,9 @@ export default function App() {
   const [queue, setQueue] = useState<Song[]>(() => playlists[0]?.songs || INITIAL_PLAYLISTS[0].songs);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const bgAudioAnchorRef = useRef<HTMLAudioElement | null>(null);
+  const isPlayingRef = useRef<boolean>(false);
+  const userInitiatedPauseRef = useRef<boolean>(false);
   const handleNextSongRef = useRef<() => void>(() => {});
   const originalQueueRef = useRef<Song[]>([]);
 
@@ -452,18 +455,65 @@ export default function App() {
     } catch {}
   }, [downloadedSongs]);
 
-  // Histórico e Botão Físico/Virtual Voltar
+  // Histórico e Botão Físico/Virtual Voltar (Navegação Segura no Mobile)
   useEffect(() => {
     const handlePopState = () => {
-      if (isFullScreenPlayer) {
+      if (isQueueOpen) {
+        setIsQueueOpen(false);
+      } else if (isFullScreenPlayer) {
         setIsFullScreenPlayer(false);
+      } else if (isAuthModalOpen) {
+        setIsAuthModalOpen(false);
       } else if (selectedPlaylist) {
         setSelectedPlaylist(null);
       }
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [selectedPlaylist, isFullScreenPlayer]);
+  }, [selectedPlaylist, isFullScreenPlayer, isQueueOpen, isAuthModalOpen]);
+
+  // Tecla Escape para Fechamento Rápido no Desktop
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (isQueueOpen) setIsQueueOpen(false);
+        if (isFullScreenPlayer) setIsFullScreenPlayer(false);
+        if (isAuthModalOpen) setIsAuthModalOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isQueueOpen, isFullScreenPlayer, isAuthModalOpen]);
+
+  // Manutenção Contínua de Áudio em Background ao Travar a Tela do Celular (Android / iOS)
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.hidden) {
+        if (isPlayingRef.current && !userInitiatedPauseRef.current) {
+          try {
+            if (bgAudioAnchorRef.current && bgAudioAnchorRef.current.paused) {
+              bgAudioAnchorRef.current.play().catch(() => {});
+            }
+            if (window.ytPlayer && typeof window.ytPlayer.playVideo === 'function') {
+              window.ytPlayer.playVideo();
+            }
+          } catch {}
+        }
+      } else {
+        if (isPlayingRef.current && !userInitiatedPauseRef.current) {
+          try {
+            if (window.ytPlayer && typeof window.ytPlayer.getPlayerState === 'function') {
+              if (window.ytPlayer.getPlayerState() !== 1) {
+                window.ytPlayer.playVideo();
+              }
+            }
+          } catch {}
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, []);
 
   // Inicialização do YouTube Iframe API
   useEffect(() => {
@@ -492,8 +542,28 @@ export default function App() {
               onStateChange: (event: any) => {
                 if (event.data === 1) {
                   setIsPlaying(true);
+                  isPlayingRef.current = true;
+                  userInitiatedPauseRef.current = false;
+                  if (bgAudioAnchorRef.current && bgAudioAnchorRef.current.paused) {
+                    bgAudioAnchorRef.current.play().catch(() => {});
+                  }
                 } else if (event.data === 2) {
-                  setIsPlaying(false);
+                  // Se o usuário NÃO pausou intencionalmente e a tela está travada (hidden) ou app em background
+                  if (!userInitiatedPauseRef.current && (document.hidden || !document.hasFocus())) {
+                    setTimeout(() => {
+                      try {
+                        if (window.ytPlayer && typeof window.ytPlayer.playVideo === 'function') {
+                          window.ytPlayer.playVideo();
+                        }
+                      } catch {}
+                    }, 120);
+                    return;
+                  }
+                  if (userInitiatedPauseRef.current) {
+                    setIsPlaying(false);
+                    isPlayingRef.current = false;
+                    if (bgAudioAnchorRef.current) bgAudioAnchorRef.current.pause();
+                  }
                 } else if (event.data === 0) {
                   // Fim da música no YouTube: aciona o handler mais recente
                   handleNextSongRef.current();
@@ -589,8 +659,14 @@ export default function App() {
 
   useEffect(() => {
     mediaSessionController.setupActionHandlers({
-      onPlay: () => togglePlay(),
-      onPause: () => togglePlay(),
+      onPlay: () => {
+        userInitiatedPauseRef.current = false;
+        togglePlay();
+      },
+      onPause: () => {
+        userInitiatedPauseRef.current = true;
+        togglePlay();
+      },
       onPrevious: () => handlePrevSong(),
       onNext: () => handleNextSong(),
       onSeekTo: (details) => {
@@ -633,22 +709,33 @@ export default function App() {
 
   const togglePlay = () => {
     if (isPlaying) {
+      userInitiatedPauseRef.current = true;
       if (audioRef.current) audioRef.current.pause();
+      if (bgAudioAnchorRef.current) bgAudioAnchorRef.current.pause();
       if (window.ytPlayer && typeof window.ytPlayer.pauseVideo === 'function') {
         window.ytPlayer.pauseVideo();
       }
       setIsPlaying(false);
+      isPlayingRef.current = false;
     } else {
+      userInitiatedPauseRef.current = false;
+      if (bgAudioAnchorRef.current) {
+        bgAudioAnchorRef.current.play().catch(() => {});
+      }
       // Se houver YouTube Player ativo, despausa o vídeo completo
       if (window.ytPlayer && typeof window.ytPlayer.playVideo === 'function') {
         try {
           window.ytPlayer.playVideo();
           setIsPlaying(true);
+          isPlayingRef.current = true;
           return;
         } catch {}
       }
       if (audioRef.current && audioRef.current.src) {
-        audioRef.current.play().then(() => setIsPlaying(true)).catch(() => {
+        audioRef.current.play().then(() => {
+          setIsPlaying(true);
+          isPlayingRef.current = true;
+        }).catch(() => {
           if (currentSong) playSong(currentSong);
         });
       } else if (currentSong) {
@@ -669,12 +756,19 @@ export default function App() {
 
   // Motor Padrão AbleMusic (YouTube Music Stream Completo 100% da Duração)
   const playSong = async (song: Song, newQueue?: Song[]) => {
+    userInitiatedPauseRef.current = false;
     setCurrentSong(song);
     setCurrentTime(0);
     setDuration(song.duration || 240);
     setIsPlaying(true);
+    isPlayingRef.current = true;
     if (newQueue) setQueue(newQueue);
     showToast(`Tocando: ${song.name}`);
+
+    // Aciona a âncora de áudio HTML5 para manter playback de sistema aberto em background
+    if (bgAudioAnchorRef.current) {
+      bgAudioAnchorRef.current.play().catch(() => {});
+    }
 
     // Incrementa contador de reprodução para Músicas em Destaque (Mais Tocadas da Conta)
     setPlayCounts((prev) => {
@@ -787,9 +881,32 @@ export default function App() {
               } catch {}
             },
             onStateChange: (e: any) => {
-              if (e.data === 1) setIsPlaying(true);
-              else if (e.data === 2) setIsPlaying(false);
-              else if (e.data === 0) handleNextSongRef.current();
+              if (e.data === 1) {
+                setIsPlaying(true);
+                isPlayingRef.current = true;
+                userInitiatedPauseRef.current = false;
+                if (bgAudioAnchorRef.current && bgAudioAnchorRef.current.paused) {
+                  bgAudioAnchorRef.current.play().catch(() => {});
+                }
+              } else if (e.data === 2) {
+                if (!userInitiatedPauseRef.current && (document.hidden || !document.hasFocus())) {
+                  setTimeout(() => {
+                    try {
+                      if (window.ytPlayer && typeof window.ytPlayer.playVideo === 'function') {
+                        window.ytPlayer.playVideo();
+                      }
+                    } catch {}
+                  }, 120);
+                  return;
+                }
+                if (userInitiatedPauseRef.current) {
+                  setIsPlaying(false);
+                  isPlayingRef.current = false;
+                  if (bgAudioAnchorRef.current) bgAudioAnchorRef.current.pause();
+                }
+              } else if (e.data === 0) {
+                handleNextSongRef.current();
+              }
             }
           }
         });
@@ -2688,150 +2805,175 @@ export default function App() {
         onSyncPlaylists={handleForceCloudSync}
       />
 
-      {/* PAINEL LATERAL: FILA DE REPRODUÇÃO (QUEUE DRAWER) */}
+      {/* PAINEL LATERAL: FILA DE REPRODUÇÃO (QUEUE DRAWER) COM BACKDROP E DISMISSAL TOUCH-FRIENDLY */}
       {isQueueOpen && (
-        <aside className="fixed top-16 bottom-20 sm:bottom-20 right-0 w-full sm:w-96 bg-[#181818]/95 backdrop-blur-2xl border-l border-white/10 z-40 p-5 flex flex-col shadow-[-20px_0_50px_rgba(0,0,0,0.85)] animate-fade-in select-none">
-          {/* CABEÇALHO DA FILA */}
-          <div className="flex items-center justify-between pb-4 border-b border-white/10">
-            <div className="flex items-center gap-2">
-              <ListMusic size={20} className="text-[#1DB954]" />
-              <h3 className="text-base font-black text-white tracking-tight">Fila de Reprodução</h3>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/10 text-neutral-300">
-                {queue.length}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              {queue.length > 1 && (
-                <button
-                  onClick={handleClearQueue}
-                  className="text-[11px] font-semibold text-neutral-400 hover:text-white px-2 py-1 rounded-lg hover:bg-white/5 transition"
-                >
-                  Limpar
-                </button>
-              )}
-              <button
-                onClick={() => setIsQueueOpen(false)}
-                className="rounded-full p-1.5 text-neutral-400 hover:text-white hover:bg-white/10 transition"
-                title="Fechar Fila"
-              >
-                <X size={18} />
-              </button>
-            </div>
-          </div>
+        <>
+          {/* BACKDROP ESCURECIDO CLICÁVEL: Fecha ao tocar fora em qualquer lugar da tela */}
+          <div
+            onClick={() => setIsQueueOpen(false)}
+            className="fixed inset-0 bg-black/75 backdrop-blur-sm z-30 animate-fade-in"
+            aria-label="Fechar Fila de Reprodução"
+          />
 
-          <div className="flex-1 overflow-y-auto space-y-6 pt-4 pr-1">
-            {/* SEÇÃO: TOCANDO AGORA */}
-            <div className="space-y-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">
-                Tocando Agora
-              </span>
-              <div className="flex items-center gap-3 p-3 rounded-2xl bg-white/5 border border-[#1DB954]/20 shadow-md">
-                <img
-                  src={activeSong.thumbnail}
-                  alt={activeSong.name}
-                  className="h-12 w-12 rounded-xl object-cover shadow flex-shrink-0"
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-bold text-[#1DB954] truncate flex items-center gap-1.5">
-                    <span>{activeSong.name}</span>
-                    <span className="inline-block h-2 w-2 rounded-full bg-[#1DB954] animate-pulse" />
-                  </p>
-                  <p className="text-xs text-neutral-400 truncate">{activeSong.artist}</p>
+          <aside className="fixed top-0 bottom-16 sm:bottom-0 right-0 w-full sm:max-w-md bg-[#161616] border-l border-white/10 z-40 p-4 sm:p-6 flex flex-col shadow-2xl animate-fade-in select-none">
+            {/* CABEÇALHO DA FILA COM TOUCH TARGET SEGURO */}
+            <div className="flex items-center justify-between pb-4 border-b border-white/10 flex-shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#1DB954]/15 text-[#1DB954]">
+                  <ListMusic size={22} />
                 </div>
-                <span className="text-xs font-mono text-neutral-400 tabular-nums">
-                  {formatTime(activeSong.duration || duration)}
-                </span>
+                <div>
+                  <h3 className="text-base font-black text-white tracking-tight">Fila de Reprodução</h3>
+                  <p className="text-[11px] text-neutral-400 font-medium">
+                    {queue.length} {queue.length === 1 ? 'música na lista' : 'músicas na lista'}
+                  </p>
+                </div>
               </div>
-            </div>
-
-            {/* SEÇÃO: A SEGUIR NA FILA */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">
-                  A Seguir ({Math.max(0, queue.length - 1)})
-                </span>
-                {queue.length > 2 && (
+              <div className="flex items-center gap-2">
+                {queue.length > 1 && (
                   <button
-                    onClick={() => {
-                      const nextQ = [...queue];
-                      // Embaralha apenas as próximas faixas da fila
-                      const rest = nextQ.filter(s => s.id !== activeSong.id);
-                      for (let i = rest.length - 1; i > 0; i--) {
-                        const j = Math.floor(Math.random() * (i + 1));
-                        [rest[i], rest[j]] = [rest[j], rest[i]];
-                      }
-                      setQueue([activeSong, ...rest]);
-                      showToast('Fila embaralhada!');
-                    }}
-                    className="flex items-center gap-1 text-[11px] font-semibold text-neutral-400 hover:text-[#1DB954] transition"
+                    onClick={handleClearQueue}
+                    className="text-xs font-semibold text-neutral-400 hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/5 transition"
                   >
-                    <Shuffle size={12} />
-                    <span>Embaralhar</span>
+                    Limpar
                   </button>
                 )}
+                {/* BOTÃO FECHAR TOUCH-FRIENDLY (min 44x44px) */}
+                <button
+                  onClick={() => setIsQueueOpen(false)}
+                  className="flex items-center justify-center h-11 w-11 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 text-white transition shadow"
+                  title="Fechar Fila"
+                  aria-label="Fechar Fila"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-6 pt-4 pr-1">
+              {/* SEÇÃO: TOCANDO AGORA */}
+              <div className="space-y-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">
+                  Tocando Agora
+                </span>
+                <div className="flex items-center gap-3 p-3 rounded-2xl bg-white/5 border border-[#1DB954]/20 shadow-md">
+                  <img
+                    src={activeSong.thumbnail}
+                    alt={activeSong.name}
+                    className="h-12 w-12 rounded-xl object-cover shadow flex-shrink-0"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-[#1DB954] truncate flex items-center gap-1.5">
+                      <span>{activeSong.name}</span>
+                      <span className="inline-block h-2 w-2 rounded-full bg-[#1DB954] animate-pulse" />
+                    </p>
+                    <p className="text-xs text-neutral-400 truncate">{activeSong.artist}</p>
+                  </div>
+                  <span className="text-xs font-mono text-neutral-400 tabular-nums">
+                    {formatTime(activeSong.duration || duration)}
+                  </span>
+                </div>
               </div>
 
-              {queue.length > 1 ? (
-                <div className="space-y-1">
-                  {queue
-                    .filter((s, idx) => !(s.id === activeSong.id && idx === 0))
-                    .map((song, qIdx) => (
-                      <div
-                        key={`queue-${song.id}-${qIdx}`}
-                        onClick={() => playSong(song)}
-                        className="flex items-center justify-between p-2.5 rounded-xl hover:bg-white/5 transition cursor-pointer group"
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <span className="text-xs font-mono text-neutral-500 w-4 tabular-nums">
-                            {qIdx + 1}
-                          </span>
-                          <img
-                            src={song.thumbnail}
-                            alt={song.name}
-                            className="h-9 w-9 rounded-lg object-cover flex-shrink-0"
-                          />
-                          <div className="min-w-0">
-                            <p className="text-xs font-bold text-white truncate group-hover:text-[#1DB954]">
-                              {song.name}
-                            </p>
-                            <p className="text-[11px] text-neutral-400 truncate">{song.artist}</p>
+              {/* SEÇÃO: A SEGUIR NA FILA */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">
+                    A Seguir ({Math.max(0, queue.length - 1)})
+                  </span>
+                  {queue.length > 2 && (
+                    <button
+                      onClick={() => {
+                        const nextQ = [...queue];
+                        // Embaralha apenas as próximas faixas da fila
+                        const rest = nextQ.filter(s => s.id !== activeSong.id);
+                        for (let i = rest.length - 1; i > 0; i--) {
+                          const j = Math.floor(Math.random() * (i + 1));
+                          [rest[i], rest[j]] = [rest[j], rest[i]];
+                        }
+                        setQueue([activeSong, ...rest]);
+                        showToast('Fila embaralhada!');
+                      }}
+                      className="flex items-center gap-1 text-[11px] font-semibold text-neutral-400 hover:text-[#1DB954] transition"
+                    >
+                      <Shuffle size={12} />
+                      <span>Embaralhar</span>
+                    </button>
+                  )}
+                </div>
+
+                {queue.length > 1 ? (
+                  <div className="space-y-1">
+                    {queue
+                      .filter((s, idx) => !(s.id === activeSong.id && idx === 0))
+                      .map((song, qIdx) => (
+                        <div
+                          key={`queue-${song.id}-${qIdx}`}
+                          onClick={() => playSong(song)}
+                          className="flex items-center justify-between p-2.5 rounded-xl hover:bg-white/5 active:bg-white/10 transition cursor-pointer group"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className="text-xs font-mono text-neutral-500 w-4 tabular-nums">
+                              {qIdx + 1}
+                            </span>
+                            <img
+                              src={song.thumbnail}
+                              alt={song.name}
+                              className="h-10 w-10 rounded-lg object-cover flex-shrink-0"
+                            />
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-white truncate group-hover:text-[#1DB954]">
+                                {song.name}
+                              </p>
+                              <p className="text-[11px] text-neutral-400 truncate">{song.artist}</p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-mono text-neutral-500 tabular-nums">
+                              {formatTime(song.duration || 210)}
+                            </span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRemoveFromQueue(qIdx + 1);
+                              }}
+                              className="p-2 text-neutral-500 hover:text-red-400 transition"
+                              title="Remover da fila"
+                            >
+                              <Trash2 size={16} />
+                            </button>
                           </div>
                         </div>
-
-                        <div className="flex items-center gap-2">
-                          <span className="text-[11px] font-mono text-neutral-500 tabular-nums">
-                            {formatTime(song.duration || 210)}
-                          </span>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRemoveFromQueue(qIdx + 1);
-                            }}
-                            className="p-1.5 text-neutral-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition"
-                            title="Remover da fila"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              ) : (
-                <div className="p-6 rounded-2xl bg-white/5 border border-dashed border-white/10 text-center space-y-3">
-                  <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-white/5 text-neutral-400">
-                    <ListMusic size={20} />
+                      ))}
                   </div>
-                  <div>
-                    <p className="text-xs font-bold text-white">Fila vazia</p>
-                    <p className="text-[11px] text-neutral-400 mt-1">
-                      Adicione músicas clicando no ícone <ListPlus size={12} className="inline mx-0.5" /> em qualquer playlist.
-                    </p>
+                ) : (
+                  <div className="p-6 rounded-2xl bg-white/5 border border-dashed border-white/10 text-center space-y-3">
+                    <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-white/5 text-neutral-400">
+                      <ListMusic size={20} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-white">Fila vazia</p>
+                      <p className="text-[11px] text-neutral-400 mt-1">
+                        Adicione músicas clicando no ícone <ListPlus size={12} className="inline mx-0.5" /> em qualquer playlist.
+                      </p>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
-          </div>
-        </aside>
+
+            {/* BOTÃO DE RODAPÉ FIXO: SAÍDA INSTANTÂNEA E GARANTIDA DA TELA */}
+            <div className="pt-4 border-t border-white/10 flex-shrink-0">
+              <button
+                onClick={() => setIsQueueOpen(false)}
+                className="w-full py-3.5 px-4 rounded-2xl bg-white/10 hover:bg-white/20 active:scale-98 text-white font-bold text-xs transition flex items-center justify-center gap-2 shadow-lg"
+              >
+                <span>Voltar ao Player / Fechar</span>
+              </button>
+            </div>
+          </aside>
+        </>
       )}
 
       {/* MINI-PLAYER INFERIOR RESPONSIVO */}
@@ -3132,7 +3274,7 @@ export default function App() {
       )}
 
       {/* BOTTOM NAVIGATION TABS (Mobile) */}
-      <nav className="fixed bottom-0 left-0 right-0 h-16 bg-[#121212]/95 border-t border-white/[0.08] backdrop-blur-lg flex items-center justify-around z-20 sm:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 h-16 bg-[#121212]/95 border-t border-white/[0.08] backdrop-blur-lg flex items-center justify-around z-50 sm:hidden">
         {[
           { id: 'home', label: 'Início', icon: HomeIcon },
           { id: 'search', label: 'Buscar', icon: Search },
@@ -3145,6 +3287,7 @@ export default function App() {
             <button
               key={item.id}
               onClick={() => {
+                setIsQueueOpen(false);
                 setActiveTab(item.id as any);
                 setSelectedPlaylist(null);
               }}
@@ -3158,6 +3301,15 @@ export default function App() {
           );
         })}
       </nav>
+
+      {/* ÂNCORA DE ÁUDIO EM BACKGROUND (WAV SILENCIOSO CONTÍNUO QUE MANTÉM O CELULAR TOCANDO COM TELA TRAVADA) */}
+      <audio
+        ref={bgAudioAnchorRef}
+        id="montanha-bg-anchor"
+        loop
+        preload="auto"
+        src="data:audio/wav;base64,UklGRjIAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YRAAAAAAAAAAAAAAAAAA"
+      />
 
       </div>
     </div>
