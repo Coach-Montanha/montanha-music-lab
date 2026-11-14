@@ -1,75 +1,211 @@
-import { Song } from '../types';
+import { Song, SearchAlbum, SearchArtist, SearchPlaylist, CategorizedSearchResults } from '../types';
 
-export async function universalSearch(query: string): Promise<Song[]> {
+// Busca categorizada completa (Músicas, Álbuns, Artistas e Playlists)
+export async function searchCategorized(
+  query: string,
+  filterType: 'all' | 'songs' | 'albums' | 'artists' | 'playlists' = 'all'
+): Promise<CategorizedSearchResults> {
   const q = query.trim();
-  if (!q) return [];
+  const emptyResult: CategorizedSearchResults = {
+    songs: [],
+    albums: [],
+    artists: [],
+    playlists: []
+  };
 
-  const results: Song[] = [];
+  if (!q) return emptyResult;
 
-  // 1. Apple Music / iTunes Search API (100% nativo com CORS Aberto, streaming instantâneo sem proxy)
+  const apiType =
+    filterType === 'songs'
+      ? 'track'
+      : filterType === 'albums'
+      ? 'album'
+      : filterType === 'artists'
+      ? 'artist'
+      : filterType === 'playlists'
+      ? 'playlist'
+      : 'all';
+
+  // 1. Tenta API Serverless /api/search (Deezer Ultra HD em alta fidelidade)
   try {
-    const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=song&limit=30`;
-    const resp = await fetch(itunesUrl);
-    if (resp.ok) {
-      const data = await resp.json();
-      const items = data.results || [];
-      if (items.length > 0) {
-        for (const item of items) {
-          if (item.trackName && item.previewUrl) {
-            const highResArt = (item.artworkUrl100 || '').replace('100x100bb', '600x600bb');
-            results.push({
+    const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&type=${apiType}`, {
+      signal: AbortSignal.timeout(5000)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (
+        (data.songs && data.songs.length > 0) ||
+        (data.albums && data.albums.length > 0) ||
+        (data.artists && data.artists.length > 0) ||
+        (data.playlists && data.playlists.length > 0)
+      ) {
+        return {
+          songs: data.songs || [],
+          albums: data.albums || [],
+          artists: data.artists || [],
+          playlists: data.playlists || []
+        };
+      }
+    }
+  } catch {}
+
+  // 2. Fallback Aberto: iTunes API (CORS nativo sem servidor para Músicas, Álbuns e Artistas)
+  try {
+    const itunesPromises: Promise<any>[] = [];
+
+    if (filterType === 'all' || filterType === 'songs') {
+      itunesPromises.push(
+        fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=song&limit=25`, {
+          signal: AbortSignal.timeout(4000)
+        })
+          .then((r) => (r.ok ? r.json() : { results: [] }))
+          .then((d) => ({
+            type: 'songs',
+            items: (d.results || []).map((item: any) => ({
               id: `itunes-${item.trackId}`,
               name: item.trackName,
               artist: item.artistName || 'Artista',
               album: item.collectionName,
-              thumbnail: highResArt || item.artworkUrl100 || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80',
+              thumbnail: (item.artworkUrl100 || '').replace('100x100bb', '600x600bb'),
+              duration: item.trackTimeMillis ? Math.round(item.trackTimeMillis / 1000) : 210,
+              audioUrl: item.previewUrl
+            }))
+          }))
+          .catch(() => ({ type: 'songs', items: [] }))
+      );
+    }
+
+    if (filterType === 'all' || filterType === 'albums') {
+      itunesPromises.push(
+        fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=album&limit=15`, {
+          signal: AbortSignal.timeout(4000)
+        })
+          .then((r) => (r.ok ? r.json() : { results: [] }))
+          .then((d) => ({
+            type: 'albums',
+            items: (d.results || []).map((item: any) => ({
+              id: `itunes-alb-${item.collectionId}`,
+              rawId: item.collectionId,
+              name: item.collectionName,
+              artist: item.artistName || 'Artista',
+              cover: (item.artworkUrl100 || '').replace('100x100bb', '600x600bb'),
+              trackCount: item.trackCount || 0
+            }))
+          }))
+          .catch(() => ({ type: 'albums', items: [] }))
+      );
+    }
+
+    if (filterType === 'all' || filterType === 'artists') {
+      itunesPromises.push(
+        fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=musicArtist&limit=12`, {
+          signal: AbortSignal.timeout(4000)
+        })
+          .then((r) => (r.ok ? r.json() : { results: [] }))
+          .then((d) => ({
+            type: 'artists',
+            items: (d.results || []).map((item: any) => ({
+              id: `itunes-art-${item.artistId}`,
+              rawId: item.artistId,
+              name: item.artistName,
+              image: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80',
+              nbAlbum: 0
+            }))
+          }))
+          .catch(() => ({ type: 'artists', items: [] }))
+      );
+    }
+
+    const itunesResults = await Promise.all(itunesPromises);
+    const result: CategorizedSearchResults = { ...emptyResult };
+
+    for (const r of itunesResults) {
+      if (r.type === 'songs') result.songs = r.items;
+      if (r.type === 'albums') result.albums = r.items;
+      if (r.type === 'artists') result.artists = r.items;
+    }
+
+    if (result.songs.length > 0 || result.albums.length > 0 || result.artists.length > 0) {
+      return result;
+    }
+  } catch {}
+
+  return emptyResult;
+}
+
+// Busca faixas completas de um álbum, playlist ou top músicas de um artista
+export async function fetchEntityTracks(
+  rawId: string | number,
+  entityType: 'album' | 'playlist' | 'artist',
+  artistName?: string
+): Promise<Song[]> {
+  // 1. Tenta API Serverless /api/search?action=tracks
+  try {
+    const res = await fetch(`/api/search?action=tracks&id=${rawId}&entityType=${entityType}`, {
+      signal: AbortSignal.timeout(6000)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.songs) && data.songs.length > 0) {
+        return data.songs;
+      }
+    }
+  } catch {}
+
+  // 2. Fallback iTunes para álbuns
+  if (entityType === 'album' && rawId) {
+    try {
+      const res = await fetch(`https://itunes.apple.com/lookup?id=${rawId}&entity=song`, {
+        signal: AbortSignal.timeout(5000)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const items = data.results || [];
+        const songs: Song[] = [];
+        for (const item of items) {
+          if (item.wrapperType === 'track') {
+            songs.push({
+              id: `itunes-${item.trackId}`,
+              name: item.trackName,
+              artist: item.artistName || artistName || 'Artista',
+              album: item.collectionName,
+              thumbnail: (item.artworkUrl100 || '').replace('100x100bb', '600x600bb'),
               duration: item.trackTimeMillis ? Math.round(item.trackTimeMillis / 1000) : 210,
               audioUrl: item.previewUrl
             });
           }
         }
-        if (results.length > 0) return results;
-      }
-    }
-  } catch (err) {
-    console.warn('iTunes Search:', err);
-  }
-
-  // 2. Fallback: Piped & Invidious (Para músicas do YouTube Music)
-  const videoInstances = [
-    'https://api.piped.private.coffee',
-    'https://pipedapi.adminforge.de',
-    'https://inv.tux.pizza/api/v1'
-  ];
-
-  for (const inst of videoInstances) {
-    try {
-      const isInv = inst.includes('inv');
-      const url = isInv
-        ? `${inst}/search?q=${encodeURIComponent(q)}&type=video`
-        : `${inst}/search?q=${encodeURIComponent(q)}&filter=music_songs`;
-
-      const resp = await fetch(url);
-      if (resp.ok) {
-        const data = await resp.json();
-        const items = isInv ? data : (data.items || []);
-        for (const item of items) {
-          const ytId = isInv ? item.videoId : (item.url || '').replace('/watch?v=', '').split('&')[0];
-          if (ytId) {
-            results.push({
-              id: `yt-${ytId}`,
-              name: item.title || 'Música',
-              artist: (isInv ? item.author : item.uploaderName) || 'Artista',
-              youtubeId: ytId,
-              thumbnail: (item.videoThumbnails?.[0]?.url || item.thumbnail) || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&q=80',
-              duration: item.lengthSeconds || item.duration || 210
-            });
-          }
-        }
-        if (results.length > 0) return results;
+        if (songs.length > 0) return songs;
       }
     } catch {}
   }
 
-  return results;
+  // 3. Fallback Artista: busca top músicas do artista no iTunes
+  if (entityType === 'artist' && artistName) {
+    try {
+      const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(artistName)}&media=music&entity=song&limit=30`, {
+        signal: AbortSignal.timeout(5000)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return (data.results || []).map((item: any) => ({
+          id: `itunes-${item.trackId}`,
+          name: item.trackName,
+          artist: item.artistName || artistName,
+          album: item.collectionName,
+          thumbnail: (item.artworkUrl100 || '').replace('100x100bb', '600x600bb'),
+          duration: item.trackTimeMillis ? Math.round(item.trackTimeMillis / 1000) : 210,
+          audioUrl: item.previewUrl
+        }));
+      }
+    } catch {}
+  }
+
+  return [];
+}
+
+// Mantido para compatibilidade reversa
+export async function universalSearch(query: string): Promise<Song[]> {
+  const categorized = await searchCategorized(query, 'songs');
+  return categorized.songs;
 }

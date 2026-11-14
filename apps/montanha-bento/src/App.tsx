@@ -34,14 +34,16 @@ import {
   CheckCircle2,
   Smartphone,
   RefreshCw,
-  ListMusic
+  ListMusic,
+  Disc,
+  Users
 } from 'lucide-react';
 
-import { Song, Playlist } from './types';
+import { Song, Playlist, SearchAlbum, SearchArtist, SearchPlaylist, CategorizedSearchResults } from './types';
 import { storeOfflineBlob, getOfflineBlob, deleteOfflineBlob } from './lib/offlineDb';
 import { supabase, syncCloudPlaylists, fetchCloudPlaylists } from './lib/supabase';
 import { extractPlaylistFromUrl } from './lib/playlistExtractor';
-import { universalSearch } from './lib/searchEngine';
+import { universalSearch, searchCategorized, fetchEntityTracks } from './lib/searchEngine';
 import { AuthModal } from './components/AuthModal';
 import { AuthGateway } from './components/AuthGateway';
 import { mediaSessionController } from './lib/mediaSession';
@@ -172,10 +174,28 @@ export default function App() {
   // Full Screen Player Sheet
   const [isFullScreenPlayer, setIsFullScreenPlayer] = useState<boolean>(false);
 
-  // Search State
+  // Search State Categorizado (Músicas, Álbuns, Artistas, Playlists)
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isSearching, setIsSearching] = useState<boolean>(false);
+  const [searchCategory, setSearchCategory] = useState<'all' | 'songs' | 'albums' | 'artists' | 'playlists'>('all');
   const [searchResults, setSearchResults] = useState<Song[]>([]);
+  const [categorizedResults, setCategorizedResults] = useState<CategorizedSearchResults>({
+    songs: [],
+    albums: [],
+    artists: [],
+    playlists: []
+  });
+
+  // Modal de Inspeção e Execução de Álbum / Playlist / Artista
+  const [viewingEntity, setViewingEntity] = useState<{
+    type: 'album' | 'playlist' | 'artist';
+    name: string;
+    subtitle?: string;
+    cover: string;
+    rawId?: string | number;
+    songs: Song[];
+    loading: boolean;
+  } | null>(null);
 
   // Importador Universal (Spotify + YouTube / YouTube Music)
   const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
@@ -1113,30 +1133,139 @@ export default function App() {
     }
   };
 
-  // BUSCA UNIVERSAL (Deezer + Piped + YouTube)
-  const handleSearch = async (query: string) => {
-    if (!query.trim()) {
+  // BUSCA CATEGORIZADA (Músicas, Álbuns, Artistas e Playlists)
+  const handleSearch = async (
+    query: string,
+    cat: 'all' | 'songs' | 'albums' | 'artists' | 'playlists' = searchCategory
+  ) => {
+    const q = query.trim();
+    if (!q) {
       setSearchResults([]);
+      setCategorizedResults({ songs: [], albums: [], artists: [], playlists: [] });
+      setIsSearching(false);
       return;
     }
     setIsSearching(true);
     try {
-      const results = await universalSearch(query);
-      if (results.length > 0) {
-        setSearchResults(results);
+      const results = await searchCategorized(q, cat);
+      setCategorizedResults(results);
+      setSearchResults(results.songs || []);
+      
+      if (
+        (results.songs && results.songs.length > 0) ||
+        (results.albums && results.albums.length > 0) ||
+        (results.artists && results.artists.length > 0) ||
+        (results.playlists && results.playlists.length > 0)
+      ) {
         setIsSearching(false);
         return;
       }
     } catch {}
 
+    // Fallback: Busca nas playlists locais da biblioteca do usuário
     const allSongs = playlists.flatMap((p) => p.songs);
-    const filtered = allSongs.filter(
+    const filteredSongs = allSongs.filter(
       (s) =>
-        s.name.toLowerCase().includes(query.toLowerCase()) ||
-        s.artist.toLowerCase().includes(query.toLowerCase())
+        s.name.toLowerCase().includes(q.toLowerCase()) ||
+        s.artist.toLowerCase().includes(q.toLowerCase())
     );
-    setSearchResults(filtered);
+    const filteredPlaylists: SearchPlaylist[] = playlists
+      .filter((p) => p.name.toLowerCase().includes(q.toLowerCase()))
+      .map((p) => ({
+        id: p.id,
+        rawId: p.id,
+        name: p.name,
+        creator: p.creator || 'Você',
+        cover: p.cover,
+        trackCount: p.songs.length
+      }));
+
+    setSearchResults(filteredSongs);
+    setCategorizedResults({
+      songs: filteredSongs,
+      albums: [],
+      artists: [],
+      playlists: filteredPlaylists
+    });
     setIsSearching(false);
+  };
+
+  // Abre detalhes de um Álbum, Artista ou Playlist encontrada
+  const handleOpenEntity = async (entity: {
+    type: 'album' | 'playlist' | 'artist';
+    name: string;
+    subtitle?: string;
+    cover: string;
+    rawId?: string | number;
+  }) => {
+    setViewingEntity({
+      ...entity,
+      songs: [],
+      loading: true
+    });
+
+    try {
+      if (entity.rawId) {
+        const tracks = await fetchEntityTracks(entity.rawId, entity.type, entity.name);
+        setViewingEntity((prev) => (prev ? { ...prev, songs: tracks, loading: false } : null));
+      } else {
+        const local = playlists.find((p) => p.id === entity.name);
+        setViewingEntity((prev) => (prev ? { ...prev, songs: local?.songs || [], loading: false } : null));
+      }
+    } catch {
+      setViewingEntity((prev) => (prev ? { ...prev, loading: false } : null));
+    }
+  };
+
+  // Toca todas as faixas da entidade aberta
+  const handlePlayEntityAll = (entity: { name: string; songs: Song[] }) => {
+    if (!entity.songs || entity.songs.length === 0) {
+      showToast('Nenhuma faixa disponível para reprodução.');
+      return;
+    }
+    setQueue(entity.songs);
+    playSong(entity.songs[0], entity.songs);
+    showToast(`Tocando ${entity.songs.length} faixas de "${entity.name}"!`);
+  };
+
+  // Salva o álbum ou playlist encontrada na biblioteca do usuário e sincroniza com a nuvem
+  const handleSaveEntityToLibrary = (entity: {
+    type: 'album' | 'playlist' | 'artist';
+    name: string;
+    subtitle?: string;
+    cover: string;
+    songs: Song[];
+  }) => {
+    if (!entity.songs || entity.songs.length === 0) {
+      showToast('Nenhuma faixa para salvar na biblioteca.');
+      return;
+    }
+
+    const titlePrefix =
+      entity.type === 'album'
+        ? `${entity.name} (Álbum)`
+        : entity.type === 'artist'
+        ? `Top: ${entity.name}`
+        : entity.name;
+
+    const newPl: Playlist = {
+      id: `pl-${entity.type}-${Date.now()}`,
+      name: titlePrefix,
+      creator: entity.subtitle || 'Montanha Music Lab',
+      cover: entity.cover,
+      songs: entity.songs,
+      isCustom: true
+    };
+
+    const nextPlaylists = [newPl, ...playlists];
+    setPlaylists(nextPlaylists);
+    setSelectedPlaylist(newPl);
+    setViewingEntity(null);
+    showToast(`"${newPl.name}" salva na sua biblioteca!`);
+
+    if (currentUser?.id) {
+      syncCloudPlaylists(currentUser.id, nextPlaylists);
+    }
   };
 
   const formatTime = (secs: number) => {
@@ -1475,9 +1604,10 @@ export default function App() {
           </div>
         )}
 
-        {/* VIEW 2: SEARCH */}
+        {/* VIEW 2: SEARCH CATEGORIZADO (MÚSICAS, ÁLBUNS, ARTISTAS, PLAYLISTS) */}
         {activeTab === 'search' && !selectedPlaylist && (
-          <div className="space-y-6 max-w-4xl mx-auto">
+          <div className="space-y-6 max-w-5xl mx-auto">
+            {/* Campo de Busca */}
             <div className="relative">
               <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400" />
               <input
@@ -1487,69 +1617,280 @@ export default function App() {
                   setSearchQuery(e.target.value);
                   handleSearch(e.target.value);
                 }}
-                placeholder="Buscar qualquer música, artista ou banda..."
-                className="h-12 w-full rounded-2xl bg-[#1e1e1e] border border-white/10 pl-11 pr-4 text-sm text-white placeholder-neutral-400 outline-none focus:border-[#1DB954] transition"
+                placeholder="Buscar músicas, álbuns, artistas ou playlists..."
+                className="h-12 w-full rounded-2xl bg-[#1e1e1e] border border-white/10 pl-11 pr-10 text-sm text-white placeholder-neutral-400 outline-none focus:border-[#1DB954] transition shadow-lg"
               />
-              {isSearching && (
+              {isSearching ? (
                 <Loader2 size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-[#1DB954] animate-spin" />
-              )}
+              ) : searchQuery ? (
+                <button
+                  onClick={() => {
+                    setSearchQuery('');
+                    handleSearch('');
+                  }}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white"
+                >
+                  <X size={16} />
+                </button>
+              ) : null}
             </div>
 
-            {/* Resultados de Busca */}
-            {searchResults.length > 0 ? (
-              <div className="space-y-2">
-                <h3 className="text-sm font-bold text-neutral-400">Resultados da Busca</h3>
-                {searchResults.map((song) => (
-                  <div
-                    key={song.id}
-                    onClick={() => playSong(song, searchResults)}
-                    className="flex items-center justify-between p-3 rounded-xl bg-[#181818] hover:bg-[#282828] transition cursor-pointer group border border-white/5"
+            {/* Pílulas de Filtro por Categoria */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+              {[
+                { id: 'all', label: 'Tudo', count: null },
+                { id: 'songs', label: 'Músicas', count: categorizedResults.songs.length },
+                { id: 'albums', label: 'Álbuns', count: categorizedResults.albums.length },
+                { id: 'artists', label: 'Artistas', count: categorizedResults.artists.length },
+                { id: 'playlists', label: 'Playlists', count: categorizedResults.playlists.length }
+              ].map((tab) => {
+                const isActive = searchCategory === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => {
+                      setSearchCategory(tab.id as any);
+                      if (searchQuery) handleSearch(searchQuery, tab.id as any);
+                    }}
+                    className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold transition active:scale-95 whitespace-nowrap shadow-sm ${
+                      isActive
+                        ? 'bg-[#1DB954] text-black shadow-[0_2px_10px_rgba(29,185,84,0.3)]'
+                        : 'bg-white/5 text-neutral-400 hover:text-white hover:bg-white/10 border border-white/5'
+                    }`}
                   >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <img src={song.thumbnail} alt={song.name} className="h-12 w-12 rounded-lg object-cover" />
-                      <div className="min-w-0">
-                        <p className="text-sm font-bold text-white truncate group-hover:text-[#1DB954]">{song.name}</p>
-                        <p className="text-xs text-neutral-400 truncate">{song.artist}</p>
-                      </div>
+                    <span>{tab.label}</span>
+                    {searchQuery && tab.count !== null && tab.count > 0 && (
+                      <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                        isActive ? 'bg-black/20 text-black' : 'bg-white/10 text-neutral-300'
+                      }`}>
+                        {tab.count}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* RESULTADOS CATEGORIZADOS */}
+            {searchQuery ? (
+              <div className="space-y-8 animate-fade-in">
+                {/* 1. SEÇÃO DE ÁLBUNS */}
+                {(searchCategory === 'all' || searchCategory === 'albums') && categorizedResults.albums.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-black uppercase tracking-wider text-neutral-400 flex items-center gap-2">
+                        <Disc size={16} className="text-[#1DB954]" />
+                        <span>Álbuns Encontrados</span>
+                      </h3>
+                      {searchCategory === 'all' && categorizedResults.albums.length > 4 && (
+                        <button
+                          onClick={() => setSearchCategory('albums')}
+                          className="text-xs text-[#1DB954] hover:underline font-bold"
+                        >
+                          Ver todos ({categorizedResults.albums.length})
+                        </button>
+                      )}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSongToAddToPlaylist(song);
-                          setIsAddToPlaylistModalOpen(true);
-                        }}
-                        className="p-2 text-neutral-400 hover:text-white"
-                        title="Adicionar à Playlist"
-                      >
-                        <ListPlus size={16} />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDownloadSong(song);
-                        }}
-                        className="p-2 text-neutral-400 hover:text-white"
-                        title="Baixar para Offline"
-                      >
-                        <Download size={16} />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleFavorite(song.id);
-                        }}
-                        className="p-2 text-neutral-400 hover:text-white"
-                      >
-                        <Heart size={16} className={favoriteSongIds.includes(song.id) ? 'fill-[#1DB954] text-[#1DB954]' : ''} />
-                      </button>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                      {(searchCategory === 'all' ? categorizedResults.albums.slice(0, 4) : categorizedResults.albums).map((album) => (
+                        <div
+                          key={album.id}
+                          onClick={() => handleOpenEntity({
+                            type: 'album',
+                            name: album.name,
+                            subtitle: album.artist,
+                            cover: album.cover,
+                            rawId: album.rawId
+                          })}
+                          className="group p-3 rounded-2xl bg-[#181818] hover:bg-[#282828] transition duration-200 cursor-pointer border border-white/5 relative flex flex-col"
+                        >
+                          <div className="aspect-square w-full rounded-xl overflow-hidden mb-3 shadow-md relative">
+                            <img
+                              src={album.cover}
+                              alt={album.name}
+                              className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
+                            />
+                            <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md text-[10px] text-white px-2 py-0.5 rounded-full font-bold">
+                              Álbum
+                            </div>
+                          </div>
+                          <p className="text-sm font-bold text-white truncate group-hover:text-[#1DB954]">{album.name}</p>
+                          <p className="text-xs text-neutral-400 truncate mt-0.5">{album.artist}</p>
+                          {album.trackCount ? (
+                            <span className="text-[10px] text-neutral-500 mt-1">{album.trackCount} faixas</span>
+                          ) : null}
+                        </div>
+                      ))}
                     </div>
                   </div>
-                ))}
+                )}
+
+                {/* 2. SEÇÃO DE ARTISTAS */}
+                {(searchCategory === 'all' || searchCategory === 'artists') && categorizedResults.artists.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-black uppercase tracking-wider text-neutral-400 flex items-center gap-2">
+                        <Users size={16} className="text-[#1DB954]" />
+                        <span>Artistas</span>
+                      </h3>
+                      {searchCategory === 'all' && categorizedResults.artists.length > 4 && (
+                        <button
+                          onClick={() => setSearchCategory('artists')}
+                          className="text-xs text-[#1DB954] hover:underline font-bold"
+                        >
+                          Ver todos ({categorizedResults.artists.length})
+                        </button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-4">
+                      {(searchCategory === 'all' ? categorizedResults.artists.slice(0, 6) : categorizedResults.artists).map((artist) => (
+                        <div
+                          key={artist.id}
+                          onClick={() => handleOpenEntity({
+                            type: 'artist',
+                            name: artist.name,
+                            subtitle: `${artist.nbAlbum || 0} álbuns`,
+                            cover: artist.image,
+                            rawId: artist.rawId
+                          })}
+                          className="group p-3 rounded-2xl bg-[#181818] hover:bg-[#282828] transition duration-200 cursor-pointer border border-white/5 flex flex-col items-center text-center"
+                        >
+                          <div className="h-20 w-20 sm:h-24 sm:w-24 rounded-full overflow-hidden mb-3 shadow-md border-2 border-transparent group-hover:border-[#1DB954] transition">
+                            <img
+                              src={artist.image}
+                              alt={artist.name}
+                              className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
+                            />
+                          </div>
+                          <p className="text-xs sm:text-sm font-bold text-white truncate w-full group-hover:text-[#1DB954]">{artist.name}</p>
+                          <span className="text-[10px] text-neutral-400 mt-0.5">Artista</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. SEÇÃO DE PLAYLISTS */}
+                {(searchCategory === 'all' || searchCategory === 'playlists') && categorizedResults.playlists.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-black uppercase tracking-wider text-neutral-400 flex items-center gap-2">
+                        <ListMusic size={16} className="text-[#1DB954]" />
+                        <span>Playlists Encontradas</span>
+                      </h3>
+                      {searchCategory === 'all' && categorizedResults.playlists.length > 4 && (
+                        <button
+                          onClick={() => setSearchCategory('playlists')}
+                          className="text-xs text-[#1DB954] hover:underline font-bold"
+                        >
+                          Ver todas ({categorizedResults.playlists.length})
+                        </button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                      {(searchCategory === 'all' ? categorizedResults.playlists.slice(0, 4) : categorizedResults.playlists).map((playlist) => (
+                        <div
+                          key={playlist.id}
+                          onClick={() => handleOpenEntity({
+                            type: 'playlist',
+                            name: playlist.name,
+                            subtitle: playlist.creator,
+                            cover: playlist.cover,
+                            rawId: playlist.rawId
+                          })}
+                          className="group p-3 rounded-2xl bg-[#181818] hover:bg-[#282828] transition duration-200 cursor-pointer border border-white/5 relative flex flex-col"
+                        >
+                          <div className="aspect-square w-full rounded-xl overflow-hidden mb-3 shadow-md relative">
+                            <img
+                              src={playlist.cover}
+                              alt={playlist.name}
+                              className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
+                            />
+                            <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md text-[10px] text-white px-2 py-0.5 rounded-full font-bold">
+                              Playlist
+                            </div>
+                          </div>
+                          <p className="text-sm font-bold text-white truncate group-hover:text-[#1DB954]">{playlist.name}</p>
+                          <p className="text-xs text-neutral-400 truncate mt-0.5">{playlist.creator}</p>
+                          {playlist.trackCount ? (
+                            <span className="text-[10px] text-neutral-500 mt-1">{playlist.trackCount} faixas</span>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 4. SEÇÃO DE MÚSICAS */}
+                {(searchCategory === 'all' || searchCategory === 'songs') && (
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-black uppercase tracking-wider text-neutral-400 flex items-center gap-2">
+                      <Music size={16} className="text-[#1DB954]" />
+                      <span>Músicas</span>
+                    </h3>
+                    {categorizedResults.songs.length > 0 ? (
+                      <div className="space-y-2">
+                        {categorizedResults.songs.map((song) => (
+                          <div
+                            key={song.id}
+                            onClick={() => playSong(song, categorizedResults.songs)}
+                            className="flex items-center justify-between p-3 rounded-xl bg-[#181818] hover:bg-[#282828] transition cursor-pointer group border border-white/5"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <img src={song.thumbnail} alt={song.name} className="h-12 w-12 rounded-lg object-cover shadow" />
+                              <div className="min-w-0">
+                                <p className="text-sm font-bold text-white truncate group-hover:text-[#1DB954]">{song.name}</p>
+                                <p className="text-xs text-neutral-400 truncate">{song.artist}{song.album ? ` • ${song.album}` : ''}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSongToAddToPlaylist(song);
+                                  setIsAddToPlaylistModalOpen(true);
+                                }}
+                                className="p-2 text-neutral-400 hover:text-white transition"
+                                title="Adicionar à Playlist"
+                              >
+                                <ListPlus size={16} />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDownloadSong(song);
+                                }}
+                                className="p-2 text-neutral-400 hover:text-white transition"
+                                title="Baixar para Offline"
+                              >
+                                <Download size={16} />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleFavorite(song.id);
+                                }}
+                                className="p-2 text-neutral-400 hover:text-white transition"
+                              >
+                                <Heart size={16} className={favoriteSongIds.includes(song.id) ? 'fill-[#1DB954] text-[#1DB954]' : ''} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="py-8 text-center text-neutral-500 text-xs">
+                        Nenhuma música avulsa encontrada para este termo.
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             ) : (
-              <div className="py-16 text-center text-neutral-500 text-sm">
-                Digite um termo para pesquisar ou ouça qualquer playlist da sua biblioteca.
+              <div className="py-16 text-center text-neutral-500 text-sm space-y-2">
+                <Search size={32} className="mx-auto text-neutral-600 opacity-60" />
+                <p>Busque músicas, álbuns de estúdio, artistas ou playlists públicas.</p>
+                <p className="text-xs text-neutral-600">Encontre qualquer conteúdo e ouça direto no Montanha Music Lab.</p>
               </div>
             )}
           </div>
@@ -2168,6 +2509,99 @@ export default function App() {
               <FolderPlus size={16} />
               <span>+ Criar Nova Playlist</span>
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE INSPEÇÃO E EXECUÇÃO DE ÁLBUM / PLAYLIST / ARTISTA */}
+      {viewingEntity && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
+          <div className="w-full max-w-2xl max-h-[85vh] rounded-3xl bg-[#181818] border border-white/10 p-6 flex flex-col shadow-2xl relative overflow-hidden">
+            {/* Header da Entidade */}
+            <div className="flex items-start gap-4 pb-4 border-b border-white/10 relative">
+              <div className={`h-24 w-24 sm:h-28 sm:w-28 shrink-0 overflow-hidden shadow-xl ${
+                viewingEntity.type === 'artist' ? 'rounded-full' : 'rounded-2xl'
+              }`}>
+                <img
+                  src={viewingEntity.cover}
+                  alt={viewingEntity.name}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+
+              <div className="flex-1 min-w-0 pr-8">
+                <div className="inline-block bg-[#1DB954]/20 text-[#1DB954] border border-[#1DB954]/30 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider mb-1.5">
+                  {viewingEntity.type === 'album' ? 'Álbum' : viewingEntity.type === 'artist' ? 'Artista' : 'Playlist'}
+                </div>
+                <h3 className="text-xl sm:text-2xl font-black text-white truncate">{viewingEntity.name}</h3>
+                {viewingEntity.subtitle && (
+                  <p className="text-xs text-neutral-400 mt-1 truncate">{viewingEntity.subtitle}</p>
+                )}
+                <div className="mt-3 flex items-center gap-2 flex-wrap">
+                  <button
+                    onClick={() => handlePlayEntityAll(viewingEntity)}
+                    disabled={viewingEntity.loading || viewingEntity.songs.length === 0}
+                    className="flex items-center gap-2 rounded-full bg-[#1DB954] hover:bg-[#1ed760] px-4 py-2 text-xs font-bold text-black transition active:scale-95 disabled:opacity-40"
+                  >
+                    <Play size={14} fill="currentColor" />
+                    <span>Tocar Tudo</span>
+                  </button>
+                  <button
+                    onClick={() => handleSaveEntityToLibrary(viewingEntity)}
+                    disabled={viewingEntity.loading || viewingEntity.songs.length === 0}
+                    className="flex items-center gap-2 rounded-full bg-white/10 hover:bg-white/20 px-4 py-2 text-xs font-bold text-white transition active:scale-95 border border-white/10 disabled:opacity-40"
+                  >
+                    <FolderPlus size={14} className="text-[#1DB954]" />
+                    <span>Salvar na Biblioteca</span>
+                  </button>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setViewingEntity(null)}
+                className="absolute top-0 right-0 p-2 text-neutral-400 hover:text-white rounded-full bg-white/5 hover:bg-white/10 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Lista de Faixas da Entidade */}
+            <div className="flex-1 overflow-y-auto mt-4 pr-1 space-y-1.5 scrollbar-thin">
+              {viewingEntity.loading ? (
+                <div className="py-16 text-center text-neutral-400 text-xs flex flex-col items-center gap-2">
+                  <Loader2 size={24} className="animate-spin text-[#1DB954]" />
+                  <span>Carregando faixas em alta fidelidade...</span>
+                </div>
+              ) : viewingEntity.songs.length > 0 ? (
+                viewingEntity.songs.map((song, idx) => (
+                  <div
+                    key={song.id || idx}
+                    onClick={() => {
+                      setQueue(viewingEntity.songs);
+                      playSong(song, viewingEntity.songs);
+                    }}
+                    className="flex items-center justify-between p-2.5 rounded-xl hover:bg-white/5 transition cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="w-5 text-center text-xs text-neutral-500 font-mono group-hover:text-[#1DB954]">
+                        {idx + 1}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-white truncate group-hover:text-[#1DB954]">{song.name}</p>
+                        <p className="text-xs text-neutral-400 truncate">{song.artist}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-neutral-400 font-mono">
+                      <span>{song.duration ? formatTime(song.duration) : ''}</span>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="py-12 text-center text-neutral-500 text-xs">
+                  Nenhuma faixa encontrada para este item.
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
