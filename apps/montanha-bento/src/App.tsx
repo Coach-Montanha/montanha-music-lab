@@ -48,6 +48,7 @@ import { AuthModal } from './components/AuthModal';
 import { AuthGateway } from './components/AuthGateway';
 import { mediaSessionController } from './lib/mediaSession';
 import { fetchRealTrackCover, cacheImageLocally, downloadImageFile, enrichPlaylistTracks } from './lib/coverEngine';
+import { audioAnchor } from './lib/audioAnchor';
 
 declare global {
   interface Window {
@@ -493,12 +494,21 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isQueueOpen, isFullScreenPlayer, isAuthModalOpen]);
 
-  // Manutenção Limpa de Áudio em Background ao Travar a Tela do Celular (Android / iOS)
+  // Manutenção Limpa e Contínua de Áudio em Background ao Travar a Tela do Celular (Android / iOS)
   useEffect(() => {
+    audioAnchor.init();
     const handleVisibility = () => {
       if (document.hidden) {
         // Quando a tela escurece ou o app vai para background:
-        // Não forçamos chamadas repetitivas de áudio para evitar cliques e som de 'toc toc toc' nos fones
+        if (isPlayingRef.current && !userInitiatedPauseRef.current) {
+          // Mantém a sessão de áudio do SO ativa via âncora 100% silenciosa
+          audioAnchor.play();
+          try {
+            if (window.ytPlayer && typeof window.ytPlayer.playVideo === 'function') {
+              window.ytPlayer.playVideo();
+            }
+          } catch {}
+        }
       } else {
         // Ao reativar a tela, se estava tocando e não foi pausado pelo usuário, garante que o player continue
         if (isPlayingRef.current && !userInitiatedPauseRef.current) {
@@ -548,23 +558,30 @@ export default function App() {
                   setIsPlaying(true);
                   isPlayingRef.current = true;
                   userInitiatedPauseRef.current = false;
+                  audioAnchor.play();
                 } else if (event.data === 2) {
                   // Se o usuário NÃO pausou intencionalmente e a tela está travada (hidden) ou app em background
                   if (!userInitiatedPauseRef.current && (document.hidden || !document.hasFocus())) {
+                    audioAnchor.play();
                     const now = Date.now();
-                    if (now - lastBackgroundResumeRef.current > 3000) {
+                    if (now - lastBackgroundResumeRef.current > 1200) {
                       lastBackgroundResumeRef.current = now;
-                      try {
-                        if (window.ytPlayer && typeof window.ytPlayer.playVideo === 'function') {
-                          window.ytPlayer.playVideo();
+                      setTimeout(() => {
+                        if (!userInitiatedPauseRef.current && (document.hidden || !document.hasFocus())) {
+                          try {
+                            if (window.ytPlayer && typeof window.ytPlayer.playVideo === 'function') {
+                              window.ytPlayer.playVideo();
+                            }
+                          } catch {}
                         }
-                      } catch {}
+                      }, 180);
                     }
                     return;
                   }
                   if (userInitiatedPauseRef.current) {
                     setIsPlaying(false);
                     isPlayingRef.current = false;
+                    audioAnchor.pause();
                   }
                 } else if (event.data === 0) {
                   // Fim da música no YouTube: aciona o handler mais recente
@@ -663,10 +680,12 @@ export default function App() {
     mediaSessionController.setupActionHandlers({
       onPlay: () => {
         userInitiatedPauseRef.current = false;
+        audioAnchor.play();
         togglePlay();
       },
       onPause: () => {
         userInitiatedPauseRef.current = true;
+        audioAnchor.pause();
         togglePlay();
       },
       onPrevious: () => handlePrevSong(),
@@ -712,6 +731,7 @@ export default function App() {
   const togglePlay = () => {
     if (isPlaying) {
       userInitiatedPauseRef.current = true;
+      audioAnchor.pause();
       if (audioRef.current) audioRef.current.pause();
       if (window.ytPlayer && typeof window.ytPlayer.pauseVideo === 'function') {
         window.ytPlayer.pauseVideo();
@@ -720,6 +740,7 @@ export default function App() {
       isPlayingRef.current = false;
     } else {
       userInitiatedPauseRef.current = false;
+      audioAnchor.play();
       // Se houver YouTube Player ativo, despausa o vídeo completo
       if (window.ytPlayer && typeof window.ytPlayer.playVideo === 'function') {
         try {
@@ -755,6 +776,7 @@ export default function App() {
   // Motor Padrão AbleMusic (YouTube Music Stream Completo 100% da Duração)
   const playSong = async (song: Song, newQueue?: Song[]) => {
     userInitiatedPauseRef.current = false;
+    audioAnchor.play();
     setCurrentSong(song);
     setCurrentTime(0);
     setDuration(song.duration || 240);
@@ -878,22 +900,29 @@ export default function App() {
                 setIsPlaying(true);
                 isPlayingRef.current = true;
                 userInitiatedPauseRef.current = false;
+                audioAnchor.play();
               } else if (e.data === 2) {
                 if (!userInitiatedPauseRef.current && (document.hidden || !document.hasFocus())) {
+                  audioAnchor.play();
                   const now = Date.now();
-                  if (now - lastBackgroundResumeRef.current > 3000) {
+                  if (now - lastBackgroundResumeRef.current > 1200) {
                     lastBackgroundResumeRef.current = now;
-                    try {
-                      if (window.ytPlayer && typeof window.ytPlayer.playVideo === 'function') {
-                        window.ytPlayer.playVideo();
+                    setTimeout(() => {
+                      if (!userInitiatedPauseRef.current && (document.hidden || !document.hasFocus())) {
+                        try {
+                          if (window.ytPlayer && typeof window.ytPlayer.playVideo === 'function') {
+                            window.ytPlayer.playVideo();
+                          }
+                        } catch {}
                       }
-                    } catch {}
+                    }, 180);
                   }
                   return;
                 }
                 if (userInitiatedPauseRef.current) {
                   setIsPlaying(false);
                   isPlayingRef.current = false;
+                  audioAnchor.pause();
                 }
               } else if (e.data === 0) {
                 handleNextSongRef.current();
