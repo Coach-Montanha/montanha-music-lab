@@ -608,14 +608,24 @@ export default function App() {
                   setIsPlaying(true);
                   isPlayingRef.current = true;
                   userInitiatedPauseRef.current = false;
+                  audioAnchor.play();
                 } else if (event.data === 2) {
                   if (userInitiatedPauseRef.current) {
                     setIsPlaying(false);
                     isPlayingRef.current = false;
+                    audioAnchor.pause();
                   } else {
-                    // Pausa externa (sistema operacional ou fone)
-                    setIsPlaying(false);
-                    isPlayingRef.current = false;
+                    // Pausa involuntária (tela apagada, troca de app ou tela de bloqueio)
+                    // NÃO aceita a pausa: retoma imediatamente a reprodução contínua com som
+                    setTimeout(() => {
+                      if (!userInitiatedPauseRef.current && window.ytPlayer && typeof window.ytPlayer.playVideo === 'function') {
+                        try {
+                          window.ytPlayer.playVideo();
+                          if (typeof window.ytPlayer.unMute === 'function' && !isMuted) window.ytPlayer.unMute();
+                          if (typeof window.ytPlayer.setVolume === 'function') window.ytPlayer.setVolume(Math.round(volume * 100));
+                        } catch {}
+                      }
+                    }, 80);
                   }
                 } else if (event.data === 0) {
                   // Fim da música no YouTube: aciona o handler mais recente
@@ -948,9 +958,24 @@ export default function App() {
                 setIsPlaying(true);
                 isPlayingRef.current = true;
                 userInitiatedPauseRef.current = false;
+                audioAnchor.play();
               } else if (e.data === 2) {
-                setIsPlaying(false);
-                isPlayingRef.current = false;
+                if (userInitiatedPauseRef.current) {
+                  setIsPlaying(false);
+                  isPlayingRef.current = false;
+                  audioAnchor.pause();
+                } else {
+                  // Pausa involuntária (tela apagada, troca de app ou tela de bloqueio)
+                  setTimeout(() => {
+                    if (!userInitiatedPauseRef.current && window.ytPlayer && typeof window.ytPlayer.playVideo === 'function') {
+                      try {
+                        window.ytPlayer.playVideo();
+                        if (typeof window.ytPlayer.unMute === 'function' && !isMuted) window.ytPlayer.unMute();
+                        if (typeof window.ytPlayer.setVolume === 'function') window.ytPlayer.setVolume(Math.round(volume * 100));
+                      } catch {}
+                    }
+                  }, 80);
+                }
               } else if (e.data === 0) {
                 handleNextSongRef.current();
               }
