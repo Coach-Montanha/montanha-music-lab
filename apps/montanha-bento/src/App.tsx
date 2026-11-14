@@ -52,6 +52,7 @@ import { SettingsModal } from './components/SettingsModal';
 import { mediaSessionController } from './lib/mediaSession';
 import { fetchRealTrackCover, cacheImageLocally, downloadImageFile, enrichPlaylistTracks } from './lib/coverEngine';
 import { audioAnchor } from './lib/audioAnchor';
+import { fetchAudioStream } from './lib/audioStreamEngine';
 
 declare global {
   interface Window {
@@ -655,9 +656,17 @@ export default function App() {
     if (isPlaying) {
       interval = setInterval(() => {
         if (audioRef.current && !audioRef.current.paused) {
-          setCurrentTime(Math.floor(audioRef.current.currentTime));
+          const cur = Math.floor(audioRef.current.currentTime);
+          setCurrentTime(cur);
           if (audioRef.current.duration) {
-            setDuration(Math.floor(audioRef.current.duration));
+            const dur = Math.floor(audioRef.current.duration);
+            if (dur > 0 && dur !== duration) {
+              setDuration(dur);
+            }
+            // Auto-avanço ininterrupto de playlist quando a música chega ao final
+            if (dur > 10 && cur >= dur - 1) {
+              handleNextSongRef.current();
+            }
           }
         } else if (window.ytPlayer && typeof window.ytPlayer.getCurrentTime === 'function') {
           try {
@@ -699,6 +708,24 @@ export default function App() {
     }
     return () => clearInterval(interval);
   }, [isPlaying, duration]);
+
+  // Sincronização Imediata de Volume e Mute entre <audio> e fallback do player
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = isMuted ? 0 : volume;
+    }
+    if (window.ytPlayer) {
+      try {
+        if (typeof window.ytPlayer.setVolume === 'function') {
+          window.ytPlayer.setVolume(Math.round(volume * 100));
+        }
+        if (typeof window.ytPlayer.mute === 'function' && typeof window.ytPlayer.unMute === 'function') {
+          if (isMuted) window.ytPlayer.mute();
+          else window.ytPlayer.unMute();
+        }
+      } catch {}
+    }
+  }, [volume, isMuted]);
 
   // PWA Install Prompt State
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -747,6 +774,16 @@ export default function App() {
     isPlayingRef.current = true;
     mediaSessionController.updatePlaybackState(true);
 
+    // 1. Prioridade absoluta para o motor de áudio nativo HTML5 (background-safe)
+    if (audioRef.current && audioRef.current.src) {
+      audioRef.current.volume = isMuted ? 0 : volume;
+      audioRef.current.play().catch(() => {
+        if (currentSong) playSong(currentSong);
+      });
+      return;
+    }
+
+    // 2. Fallback para YouTube Player se o áudio HTML5 não estiver carregado
     if (window.ytPlayer && typeof window.ytPlayer.playVideo === 'function') {
       try {
         if (typeof window.ytPlayer.unMute === 'function' && !isMuted) {
@@ -759,11 +796,8 @@ export default function App() {
         return;
       } catch {}
     }
-    if (audioRef.current && audioRef.current.src) {
-      audioRef.current.play().catch(() => {
-        if (currentSong) playSong(currentSong);
-      });
-    } else if (currentSong) {
+
+    if (currentSong) {
       playSong(currentSong);
     }
   };
@@ -900,12 +934,35 @@ export default function App() {
       ytId = song.youtubeId || 'ytQ5CYE1VZw';
     }
 
-    // Pausa qualquer áudio HTML5 para não sobrepor
+    // 2. MOTOR DE STREAMING EM TAG <audio> PURA (Background-safe ininterrupto com tela apagada)
+    try {
+      const stream = await fetchAudioStream(ytId, song.name, song.artist);
+      if (stream?.url && audioRef.current) {
+        if (window.ytPlayer && typeof window.ytPlayer.pauseVideo === 'function') {
+          try { window.ytPlayer.pauseVideo(); } catch {}
+        }
+        audioRef.current.src = stream.url;
+        audioRef.current.currentTime = 0;
+        audioRef.current.volume = isMuted ? 0 : volume;
+        if (stream.duration) {
+          setDuration(Math.floor(stream.duration));
+        }
+        await audioRef.current.play();
+        setIsPlaying(true);
+        isPlayingRef.current = true;
+        mediaSessionController.updatePlaybackState(true);
+        return;
+      }
+    } catch (streamErr) {
+      console.warn('Erro ao reproduzir stream de áudio direto, usando fallback:', streamErr);
+    }
+
+    // Pausa qualquer áudio HTML5 para não sobrepor se usar fallback
     if (audioRef.current) {
       audioRef.current.pause();
     }
 
-    // Reproduz áudio completo via YouTube Music Engine
+    // Fallback: Reproduz via YouTube Music Engine caso o streaming direto falhe
     if (window.ytPlayer && typeof window.ytPlayer.loadVideoById === 'function') {
       try {
         window.ytPlayer.loadVideoById({ videoId: ytId, startSeconds: 0 });

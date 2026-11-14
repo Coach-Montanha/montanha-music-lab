@@ -15,73 +15,99 @@ export default async function handler(req, res) {
   }
 
   let cleanId = id.replace(/^yt-/, '').replace(/https?:\/\/(www\.)?youtube\.com\/watch\?v=/, '').split('&')[0];
+  const isValidYoutubeId = /^[a-zA-Z0-9_-]{11}$/.test(cleanId);
 
-  const pipedInstances = [
-    'https://api.piped.private.coffee',
-    'https://pipedapi.adminforge.de',
-    'https://piped.video/api/v1',
-    'https://api.piped.projectsegfau.lt'
+  const invidiousHosts = [
+    'https://echostreamz.com'
   ];
 
-  // 1. Se não for ID válido direto do YouTube (ex: dz-*, sp-* ou busca por texto), busca no YouTube Music / Piped
-  const isValidYoutubeId = /^[a-zA-Z0-9_-]{11}$/.test(cleanId);
-  if (!cleanId || !isValidYoutubeId || cleanId.startsWith('dz-') || cleanId.startsWith('sp-')) {
-    const searchTerm = query || id.replace(/^(dz|sp)-/, '');
-    for (const instance of pipedInstances) {
-      try {
-        const c = new AbortController();
-        const t = setTimeout(() => c.abort(), 3500);
-        const searchResp = await fetch(`${instance}/search?q=${encodeURIComponent(searchTerm)}&filter=music_songs`, {
-          signal: c.signal,
-          headers: { 'User-Agent': 'Mozilla/5.0' }
-        });
-        clearTimeout(t);
-        if (searchResp.ok) {
-          const searchData = await searchResp.json();
-          const firstStream = (searchData.items || []).find((item) => item.type === 'stream' || item.url);
-          if (firstStream?.url) {
-            cleanId = firstStream.url.replace('/watch?v=', '').split('&')[0];
-            break;
-          }
-        }
-      } catch {}
+  // Função auxiliar para selecionar o melhor stream de áudio (AAC/m4a preferencial)
+  function selectBestAudio(data, host) {
+    const audios = (data.adaptiveFormats || []).filter(
+      (f) => f.type && (f.type.startsWith('audio/mp4') || f.type.startsWith('audio/webm'))
+    );
+    if (audios.length === 0) return null;
+
+    audios.sort((a, b) => {
+      const aMp4 = a.type.startsWith('audio/mp4') ? 1 : 0;
+      const bMp4 = b.type.startsWith('audio/mp4') ? 1 : 0;
+      if (aMp4 !== bMp4) return bMp4 - aMp4;
+      return (parseInt(b.bitrate) || 0) - (parseInt(a.bitrate) || 0);
+    });
+
+    const best = audios[0];
+    if (!best.url) return null;
+
+    try {
+      const proxiedUrl = best.url.replace(new URL(best.url).origin, host);
+      return {
+        url: proxiedUrl,
+        title: data.title,
+        artist: data.author,
+        duration: Number(data.lengthSeconds) || 240,
+        mimeType: best.type.split(';')[0] || 'audio/mp4'
+      };
+    } catch {
+      return null;
     }
   }
 
-  // 2. Extrair áudio de alta fidelidade completo (Opus/AAC 160-320kbps) das instâncias Piped
-  if (cleanId && !cleanId.startsWith('dz-')) {
-    for (const instance of pipedInstances) {
+  // 1. Tenta extrair áudio diretamente pelo ID
+  if (cleanId && isValidYoutubeId) {
+    for (const host of invidiousHosts) {
       try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 4000);
-
-        const resp = await fetch(`${instance}/streams/${encodeURIComponent(cleanId)}`, {
-          signal: controller.signal,
+        const resp = await fetch(`${host}/api/v1/videos/${encodeURIComponent(cleanId)}`, {
+          signal: AbortSignal.timeout(3500),
           headers: { 'User-Agent': 'Mozilla/5.0' }
         });
-        clearTimeout(timeout);
-
         if (resp.ok) {
           const data = await resp.json();
-          const audioStreams = data.audioStreams || [];
-          if (audioStreams.length > 0) {
-            audioStreams.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0));
-            return res.status(200).json({
-              url: audioStreams[0].url,
-              title: data.title,
-              artist: data.uploader,
-              duration: data.duration,
-              mimeType: audioStreams[0].mimeType || 'audio/webm'
-            });
+          const result = selectBestAudio(data, host);
+          if (result) {
+            return res.status(200).json(result);
           }
         }
       } catch {}
     }
   }
 
-  // 3. Fallback inteligente: se não conseguiu extrair URL estática, devolve o ID do YouTube limpo
-  // para que o player utilize o YouTube IFrame Player integrado (sem 30s de corte)
-  if (cleanId && !cleanId.startsWith('dz-')) {
+  // 2. Busca por termo ou query alternativa (com 'audio' para focar na faixa de música oficial)
+  const searchTerm = (query || (isValidYoutubeId ? '' : cleanId) || '').trim();
+  if (searchTerm) {
+    for (const host of invidiousHosts) {
+      try {
+        const searchResp = await fetch(
+          `${host}/api/v1/search?q=${encodeURIComponent(`${searchTerm} audio`)}&type=video`,
+          {
+            signal: AbortSignal.timeout(3500),
+            headers: { 'User-Agent': 'Mozilla/5.0' }
+          }
+        );
+        if (searchResp.ok) {
+          const searchData = await searchResp.json();
+          for (const item of (searchData || []).slice(0, 3)) {
+            if (!item?.videoId) continue;
+            try {
+              const vResp = await fetch(`${host}/api/v1/videos/${encodeURIComponent(item.videoId)}`, {
+                signal: AbortSignal.timeout(3000),
+                headers: { 'User-Agent': 'Mozilla/5.0' }
+              });
+              if (vResp.ok) {
+                const vData = await vResp.json();
+                const result = selectBestAudio(vData, host);
+                if (result) {
+                  return res.status(200).json(result);
+                }
+              }
+            } catch {}
+          }
+        }
+      } catch {}
+    }
+  }
+
+  // 3. Fallback: devolve o ID do YouTube limpo caso o stream direto falhe
+  if (cleanId && isValidYoutubeId) {
     return res.status(200).json({
       url: `https://www.youtube.com/watch?v=${cleanId}`,
       youtubeId: cleanId,
