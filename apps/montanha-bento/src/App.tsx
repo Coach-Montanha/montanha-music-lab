@@ -205,9 +205,9 @@ export default function App() {
   const [queue, setQueue] = useState<Song[]>(() => playlists[0]?.songs || INITIAL_PLAYLISTS[0].songs);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const bgAudioAnchorRef = useRef<HTMLAudioElement | null>(null);
   const isPlayingRef = useRef<boolean>(false);
   const userInitiatedPauseRef = useRef<boolean>(false);
+  const lastBackgroundResumeRef = useRef<number>(0);
   const handleNextSongRef = useRef<() => void>(() => {});
   const originalQueueRef = useRef<Song[]>([]);
 
@@ -493,27 +493,23 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isQueueOpen, isFullScreenPlayer, isAuthModalOpen]);
 
-  // Manutenção Contínua de Áudio em Background ao Travar a Tela do Celular (Android / iOS)
+  // Manutenção Limpa de Áudio em Background ao Travar a Tela do Celular (Android / iOS)
   useEffect(() => {
     const handleVisibility = () => {
       if (document.hidden) {
-        if (isPlayingRef.current && !userInitiatedPauseRef.current) {
-          try {
-            if (bgAudioAnchorRef.current && bgAudioAnchorRef.current.paused) {
-              bgAudioAnchorRef.current.play().catch(() => {});
-            }
-            if (window.ytPlayer && typeof window.ytPlayer.playVideo === 'function') {
-              window.ytPlayer.playVideo();
-            }
-          } catch {}
-        }
+        // Quando a tela escurece ou o app vai para background:
+        // Não forçamos chamadas repetitivas de áudio para evitar cliques e som de 'toc toc toc' nos fones
       } else {
+        // Ao reativar a tela, se estava tocando e não foi pausado pelo usuário, garante que o player continue
         if (isPlayingRef.current && !userInitiatedPauseRef.current) {
           try {
             if (window.ytPlayer && typeof window.ytPlayer.getPlayerState === 'function') {
               if (window.ytPlayer.getPlayerState() !== 1) {
                 window.ytPlayer.playVideo();
               }
+            }
+            if (audioRef.current && audioRef.current.paused && audioRef.current.src) {
+              audioRef.current.play().catch(() => {});
             }
           } catch {}
         }
@@ -552,25 +548,23 @@ export default function App() {
                   setIsPlaying(true);
                   isPlayingRef.current = true;
                   userInitiatedPauseRef.current = false;
-                  if (bgAudioAnchorRef.current && bgAudioAnchorRef.current.paused) {
-                    bgAudioAnchorRef.current.play().catch(() => {});
-                  }
                 } else if (event.data === 2) {
                   // Se o usuário NÃO pausou intencionalmente e a tela está travada (hidden) ou app em background
                   if (!userInitiatedPauseRef.current && (document.hidden || !document.hasFocus())) {
-                    setTimeout(() => {
+                    const now = Date.now();
+                    if (now - lastBackgroundResumeRef.current > 3000) {
+                      lastBackgroundResumeRef.current = now;
                       try {
                         if (window.ytPlayer && typeof window.ytPlayer.playVideo === 'function') {
                           window.ytPlayer.playVideo();
                         }
                       } catch {}
-                    }, 120);
+                    }
                     return;
                   }
                   if (userInitiatedPauseRef.current) {
                     setIsPlaying(false);
                     isPlayingRef.current = false;
-                    if (bgAudioAnchorRef.current) bgAudioAnchorRef.current.pause();
                   }
                 } else if (event.data === 0) {
                   // Fim da música no YouTube: aciona o handler mais recente
@@ -719,7 +713,6 @@ export default function App() {
     if (isPlaying) {
       userInitiatedPauseRef.current = true;
       if (audioRef.current) audioRef.current.pause();
-      if (bgAudioAnchorRef.current) bgAudioAnchorRef.current.pause();
       if (window.ytPlayer && typeof window.ytPlayer.pauseVideo === 'function') {
         window.ytPlayer.pauseVideo();
       }
@@ -727,9 +720,6 @@ export default function App() {
       isPlayingRef.current = false;
     } else {
       userInitiatedPauseRef.current = false;
-      if (bgAudioAnchorRef.current) {
-        bgAudioAnchorRef.current.play().catch(() => {});
-      }
       // Se houver YouTube Player ativo, despausa o vídeo completo
       if (window.ytPlayer && typeof window.ytPlayer.playVideo === 'function') {
         try {
@@ -772,11 +762,6 @@ export default function App() {
     isPlayingRef.current = true;
     if (newQueue) setQueue(newQueue);
     showToast(`Tocando: ${song.name}`);
-
-    // Aciona a âncora de áudio HTML5 para manter playback de sistema aberto em background
-    if (bgAudioAnchorRef.current) {
-      bgAudioAnchorRef.current.play().catch(() => {});
-    }
 
     // Incrementa contador de reprodução para Músicas em Destaque (Mais Tocadas da Conta)
     setPlayCounts((prev) => {
@@ -893,24 +878,22 @@ export default function App() {
                 setIsPlaying(true);
                 isPlayingRef.current = true;
                 userInitiatedPauseRef.current = false;
-                if (bgAudioAnchorRef.current && bgAudioAnchorRef.current.paused) {
-                  bgAudioAnchorRef.current.play().catch(() => {});
-                }
               } else if (e.data === 2) {
                 if (!userInitiatedPauseRef.current && (document.hidden || !document.hasFocus())) {
-                  setTimeout(() => {
+                  const now = Date.now();
+                  if (now - lastBackgroundResumeRef.current > 3000) {
+                    lastBackgroundResumeRef.current = now;
                     try {
                       if (window.ytPlayer && typeof window.ytPlayer.playVideo === 'function') {
                         window.ytPlayer.playVideo();
                       }
                     } catch {}
-                  }, 120);
+                  }
                   return;
                 }
                 if (userInitiatedPauseRef.current) {
                   setIsPlaying(false);
                   isPlayingRef.current = false;
-                  if (bgAudioAnchorRef.current) bgAudioAnchorRef.current.pause();
                 }
               } else if (e.data === 0) {
                 handleNextSongRef.current();
@@ -3313,15 +3296,6 @@ export default function App() {
           );
         })}
       </nav>
-
-      {/* ÂNCORA DE ÁUDIO EM BACKGROUND (WAV SILENCIOSO CONTÍNUO QUE MANTÉM O CELULAR TOCANDO COM TELA TRAVADA) */}
-      <audio
-        ref={bgAudioAnchorRef}
-        id="montanha-bg-anchor"
-        loop
-        preload="auto"
-        src="data:audio/wav;base64,UklGRjIAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YRAAAAAAAAAAAAAAAAAA"
-      />
 
       </div>
     </div>
