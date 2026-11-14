@@ -620,12 +620,12 @@ export default function App() {
                     setTimeout(() => {
                       if (!userInitiatedPauseRef.current && window.ytPlayer && typeof window.ytPlayer.playVideo === 'function') {
                         try {
-                          window.ytPlayer.playVideo();
                           if (typeof window.ytPlayer.unMute === 'function' && !isMuted) window.ytPlayer.unMute();
                           if (typeof window.ytPlayer.setVolume === 'function') window.ytPlayer.setVolume(Math.round(volume * 100));
+                          window.ytPlayer.playVideo();
                         } catch {}
                       }
-                    }, 80);
+                    }, 50);
                   }
                 } else if (event.data === 0) {
                   // Fim da música no YouTube: aciona o handler mais recente
@@ -659,8 +659,19 @@ export default function App() {
           }
         } else if (window.ytPlayer && typeof window.ytPlayer.getCurrentTime === 'function') {
           try {
-            const state = window.ytPlayer.getPlayerState();
+            const state = typeof window.ytPlayer.getPlayerState === 'function' ? window.ytPlayer.getPlayerState() : -1;
             if (state === 1) {
+              // Garante que o som nunca fique mudo inadvertidamente no Android ao apagar a tela
+              if (typeof window.ytPlayer.isMuted === 'function' && window.ytPlayer.isMuted() && !isMuted) {
+                try { window.ytPlayer.unMute(); } catch {}
+              }
+              if (typeof window.ytPlayer.getVolume === 'function') {
+                const targetVol = Math.round(volume * 100);
+                if (window.ytPlayer.getVolume() < targetVol && !isMuted) {
+                  try { window.ytPlayer.setVolume(targetVol); } catch {}
+                }
+              }
+
               const cur = window.ytPlayer.getCurrentTime() || 0;
               const dur = window.ytPlayer.getDuration() || 0;
               setCurrentTime(Math.floor(cur));
@@ -672,6 +683,13 @@ export default function App() {
               if (dur > 10 && cur >= dur - 1) {
                 handleNextSongRef.current();
               }
+            } else if (state === 2 && !userInitiatedPauseRef.current && isPlayingRef.current) {
+              // Retomada contínua caso o Android pause em background
+              try {
+                if (typeof window.ytPlayer.unMute === 'function' && !isMuted) window.ytPlayer.unMute();
+                if (typeof window.ytPlayer.setVolume === 'function') window.ytPlayer.setVolume(Math.round(volume * 100));
+                window.ytPlayer.playVideo();
+              } catch {}
             }
           } catch {}
         }
@@ -969,12 +987,12 @@ export default function App() {
                   setTimeout(() => {
                     if (!userInitiatedPauseRef.current && window.ytPlayer && typeof window.ytPlayer.playVideo === 'function') {
                       try {
-                        window.ytPlayer.playVideo();
                         if (typeof window.ytPlayer.unMute === 'function' && !isMuted) window.ytPlayer.unMute();
                         if (typeof window.ytPlayer.setVolume === 'function') window.ytPlayer.setVolume(Math.round(volume * 100));
+                        window.ytPlayer.playVideo();
                       } catch {}
                     }
-                  }, 80);
+                  }, 50);
                 }
               } else if (e.data === 0) {
                 handleNextSongRef.current();
