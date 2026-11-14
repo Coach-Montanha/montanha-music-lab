@@ -597,17 +597,23 @@ export default function App() {
               },
               onStateChange: (event: any) => {
                 if (event.data === 1) {
+                  try {
+                    if (event.target && typeof event.target.unMute === 'function' && !isMuted) {
+                      event.target.unMute();
+                    }
+                    if (event.target && typeof event.target.setVolume === 'function') {
+                      event.target.setVolume(Math.round(volume * 100));
+                    }
+                  } catch {}
                   setIsPlaying(true);
                   isPlayingRef.current = true;
                   userInitiatedPauseRef.current = false;
-                  audioAnchor.play();
                 } else if (event.data === 2) {
                   if (userInitiatedPauseRef.current) {
                     setIsPlaying(false);
                     isPlayingRef.current = false;
-                    audioAnchor.pause();
                   } else {
-                    // Pausa externa (sistema operacional ou fone): atualiza o estado para permitir toque em Play na tela bloqueada
+                    // Pausa externa (sistema operacional ou fone)
                     setIsPlaying(false);
                     isPlayingRef.current = false;
                   }
@@ -772,6 +778,12 @@ export default function App() {
       // Se houver YouTube Player ativo, despausa o vídeo completo
       if (window.ytPlayer && typeof window.ytPlayer.playVideo === 'function') {
         try {
+          if (typeof window.ytPlayer.unMute === 'function' && !isMuted) {
+            window.ytPlayer.unMute();
+          }
+          if (typeof window.ytPlayer.setVolume === 'function') {
+            window.ytPlayer.setVolume(Math.round(volume * 100));
+          }
           window.ytPlayer.playVideo();
           setIsPlaying(true);
           isPlayingRef.current = true;
@@ -911,8 +923,8 @@ export default function App() {
     if (window.YT && window.YT.Player) {
       try {
         window.ytPlayer = new window.YT.Player('able-yt-player', {
-          height: '1',
-          width: '1',
+          height: '240',
+          width: '320',
           videoId: ytId,
           playerVars: { autoplay: 1, controls: 0, disablekb: 1, fs: 0, rel: 0, playsinline: 1 },
           events: {
@@ -925,19 +937,20 @@ export default function App() {
             },
             onStateChange: (e: any) => {
               if (e.data === 1) {
+                try {
+                  if (e.target && typeof e.target.unMute === 'function' && !isMuted) {
+                    e.target.unMute();
+                  }
+                  if (e.target && typeof e.target.setVolume === 'function') {
+                    e.target.setVolume(Math.round(volume * 100));
+                  }
+                } catch {}
                 setIsPlaying(true);
                 isPlayingRef.current = true;
                 userInitiatedPauseRef.current = false;
-                audioAnchor.play();
               } else if (e.data === 2) {
-                if (userInitiatedPauseRef.current) {
-                  setIsPlaying(false);
-                  isPlayingRef.current = false;
-                  audioAnchor.pause();
-                } else {
-                  setIsPlaying(false);
-                  isPlayingRef.current = false;
-                }
+                setIsPlaying(false);
+                isPlayingRef.current = false;
               } else if (e.data === 0) {
                 handleNextSongRef.current();
               }
@@ -1541,14 +1554,14 @@ export default function App() {
             </button>
           )}
 
-          <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-[#1DB954] text-black shadow-lg p-1.5 flex-shrink-0">
-            <img src="/music.svg" alt="Montanha Music Lab" className="w-full h-full object-contain" />
-          </div>
-          <div className="flex items-center gap-1.5">
-            <h1 className="text-sm sm:text-base md:text-lg font-black tracking-tight text-white flex items-center gap-1 sm:gap-1.5 whitespace-nowrap">
-              <span>Montanha</span>
-              <span className="hidden sm:inline-block text-[#1DB954] text-[10px] sm:text-xs font-black uppercase px-1.5 sm:px-2 py-0.5 rounded-md bg-[#1DB954]/10 border border-[#1DB954]/30">Music Lab</span>
-            </h1>
+          <div className="flex items-center gap-2.5 flex-shrink-0 select-none">
+            <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl bg-[#1DB954] text-black shadow-md p-1.5 flex-shrink-0">
+              <img src="/music.svg" alt="Montanha Music Lab" className="w-full h-full object-contain" />
+            </div>
+            <div className="flex flex-col justify-center leading-none">
+              <span className="text-sm sm:text-base font-black tracking-tight text-white leading-none">Montanha</span>
+              <span className="text-[8px] sm:text-[9px] font-extrabold tracking-widest text-[#1DB954] uppercase mt-1 leading-none">MUSIC LAB</span>
+            </div>
           </div>
         </div>
 

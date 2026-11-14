@@ -5,6 +5,7 @@
   "buildCommand": "npm run build --prefix apps/montanha-bento",
   "outputDirectory": "apps/montanha-bento/dist",
   "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
