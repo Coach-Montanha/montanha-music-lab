@@ -36,7 +36,9 @@ import {
   RefreshCw,
   ListMusic,
   Disc,
-  Users
+  Users,
+  Sliders,
+  Settings
 } from 'lucide-react';
 
 import { Song, Playlist, SearchAlbum, SearchArtist, SearchPlaylist, CategorizedSearchResults } from './types';
@@ -46,6 +48,7 @@ import { extractPlaylistFromUrl } from './lib/playlistExtractor';
 import { universalSearch, searchCategorized, fetchEntityTracks } from './lib/searchEngine';
 import { AuthModal } from './components/AuthModal';
 import { AuthGateway } from './components/AuthGateway';
+import { SettingsModal } from './components/SettingsModal';
 import { mediaSessionController } from './lib/mediaSession';
 import { fetchRealTrackCover, cacheImageLocally, downloadImageFile, enrichPlaylistTracks } from './lib/coverEngine';
 import { audioAnchor } from './lib/audioAnchor';
@@ -185,7 +188,16 @@ export default function App() {
 
   const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isQueueOpen, setIsQueueOpen] = useState(false);
+
+  // Estado de Atualização de Capas Sequencial de Todas as Playlists do Perfil
+  const [isEnrichingAllCovers, setIsEnrichingAllCovers] = useState(false);
+  const [enrichAllProgress, setEnrichAllProgress] = useState<{ current: number; total: number; playlistName: string }>({
+    current: 0,
+    total: 0,
+    playlistName: ''
+  });
 
   // Audio State
   const [currentSong, setCurrentSong] = useState<Song>(() => playlists[0]?.songs[0] || INITIAL_PLAYLISTS[0].songs[0]);
@@ -470,6 +482,8 @@ export default function App() {
         setIsQueueOpen(false);
       } else if (isFullScreenPlayer) {
         setIsFullScreenPlayer(false);
+      } else if (isSettingsModalOpen) {
+        setIsSettingsModalOpen(false);
       } else if (isAuthModalOpen) {
         setIsAuthModalOpen(false);
       } else if (selectedPlaylist) {
@@ -478,7 +492,7 @@ export default function App() {
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [selectedPlaylist, isFullScreenPlayer, isQueueOpen, isAuthModalOpen]);
+  }, [selectedPlaylist, isFullScreenPlayer, isQueueOpen, isAuthModalOpen, isSettingsModalOpen]);
 
   // Tecla Escape para Fechamento Rápido no Desktop
   useEffect(() => {
@@ -486,12 +500,13 @@ export default function App() {
       if (e.key === 'Escape') {
         if (isQueueOpen) setIsQueueOpen(false);
         if (isFullScreenPlayer) setIsFullScreenPlayer(false);
+        if (isSettingsModalOpen) setIsSettingsModalOpen(false);
         if (isAuthModalOpen) setIsAuthModalOpen(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isQueueOpen, isFullScreenPlayer, isAuthModalOpen]);
+  }, [isQueueOpen, isFullScreenPlayer, isAuthModalOpen, isSettingsModalOpen]);
 
   // Screen Wake Lock API (Evita que a tela do celular apague sozinha durante o treino / reprodução)
   useEffect(() => {
@@ -1193,6 +1208,66 @@ export default function App() {
     }
   };
 
+  // ENRIQUECER E ATUALIZAR CAPAS DE TODAS AS PLAYLISTS DO PERFIL SEQUENCIALMENTE
+  const handleEnrichAllPlaylistsCovers = async () => {
+    if (playlists.length === 0) {
+      showToast('Nenhuma playlist para atualizar capas.');
+      return;
+    }
+    if (isEnrichingAllCovers) return;
+
+    setIsEnrichingAllCovers(true);
+    showToast(`Iniciando atualização de capas em sequência para ${playlists.length} playlists...`);
+
+    try {
+      const updatedPlaylists = [...playlists];
+      for (let i = 0; i < updatedPlaylists.length; i++) {
+        const pl = updatedPlaylists[i];
+        setEnrichAllProgress({
+          current: i + 1,
+          total: updatedPlaylists.length,
+          playlistName: pl.name
+        });
+        showToast(`(${i + 1}/${updatedPlaylists.length}) Atualizando capas: "${pl.name}"...`);
+
+        if (pl.songs && pl.songs.length > 0) {
+          const enriched = await enrichPlaylistTracks(pl, (done, total) => {
+            if (done === total || done % 10 === 0) {
+              console.log(`[Cover Engine] Playlist "${pl.name}": ${done}/${total} faixas processadas.`);
+            }
+          });
+          updatedPlaylists[i] = enriched;
+          setPlaylists([...updatedPlaylists]);
+          if (selectedPlaylist && selectedPlaylist.id === enriched.id) {
+            setSelectedPlaylist(enriched);
+          }
+        }
+        // Intervalo de segurança amigável entre playlists
+        await new Promise((resolve) => setTimeout(resolve, 400));
+      }
+
+      // Persistência local no perfil
+      const userKey = getUserPlaylistStorageKey(currentUser?.id);
+      try {
+        localStorage.setItem(userKey, JSON.stringify(updatedPlaylists));
+      } catch {}
+
+      // Sincronização em nuvem Supabase
+      if (currentUser?.id) {
+        showToast('Salvando alterações na nuvem...');
+        await syncCloudPlaylists(currentUser.id, updatedPlaylists);
+      }
+
+      showToast(`🎉 Concluído! Todas as capas das ${updatedPlaylists.length} playlists foram atualizadas.`);
+    } catch (err) {
+      console.error('[Cover Engine Error]', err);
+      showToast('Erro ao atualizar capas de algumas playlists.');
+    } finally {
+      setIsEnrichingAllCovers(false);
+      setEnrichAllProgress({ current: 0, total: 0, playlistName: '' });
+    }
+  };
+
   // ADICIONAR MÚSICA A UMA PLAYLIST
   const handleAddSongToTargetPlaylist = (targetPlaylistId: string) => {
     if (!songToAddToPlaylist) return;
@@ -1518,6 +1593,19 @@ export default function App() {
             <span>Criar Playlist</span>
           </button>
 
+          {/* Botão Atualizar Capas ao lado de Criar Playlist */}
+          <button
+            onClick={handleEnrichAllPlaylistsCovers}
+            disabled={isEnrichingAllCovers}
+            className="flex items-center gap-1.5 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 px-3 py-1.5 sm:py-2 text-xs font-bold text-white transition border border-white/10 flex-shrink-0"
+            title="Atualizar capas em alta definição de todas as playlists em sequência"
+          >
+            <Sparkles size={14} className={isEnrichingAllCovers ? "animate-spin text-[#1DB954]" : "text-[#1DB954]"} />
+            <span className="hidden sm:inline">
+              {isEnrichingAllCovers ? `Atualizando (${enrichAllProgress.current}/${enrichAllProgress.total})` : 'Atualizar Capas'}
+            </span>
+          </button>
+
           {/* Botão Importar Playlist por Link - Apenas telas médias/grandes (já presente na Home no mobile) */}
           <button
             onClick={() => setIsImportModalOpen(true)}
@@ -1549,17 +1637,17 @@ export default function App() {
             <span className="hidden sm:inline">Baixar App</span>
           </button>
 
-          {/* Botão de Conta & Perfil */}
+          {/* Botão de Configurações & Perfil */}
           <button
-            onClick={() => setIsAuthModalOpen(true)}
+            onClick={() => setIsSettingsModalOpen(true)}
             className={`flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full border transition flex-shrink-0 ${
               currentUser
                 ? 'bg-[#1DB954]/20 border-[#1DB954] text-[#1DB954]'
                 : 'bg-white/10 border-white/10 text-white hover:bg-white/20'
             }`}
-            title={currentUser ? `Logado como ${currentUser.email}` : 'Entrar na minha conta'}
+            title={currentUser ? `Configurações de ${currentUser.email}` : 'Configurações & Login'}
           >
-            {currentUser ? <Cloud size={16} /> : <UserIcon size={16} />}
+            {currentUser ? <Sliders size={16} /> : <UserIcon size={16} />}
           </button>
         </div>
       </header>
@@ -1585,6 +1673,15 @@ export default function App() {
                 >
                   <Plus size={14} />
                   <span>Criar Playlist</span>
+                </button>
+                <button
+                  onClick={handleEnrichAllPlaylistsCovers}
+                  disabled={isEnrichingAllCovers}
+                  className="text-xs font-bold text-[#1DB954] hover:underline flex items-center gap-1 transition disabled:opacity-50"
+                  title="Atualizar capas de todas as playlists do perfil"
+                >
+                  <Sparkles size={14} className={isEnrichingAllCovers ? "animate-spin" : ""} />
+                  <span>{isEnrichingAllCovers ? `Atualizando (${enrichAllProgress.current}/${enrichAllProgress.total})...` : 'Atualizar Capas'}</span>
                 </button>
                 <button
                   onClick={() => setIsImportModalOpen(true)}
@@ -2826,6 +2923,24 @@ export default function App() {
         currentUser={currentUser}
         onUserChange={(user) => setCurrentUser(user)}
         onSyncPlaylists={handleForceCloudSync}
+      />
+
+      {/* MODAL DE CONFIGURAÇÕES, PERFIL & QUALIDADE DO SOM */}
+      <SettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
+        currentUser={currentUser}
+        onUserChange={(user) => setCurrentUser(user)}
+        playlists={playlists}
+        onPlaylistsChange={(nextPls) => {
+          setPlaylists(nextPls);
+          try {
+            const userKey = getUserPlaylistStorageKey(currentUser?.id);
+            localStorage.setItem(userKey, JSON.stringify(nextPls));
+          } catch {}
+        }}
+        onSyncPlaylists={handleForceCloudSync}
+        downloadedCount={downloadedSongs.length}
       />
 
       {/* PAINEL LATERAL: FILA DE REPRODUÇÃO (QUEUE DRAWER) COM BACKDROP E DISMISSAL TOUCH-FRIENDLY */}
