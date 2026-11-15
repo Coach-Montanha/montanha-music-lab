@@ -53,6 +53,7 @@ import { mediaSessionController } from './lib/mediaSession';
 import { fetchRealTrackCover, cacheImageLocally, downloadImageFile, enrichPlaylistTracks } from './lib/coverEngine';
 import { audioAnchor } from './lib/audioAnchor';
 import { fetchAudioStream } from './lib/audioStreamEngine';
+import { SilentHoldKeeper, GestureGuardian } from 'pwa-audio-player';
 
 declare global {
   interface Window {
@@ -219,6 +220,8 @@ export default function App() {
   const [queue, setQueue] = useState<Song[]>(() => playlists[0]?.songs || INITIAL_PLAYLISTS[0].songs);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const silentHoldRef = useRef<SilentHoldKeeper | null>(null);
+  const gestureGuardianRef = useRef<GestureGuardian | null>(null);
   const isPlayingRef = useRef<boolean>(false);
   const userInitiatedPauseRef = useRef<boolean>(false);
   const handleNextSongRef = useRef<() => void>(() => {});
@@ -650,6 +653,32 @@ export default function App() {
     }
   }, []);
 
+  // Inicialização do SilentHoldKeeper (Blindagem de Hardware Audio Session no Mobile PWA)
+  useEffect(() => {
+    if (audioRef.current && !silentHoldRef.current) {
+      try {
+        silentHoldRef.current = new SilentHoldKeeper(
+          audioRef.current,
+          {
+            strategy: 'silent-hold',
+            hardPauseTimeoutMs: 15 * 60 * 1000
+          },
+          {
+            onKeepAliveEnter: () => {
+              mediaSessionController.updatePlaybackState(false);
+            },
+            onKeepAliveExit: () => {
+              mediaSessionController.updatePlaybackState(true);
+            }
+          }
+        );
+        gestureGuardianRef.current = new GestureGuardian();
+      } catch (err) {
+        console.warn('Erro ao inicializar SilentHoldKeeper:', err);
+      }
+    }
+  }, []);
+
   // Sincronização em Tempo Real do Progresso de Áudio & Auto-Avanço Contínuo
   useEffect(() => {
     let interval: any = null;
@@ -774,7 +803,17 @@ export default function App() {
     isPlayingRef.current = true;
     mediaSessionController.updatePlaybackState(true);
 
-    // 1. Prioridade absoluta para o motor de áudio nativo HTML5 (background-safe)
+    // 1. Se estiver retido no SilentHoldKeeper, retoma a música real imediatamente
+    if (silentHoldRef.current?.isHolding()) {
+      const resumed = silentHoldRef.current.handleResume(() => {
+        setIsPlaying(true);
+        isPlayingRef.current = true;
+        mediaSessionController.updatePlaybackState(true);
+      });
+      if (resumed) return;
+    }
+
+    // 2. Prioridade absoluta para o motor de áudio nativo HTML5 (background-safe)
     if (audioRef.current && audioRef.current.src) {
       audioRef.current.volume = isMuted ? 0 : volume;
       audioRef.current.play().catch(() => {
@@ -783,7 +822,7 @@ export default function App() {
       return;
     }
 
-    // 2. Fallback para YouTube Player se o áudio HTML5 não estiver carregado
+    // 3. Fallback para YouTube Player se o áudio HTML5 não estiver carregado
     if (window.ytPlayer && typeof window.ytPlayer.playVideo === 'function') {
       try {
         if (typeof window.ytPlayer.unMute === 'function' && !isMuted) {
@@ -808,6 +847,19 @@ export default function App() {
     setIsPlaying(false);
     isPlayingRef.current = false;
     mediaSessionController.updatePlaybackState(false);
+
+    // 1. Interceptação pelo SilentHoldKeeper: evita CoreAudio decoder eviction no Android/iOS
+    if (audioRef.current && silentHoldRef.current) {
+      const handled = silentHoldRef.current.handlePause(
+        currentSong ? { id: currentSong.id, title: currentSong.name, artist: currentSong.artist, src: audioRef.current.src } : null,
+        currentTime,
+        duration,
+        audioRef.current.src
+      );
+      if (handled) {
+        return;
+      }
+    }
 
     if (window.ytPlayer && typeof window.ytPlayer.pauseVideo === 'function') {
       try { window.ytPlayer.pauseVideo(); } catch {}
@@ -936,7 +988,8 @@ export default function App() {
 
     // 2. MOTOR DE STREAMING EM TAG <audio> PURA (Background-safe ininterrupto com tela apagada)
     try {
-      const stream = await fetchAudioStream(ytId, song.name, song.artist);
+      silentHoldRef.current?.reset();
+      const stream = await fetchAudioStream(ytId, song.name, song.artist, song.audioUrl);
       if (stream?.url && audioRef.current) {
         if (window.ytPlayer && typeof window.ytPlayer.pauseVideo === 'function') {
           try { window.ytPlayer.pauseVideo(); } catch {}
@@ -951,6 +1004,24 @@ export default function App() {
         setIsPlaying(true);
         isPlayingRef.current = true;
         mediaSessionController.updatePlaybackState(true);
+
+        // Pré-carregamento contínuo da próxima faixa para auto-avanço sem bloqueio de gesto no mobile
+        if (queue.length > 1) {
+          const currentIdx = queue.findIndex(s => s.id === song.id);
+          const nextIdx = (currentIdx + 1) % queue.length;
+          const nextSong = queue[nextIdx];
+          if (nextSong) {
+            fetchAudioStream(nextSong.youtubeId, nextSong.name, nextSong.artist, nextSong.audioUrl)
+              .then(ns => {
+                if (ns?.url) {
+                  gestureGuardianRef.current?.preloadSurroundingTracks([
+                    { id: nextSong.id, title: nextSong.name, artist: nextSong.artist, src: ns.url }
+                  ], 0);
+                }
+              })
+              .catch(() => {});
+          }
+        }
         return;
       }
     } catch (streamErr) {
