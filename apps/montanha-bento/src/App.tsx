@@ -49,6 +49,7 @@ import { universalSearch, searchCategorized, fetchEntityTracks } from './lib/sea
 import { AuthModal } from './components/AuthModal';
 import { AuthGateway } from './components/AuthGateway';
 import { SettingsModal } from './components/SettingsModal';
+import { AudioScrubber } from './components/AudioScrubber';
 import { mediaSessionController } from './lib/mediaSession';
 import { fetchRealTrackCover, cacheImageLocally, downloadImageFile, enrichPlaylistTracks } from './lib/coverEngine';
 import { fetchAudioStream, invalidateStream } from './lib/audioStreamEngine';
@@ -203,6 +204,7 @@ export default function App() {
   }, [playlists, currentSong]);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [currentTime, setCurrentTime] = useState<number>(0);
+  const [scrubbingTime, setScrubbingTime] = useState<number | null>(null);
   const [duration, setDuration] = useState<number>(297);
   const [volume, setVolume] = useState<number>(0.85);
   const [isMuted, setIsMuted] = useState<boolean>(false);
@@ -3246,18 +3248,23 @@ export default function App() {
             </div>
 
             <div className="w-full max-w-md flex items-center gap-2">
-              <span className="text-[10px] text-neutral-500 font-mono tabular-nums">{formatTime(currentTime)}</span>
-              <div
-                onClick={(e) => {
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  const pos = (e.clientX - rect.left) / rect.width;
-                  handleSeek(Math.floor(pos * duration));
+              <span className="text-[10px] text-neutral-500 font-mono tabular-nums w-8 text-right">
+                {formatTime(scrubbingTime !== null ? scrubbingTime : currentTime)}
+              </span>
+              <AudioScrubber
+                currentTime={currentTime}
+                duration={duration}
+                onSeek={handleSeek}
+                className="flex-1"
+                barHeight="h-1.5"
+                thumbSize="w-3 h-3"
+                onScrubbingChange={(isScrubbing, time) => {
+                  setScrubbingTime(isScrubbing ? time : null);
                 }}
-                className="h-1.5 flex-1 rounded-full bg-white/20 overflow-hidden cursor-pointer relative group"
-              >
-                <div className="h-full bg-white group-hover:bg-[#1DB954] transition" style={{ width: `${(currentTime / Math.max(duration, 1)) * 100}%` }} />
-              </div>
-              <span className="text-[10px] text-neutral-500 font-mono tabular-nums">{formatTime(duration)}</span>
+              />
+              <span className="text-[10px] text-neutral-500 font-mono tabular-nums w-8">
+                {formatTime(duration)}
+              </span>
             </div>
           </div>
 
@@ -3367,19 +3374,23 @@ export default function App() {
             </div>
 
             <div>
-              <div
-                onClick={(e) => {
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  const pos = (e.clientX - rect.left) / rect.width;
-                  handleSeek(Math.floor(pos * duration));
+              <AudioScrubber
+                currentTime={currentTime}
+                duration={duration}
+                onSeek={handleSeek}
+                className="w-full"
+                barHeight="h-2"
+                thumbSize="w-4 h-4"
+                showThumbAlways={true}
+                onScrubbingChange={(isScrubbing, time) => {
+                  setScrubbingTime(isScrubbing ? time : null);
                 }}
-                className="relative h-2 w-full rounded-full bg-white/20 overflow-hidden cursor-pointer group"
-              >
-                <div className="h-full bg-white group-hover:bg-[#1DB954] transition" style={{ width: `${(currentTime / Math.max(duration, 1)) * 100}%` }} />
-              </div>
-              <div className="flex justify-between text-xs font-mono text-neutral-400 mt-2">
-                <span>{formatTime(currentTime)}</span>
-                <span>{formatTime(duration)}</span>
+              />
+              <div className="flex justify-between text-xs font-mono text-neutral-400 mt-1">
+                <span className="tabular-nums">
+                  {formatTime(scrubbingTime !== null ? scrubbingTime : currentTime)}
+                </span>
+                <span className="tabular-nums">{formatTime(duration)}</span>
               </div>
             </div>
 
