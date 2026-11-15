@@ -817,6 +817,12 @@ export default function App() {
       album: song.album || 'Able Music',
       artworkUrl: song.thumbnail,
     });
+    mediaSessionController.updatePlaybackState(true);
+    mediaSessionController.updatePositionState({
+      duration: song.duration || 210,
+      position: 0,
+      playbackRate: 1,
+    });
 
     // Incrementa contador de reprodução para Músicas em Destaque
     setPlayCounts((prev) => {
@@ -1487,6 +1493,14 @@ export default function App() {
           setIsPlaying(true);
           isPlayingRef.current = true;
           mediaSessionController.updatePlaybackState(true);
+          if (currentSongRef.current) {
+            mediaSessionController.updateMetadata({
+              title: currentSongRef.current.name,
+              artist: currentSongRef.current.artist,
+              album: currentSongRef.current.album || 'Able Music',
+              artworkUrl: currentSongRef.current.thumbnail,
+            });
+          }
         }}
         onTimeUpdate={() => {
           if (audioRef.current) {
@@ -3327,8 +3341,8 @@ export default function App() {
 
       {/* FULL SCREEN PLAYER MODAL */}
       {isFullScreenPlayer && (
-        <div className="fixed inset-0 z-50 bg-[#121212] flex flex-col justify-between p-6 sm:p-10 animate-fade-in select-none">
-          <div className="flex items-center justify-between">
+        <div className="fixed inset-0 z-[60] bg-[#121212] flex flex-col justify-between p-5 sm:p-8 animate-fade-in select-none h-[100dvh] max-h-[100dvh] overflow-y-auto pb-[calc(env(safe-area-inset-bottom,16px)+20px)] pt-[env(safe-area-inset-top,16px)]">
+          <div className="flex items-center justify-between flex-shrink-0">
             <button
               onClick={() => setIsFullScreenPlayer(false)}
               className="rounded-full p-2 text-neutral-400 hover:text-white hover:bg-white/10 transition"
@@ -3358,15 +3372,19 @@ export default function App() {
             </div>
           </div>
 
-          <div className="my-auto max-w-sm sm:max-w-md mx-auto w-full aspect-square rounded-3xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.8)] border border-white/10">
-            <img src={activeSong.thumbnail} alt={activeSong.name} className="w-full h-full object-cover" />
+          {/* CAPA RESPONSIVA: CSS Units dvh / % para jamais transbordar em telas mobile */}
+          <div className="my-auto flex items-center justify-center w-full min-h-0 flex-1 py-2 sm:py-4">
+            <div className="w-auto h-full max-h-[35vh] sm:max-h-[44vh] aspect-square rounded-3xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.8)] border border-white/10 flex-shrink">
+              <img src={activeSong.thumbnail} alt={activeSong.name} className="w-full h-full object-cover" />
+            </div>
           </div>
 
-          <div className="max-w-md mx-auto w-full space-y-6">
+          {/* CONTROLES E SCRUBBER: Compactos e Perfeitamente Visíveis */}
+          <div className="max-w-md mx-auto w-full space-y-4 sm:space-y-6 flex-shrink-0">
             <div className="flex items-center justify-between">
               <div className="min-w-0 flex-1">
-                <h2 className="text-2xl font-black text-white truncate">{activeSong.name}</h2>
-                <p className="text-sm text-neutral-400 font-medium truncate mt-0.5">{activeSong.artist}</p>
+                <h2 className="text-xl sm:text-2xl font-black text-white truncate">{activeSong.name}</h2>
+                <p className="text-xs sm:text-sm text-neutral-400 font-medium truncate mt-0.5">{activeSong.artist}</p>
               </div>
               <button onClick={() => toggleFavorite(currentSong.id)} className="p-2 text-neutral-400 hover:text-white">
                 <Heart size={24} className={favoriteSongIds.includes(currentSong.id) ? 'fill-[#1DB954] text-[#1DB954]' : ''} />
@@ -3394,7 +3412,7 @@ export default function App() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between pt-2">
+            <div className="flex items-center justify-between pt-1 sm:pt-2">
               <button
                 onClick={toggleShuffle}
                 className={`p-2 transition ${isShuffle ? 'text-[#1DB954]' : 'text-neutral-400 hover:text-white'}`}
@@ -3409,7 +3427,7 @@ export default function App() {
 
               <button
                 onClick={togglePlay}
-                className="flex h-16 w-16 items-center justify-center rounded-full bg-white text-black shadow-2xl hover:scale-105 active:scale-95 transition"
+                className="flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-full bg-white text-black shadow-2xl hover:scale-105 active:scale-95 transition"
               >
                 {isPlaying ? <Pause size={28} fill="currentColor" /> : <Play size={28} fill="currentColor" className="ml-1" />}
               </button>
@@ -3429,34 +3447,36 @@ export default function App() {
         </div>
       )}
 
-      {/* BOTTOM NAVIGATION TABS (Mobile) */}
-      <nav className="fixed bottom-0 left-0 right-0 h-16 bg-[#121212]/95 border-t border-white/[0.08] backdrop-blur-lg flex items-center justify-around z-50 sm:hidden">
-        {[
-          { id: 'home', label: 'Início', icon: HomeIcon },
-          { id: 'search', label: 'Buscar', icon: Search },
-          { id: 'playlists', label: 'Playlists', icon: LibraryIcon },
-          { id: 'downloads', label: 'Downloads', icon: Download }
-        ].map((item) => {
-          const Icon = item.icon;
-          const isActive = activeTab === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => {
-                setIsQueueOpen(false);
-                setActiveTab(item.id as any);
-                setSelectedPlaylist(null);
-              }}
-              className={`flex flex-col items-center justify-center gap-1 py-1 px-4 transition ${
-                isActive ? 'text-white' : 'text-neutral-500 hover:text-neutral-300'
-              }`}
-            >
-              <Icon size={20} className={isActive ? 'text-[#1DB954]' : ''} />
-              <span className={`text-[10px] font-semibold ${isActive ? 'text-white' : 'text-neutral-500'}`}>{item.label}</span>
-            </button>
-          );
-        })}
-      </nav>
+      {/* BOTTOM NAVIGATION TABS (Mobile - Oculto quando o player fullscreen está ativo) */}
+      {!isFullScreenPlayer && (
+        <nav className="fixed bottom-0 left-0 right-0 h-16 bg-[#121212]/95 border-t border-white/[0.08] backdrop-blur-lg flex items-center justify-around z-40 sm:hidden">
+          {[
+            { id: 'home', label: 'Início', icon: HomeIcon },
+            { id: 'search', label: 'Buscar', icon: Search },
+            { id: 'playlists', label: 'Playlists', icon: LibraryIcon },
+            { id: 'downloads', label: 'Downloads', icon: Download }
+          ].map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => {
+                  setIsQueueOpen(false);
+                  setActiveTab(item.id as any);
+                  setSelectedPlaylist(null);
+                }}
+                className={`flex flex-col items-center justify-center gap-1 py-1 px-4 transition ${
+                  isActive ? 'text-white' : 'text-neutral-500 hover:text-neutral-300'
+                }`}
+              >
+                <Icon size={20} className={isActive ? 'text-[#1DB954]' : ''} />
+                <span className={`text-[10px] font-semibold ${isActive ? 'text-white' : 'text-neutral-500'}`}>{item.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+      )}
 
       </div>
     </div>

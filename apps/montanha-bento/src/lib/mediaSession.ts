@@ -5,6 +5,21 @@ export interface TrackMetadata {
   artworkUrl?: string | null;
 }
 
+function normalizeArtwork(url?: string | null) {
+  if (!url || typeof url !== 'string' || !url.trim()) return [];
+  try {
+    const absolute = new URL(url.trim(), window.location.href).href;
+    return [
+      { src: absolute, sizes: '96x96' },
+      { src: absolute, sizes: '128x128' },
+      { src: absolute, sizes: '256x256' },
+      { src: absolute, sizes: '512x512' },
+    ];
+  } catch {
+    return [];
+  }
+}
+
 export class MediaSessionController {
   private static instance: MediaSessionController;
 
@@ -19,19 +34,15 @@ export class MediaSessionController {
     if (!('mediaSession' in navigator)) return;
 
     try {
+      const artwork = normalizeArtwork(track.artworkUrl);
       navigator.mediaSession.metadata = new MediaMetadata({
-        title: track.title,
+        title: track.title || 'Música',
         artist: track.artist || 'Able Music',
         album: track.album || 'Able Player Library',
-        artwork: track.artworkUrl
-          ? [
-              { src: track.artworkUrl, sizes: '96x96' },
-              { src: track.artworkUrl, sizes: '128x128' },
-              { src: track.artworkUrl, sizes: '256x256' },
-              { src: track.artworkUrl, sizes: '512x512' },
-            ]
-          : [],
+        artwork,
       });
+      // Garante que o playbackState permaneça 'playing' para evitar descarte da notificação pelo SO
+      navigator.mediaSession.playbackState = 'playing';
     } catch (e) {
       console.warn('Erro ao atualizar MediaMetadata:', e);
     }
