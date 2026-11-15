@@ -79,6 +79,70 @@ export default defineConfig({
           next();
         });
 
+        // 1.5. /api/stream middleware (Proxy local com suporte a Saavn 320kbps e Invidious)
+        server.middlewares.use(async (req, res, next) => {
+          if (!req.url?.startsWith('/api/stream')) return next();
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+
+          const urlObj = new URL(req.url, 'http://localhost');
+          const title = (urlObj.searchParams.get('title') || urlObj.searchParams.get('t') || '').trim();
+          const artist = (urlObj.searchParams.get('artist') || urlObj.searchParams.get('a') || '').trim();
+          const id = (urlObj.searchParams.get('id') || '').trim();
+
+          const cleanT = title.replace(/\(.*?\)/g, '').replace(/\[.*?\]/g, '').replace(/feat\..*$/i, '').trim();
+          const artists = artist.split(/[,&/]|feat\.|ft\./i).map(a => a.trim()).filter(Boolean);
+          if (artists.length === 0 && artist) artists.push(artist.trim());
+
+          // Tier 1: Saavn
+          for (const cand of artists) {
+            try {
+              const saavnRes = await fetch(
+                `https://fast-saavn.vercel.app/api?title=${encodeURIComponent(cleanT)}&artist=${encodeURIComponent(cand)}`
+              );
+              if (saavnRes.ok) {
+                const streamId = (await saavnRes.text()).trim();
+                if (streamId && streamId.length > 5 && !streamId.includes('error') && !streamId.includes('not found')) {
+                  res.statusCode = 200;
+                  res.end(JSON.stringify({
+                    url: `https://aac.saavncdn.com/${streamId}_320.mp4`,
+                    duration: 210,
+                    mimeType: 'audio/mp4',
+                    title,
+                    artist: cand,
+                    source: 'saavn-320'
+                  }));
+                  return;
+                }
+              }
+            } catch {}
+          }
+
+          // Tier 2: Deezer
+          try {
+            const dzRes = await fetch(`https://api.deezer.com/search?q=${encodeURIComponent(`${cleanT} ${artists[0] || ''}`)}&limit=1`);
+            if (dzRes.ok) {
+              const dzData = await dzRes.json();
+              const track = dzData?.data?.[0];
+              if (track?.preview) {
+                res.statusCode = 200;
+                res.end(JSON.stringify({
+                  url: track.preview,
+                  duration: track.duration || 30,
+                  mimeType: 'audio/mpeg',
+                  title: track.title || title,
+                  artist: track.artist?.name || artist,
+                  source: 'deezer'
+                }));
+                return;
+              }
+            }
+          } catch {}
+
+          res.statusCode = 404;
+          res.end(JSON.stringify({ error: 'Áudio não encontrado' }));
+        });
+
         // 2. /api/youtube-search middleware
         server.middlewares.use(async (req, res, next) => {
           if (!req.url?.startsWith('/api/youtube-search')) return next();

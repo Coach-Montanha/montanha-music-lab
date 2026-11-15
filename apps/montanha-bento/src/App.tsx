@@ -216,6 +216,7 @@ export default function App() {
   const isPlayingRef = useRef<boolean>(false);
   const userInitiatedPauseRef = useRef<boolean>(false);
   const handleNextSongRef = useRef<() => void>(() => {});
+  const nextSongStreamRef = useRef<{ id: string; url: string; duration?: number } | null>(null);
   const originalQueueRef = useRef<Song[]>([]);
 
   // Full Screen Player Sheet
@@ -829,6 +830,7 @@ export default function App() {
             fetchAudioStream(nextSong.youtubeId, nextSong.name, nextSong.artist, nextSong.audioUrl)
               .then(ns => {
                 if (ns?.url) {
+                  nextSongStreamRef.current = { id: nextSong.id, url: ns.url, duration: ns.duration };
                   gestureGuardianRef.current?.preloadSurroundingTracks([
                     { id: nextSong.id, title: nextSong.name, artist: nextSong.artist, src: ns.url }
                   ], 0);
@@ -862,14 +864,49 @@ export default function App() {
 
   const handleNextSong = () => {
     if (isRepeat && currentSong) {
-      playSong(currentSong);
+      if (audioRef.current) {
+        audioRef.current.currentTime = 0;
+        audioRef.current.play().catch(() => playSong(currentSong));
+      }
       return;
     }
     if (queue.length === 0) return;
     const currentIdx = queue.findIndex((s) => s.id === currentSong.id);
     let nextIdx = currentIdx + 1;
     if (nextIdx >= queue.length || nextIdx < 0) nextIdx = 0;
-    playSong(queue[nextIdx]);
+    const nextSong = queue[nextIdx];
+
+    // Se a próxima faixa já teve stream resolvido, toca de forma SÍNCRONA no mesmo tick do evento ended
+    // (Impede que o navegador revogue o foco de áudio em background no mobile)
+    if (nextSongStreamRef.current && nextSongStreamRef.current.id === nextSong.id && audioRef.current) {
+      const stream = nextSongStreamRef.current;
+      audioRef.current.src = stream.url;
+      audioRef.current.currentTime = 0;
+      audioRef.current.play().catch(() => {});
+      setCurrentSong(nextSong);
+      setCurrentTime(0);
+      if (stream.duration) setDuration(stream.duration);
+      setIsPlaying(true);
+      isPlayingRef.current = true;
+      userInitiatedPauseRef.current = false;
+      mediaSessionController.updatePlaybackState(true);
+
+      // Pré-carrega imediatamente a seguinte (N+2)
+      const afterNextIdx = (nextIdx + 1) % queue.length;
+      const afterNextSong = queue[afterNextIdx];
+      if (afterNextSong) {
+        fetchAudioStream(afterNextSong.youtubeId, afterNextSong.name, afterNextSong.artist, afterNextSong.audioUrl)
+          .then((ns) => {
+            if (ns?.url) {
+              nextSongStreamRef.current = { id: afterNextSong.id, url: ns.url, duration: ns.duration };
+            }
+          })
+          .catch(() => {});
+      }
+      return;
+    }
+
+    playSong(nextSong);
   };
 
   // Mantém a referência de handleNextSong sempre atualizada para YouTube Player e timers
@@ -1439,10 +1476,12 @@ export default function App() {
         }}
         onEnded={handleNextSong}
         onPause={() => {
+          // Se a música acabou naturalmente, não interfere no fluxo de avanço para a próxima
+          if (audioRef.current?.ended) return;
           // Se o sistema operacional ou tela apagada enviou pause involuntário enquanto deveria estar tocando:
           if (isPlayingRef.current && !userInitiatedPauseRef.current) {
             setTimeout(() => {
-              if (isPlayingRef.current && !userInitiatedPauseRef.current && audioRef.current?.paused) {
+              if (isPlayingRef.current && !userInitiatedPauseRef.current && audioRef.current?.paused && !audioRef.current?.ended) {
                 audioRef.current.play().catch(() => {});
               }
             }, 50);
