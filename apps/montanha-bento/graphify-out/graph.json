@@ -1,0 +1,608 @@
+{
+  "nodes": [
+    {
+      "id": "api/search.js",
+      "label": "search.js",
+      "type": "code",
+      "size": 6386,
+      "exports": [],
+      "functions": [
+        "handler",
+        "query"
+      ]
+    },
+    {
+      "id": "api/spotify.js",
+      "label": "spotify.js",
+      "type": "code",
+      "size": 4675,
+      "exports": [],
+      "functions": [
+        "handler",
+        "input"
+      ]
+    },
+    {
+      "id": "api/stream.js",
+      "label": "stream.js",
+      "type": "code",
+      "size": 5957,
+      "exports": [],
+      "functions": [
+        "sanitizeTitle",
+        "extractArtistCandidates",
+        "handler",
+        "title",
+        "artist",
+        "id",
+        "streamId",
+        "streamId",
+        "audios"
+      ]
+    },
+    {
+      "id": "api/sync.js",
+      "label": "sync.js",
+      "type": "code",
+      "size": 4281,
+      "exports": [],
+      "functions": [
+        "handler"
+      ]
+    },
+    {
+      "id": "api/youtube-search.js",
+      "label": "youtube-search.js",
+      "type": "code",
+      "size": 2732,
+      "exports": [],
+      "functions": [
+        "handler",
+        "query"
+      ]
+    },
+    {
+      "id": "index.html",
+      "label": "index.html",
+      "type": "view",
+      "size": 1427,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "package-lock.json",
+      "label": "package-lock.json",
+      "type": "code",
+      "size": 101174,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "package.json",
+      "label": "package.json",
+      "type": "code",
+      "size": 856,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "postcss.config.js",
+      "label": "postcss.config.js",
+      "type": "code",
+      "size": 86,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "public/manifest.json",
+      "label": "manifest.json",
+      "type": "code",
+      "size": 648,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "public/sw.js",
+      "label": "sw.js",
+      "type": "code",
+      "size": 2224,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "src/App.tsx",
+      "label": "App.tsx",
+      "type": "code",
+      "size": 157652,
+      "exports": [
+        "App"
+      ],
+      "functions": [
+        "getUserPlaylistStorageKey",
+        "loadInitialUserPlaylists",
+        "App",
+        "handleImageUpload",
+        "showToast",
+        "handleAuthSuccess",
+        "handleForceCloudSync",
+        "handlePopState",
+        "handleKeyDown",
+        "requestWakeLock",
+        "handleVisibility",
+        "handleBeforeInstall",
+        "handleInstallPwa",
+        "handlePlay",
+        "handlePause",
+        "togglePlay",
+        "handleSeek",
+        "takePreloaded",
+        "schedulePreload",
+        "nextIdx",
+        "playSong",
+        "handleNextSong",
+        "handlePrevSong",
+        "toggleShuffle",
+        "handleAddToQueue",
+        "handleRemoveFromQueue",
+        "handleClearQueue",
+        "toggleFavorite",
+        "handleDownloadSong",
+        "handleDeleteDownloadedSong",
+        "handleDownloadPlaylist",
+        "handleCreateNewPlaylist",
+        "handleOpenEditPlaylist",
+        "handleSaveEditPlaylist",
+        "handleDeletePlaylist",
+        "handleEnrichCurrentPlaylistCovers",
+        "handleEnrichAllPlaylistsCovers",
+        "handleAddSongToTargetPlaylist",
+        "handleRemoveSongFromPlaylist",
+        "handleImportByUrl",
+        "handleSearch",
+        "handleOpenEntity",
+        "handlePlayEntityAll",
+        "handleSaveEntityToLibrary",
+        "formatTime"
+      ]
+    },
+    {
+      "id": "src/components/AudioScrubber.tsx",
+      "label": "AudioScrubber.tsx",
+      "type": "code",
+      "size": 4074,
+      "exports": [
+        "AudioScrubber"
+      ],
+      "functions": [
+        "handlePointerDown",
+        "handlePointerMove",
+        "handlePointerUp",
+        "handlePointerCancel"
+      ]
+    },
+    {
+      "id": "src/components/AuthGateway.tsx",
+      "label": "AuthGateway.tsx",
+      "type": "code",
+      "size": 8452,
+      "exports": [
+        "AuthGateway"
+      ],
+      "functions": [
+        "AuthGateway",
+        "handleSubmit"
+      ]
+    },
+    {
+      "id": "src/components/AuthModal.tsx",
+      "label": "AuthModal.tsx",
+      "type": "code",
+      "size": 13314,
+      "exports": [
+        "AuthModal"
+      ],
+      "functions": [
+        "AuthModal",
+        "handleSubmit",
+        "handleUpdatePassword",
+        "handleManualSync",
+        "handleLogout"
+      ]
+    },
+    {
+      "id": "src/components/SettingsModal.tsx",
+      "label": "SettingsModal.tsx",
+      "type": "code",
+      "size": 32542,
+      "exports": [
+        "SettingsModal"
+      ],
+      "functions": [
+        "SettingsModal",
+        "handleSaveProfile",
+        "handleUpdatePassword",
+        "handleSaveSoundSetting",
+        "handleExportBackup",
+        "handleImportBackup",
+        "handleClearCache",
+        "handleLogout"
+      ]
+    },
+    {
+      "id": "src/ErrorBoundary.tsx",
+      "label": "ErrorBoundary.tsx",
+      "type": "code",
+      "size": 2319,
+      "exports": [
+        "ErrorBoundary"
+      ],
+      "functions": [
+        "ErrorBoundary"
+      ]
+    },
+    {
+      "id": "src/index.css",
+      "label": "index.css",
+      "type": "style",
+      "size": 1285,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "src/lib/audioAnchor.ts",
+      "label": "audioAnchor.ts",
+      "type": "code",
+      "size": 4018,
+      "exports": [
+        "audioAnchor"
+      ],
+      "functions": [
+        "AudioAnchorEngine"
+      ]
+    },
+    {
+      "id": "src/lib/audioStreamEngine.ts",
+      "label": "audioStreamEngine.ts",
+      "type": "code",
+      "size": 5940,
+      "exports": [
+        "invalidateStream",
+        "fetchAudioStream"
+      ],
+      "functions": [
+        "invalidateStream",
+        "cleanId",
+        "sanitizeTitle",
+        "fetchFromInternalApi",
+        "fetchFromSaavnDirect",
+        "cleanA",
+        "id",
+        "fetchFromDeezer",
+        "fetchAudioStream",
+        "cleanId",
+        "promise"
+      ]
+    },
+    {
+      "id": "src/lib/coverEngine.ts",
+      "label": "coverEngine.ts",
+      "type": "code",
+      "size": 4110,
+      "exports": [],
+      "functions": [
+        "fetchRealTrackCover",
+        "cleanArtist",
+        "cacheImageLocally",
+        "downloadImageFile",
+        "enrichPlaylistTracks"
+      ]
+    },
+    {
+      "id": "src/lib/mediaSession.ts",
+      "label": "mediaSession.ts",
+      "type": "code",
+      "size": 3386,
+      "exports": [
+        "MediaSessionController",
+        "mediaSessionController"
+      ],
+      "functions": [
+        "normalizeArtwork",
+        "MediaSessionController",
+        "safeSet"
+      ]
+    },
+    {
+      "id": "src/lib/offlineDb.ts",
+      "label": "offlineDb.ts",
+      "type": "code",
+      "size": 1985,
+      "exports": [],
+      "functions": [
+        "getDB",
+        "storeOfflineBlob",
+        "getOfflineBlob",
+        "deleteOfflineBlob"
+      ]
+    },
+    {
+      "id": "src/lib/playlistExtractor.ts",
+      "label": "playlistExtractor.ts",
+      "type": "code",
+      "size": 4246,
+      "exports": [],
+      "functions": [
+        "extractPlaylistFromUrl"
+      ]
+    },
+    {
+      "id": "src/lib/searchEngine.ts",
+      "label": "searchEngine.ts",
+      "type": "code",
+      "size": 7553,
+      "exports": [],
+      "functions": [
+        "searchCategorized",
+        "fetchEntityTracks",
+        "universalSearch"
+      ]
+    },
+    {
+      "id": "src/lib/supabase.ts",
+      "label": "supabase.ts",
+      "type": "code",
+      "size": 3234,
+      "exports": [
+        "SUPABASE_URL",
+        "SUPABASE_ANON_KEY",
+        "supabase"
+      ],
+      "functions": [
+        "syncCloudPlaylists",
+        "fetchCloudPlaylists"
+      ]
+    },
+    {
+      "id": "src/main.tsx",
+      "label": "main.tsx",
+      "type": "code",
+      "size": 341,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "src/types.ts",
+      "label": "types.ts",
+      "type": "code",
+      "size": 962,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "tailwind.config.js",
+      "label": "tailwind.config.js",
+      "type": "code",
+      "size": 769,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "tsconfig.json",
+      "label": "tsconfig.json",
+      "type": "code",
+      "size": 532,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "vercel.json",
+      "label": "vercel.json",
+      "type": "code",
+      "size": 288,
+      "exports": [],
+      "functions": []
+    },
+    {
+      "id": "vite.config.ts",
+      "label": "vite.config.ts",
+      "type": "code",
+      "size": 13839,
+      "exports": [],
+      "functions": [
+        "title",
+        "artist",
+        "id",
+        "streamId",
+        "query",
+        "input"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "source": "src/App.tsx",
+      "target": "react",
+      "type": "imports"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "lucide-react",
+      "type": "imports"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "./types",
+      "type": "imports"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "./lib/offlineDb",
+      "type": "imports"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "./lib/supabase",
+      "type": "imports"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "./lib/playlistExtractor",
+      "type": "imports"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "./lib/searchEngine",
+      "type": "imports"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "./components/AuthModal",
+      "type": "imports"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "./components/AuthGateway",
+      "type": "imports"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "./components/SettingsModal",
+      "type": "imports"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "./components/AudioScrubber",
+      "type": "imports"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "./lib/mediaSession",
+      "type": "imports"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "./lib/coverEngine",
+      "type": "imports"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "./lib/audioStreamEngine",
+      "type": "imports"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "pwa-audio-player",
+      "type": "imports"
+    },
+    {
+      "source": "src/components/AudioScrubber.tsx",
+      "target": "react",
+      "type": "imports"
+    },
+    {
+      "source": "src/components/AuthGateway.tsx",
+      "target": "react",
+      "type": "imports"
+    },
+    {
+      "source": "src/components/AuthGateway.tsx",
+      "target": "lucide-react",
+      "type": "imports"
+    },
+    {
+      "source": "src/components/AuthGateway.tsx",
+      "target": "../lib/supabase",
+      "type": "imports"
+    },
+    {
+      "source": "src/components/AuthModal.tsx",
+      "target": "react",
+      "type": "imports"
+    },
+    {
+      "source": "src/components/AuthModal.tsx",
+      "target": "lucide-react",
+      "type": "imports"
+    },
+    {
+      "source": "src/components/AuthModal.tsx",
+      "target": "../lib/supabase",
+      "type": "imports"
+    },
+    {
+      "source": "src/components/SettingsModal.tsx",
+      "target": "react",
+      "type": "imports"
+    },
+    {
+      "source": "src/components/SettingsModal.tsx",
+      "target": "lucide-react",
+      "type": "imports"
+    },
+    {
+      "source": "src/components/SettingsModal.tsx",
+      "target": "../lib/supabase",
+      "type": "imports"
+    },
+    {
+      "source": "src/components/SettingsModal.tsx",
+      "target": "../types",
+      "type": "imports"
+    },
+    {
+      "source": "src/ErrorBoundary.tsx",
+      "target": "react",
+      "type": "imports"
+    },
+    {
+      "source": "src/lib/coverEngine.ts",
+      "target": "../types",
+      "type": "imports"
+    },
+    {
+      "source": "src/lib/playlistExtractor.ts",
+      "target": "../types",
+      "type": "imports"
+    },
+    {
+      "source": "src/lib/searchEngine.ts",
+      "target": "../types",
+      "type": "imports"
+    },
+    {
+      "source": "src/lib/supabase.ts",
+      "target": "@supabase/supabase-js",
+      "type": "imports"
+    },
+    {
+      "source": "src/main.tsx",
+      "target": "react",
+      "type": "imports"
+    },
+    {
+      "source": "src/main.tsx",
+      "target": "react-dom/client",
+      "type": "imports"
+    },
+    {
+      "source": "src/main.tsx",
+      "target": "./App",
+      "type": "imports"
+    },
+    {
+      "source": "src/main.tsx",
+      "target": "./ErrorBoundary",
+      "type": "imports"
+    },
+    {
+      "source": "vite.config.ts",
+      "target": "vite",
+      "type": "imports"
+    },
+    {
+      "source": "vite.config.ts",
+      "target": "@vitejs/plugin-react",
+      "type": "imports"
+    }
+  ]
+}

@@ -54,6 +54,9 @@ import { mediaSessionController } from './lib/mediaSession';
 import { fetchRealTrackCover, cacheImageLocally, downloadImageFile, enrichPlaylistTracks } from './lib/coverEngine';
 import { fetchAudioStream, invalidateStream } from './lib/audioStreamEngine';
 import { SilentHoldKeeper, GestureGuardian } from 'pwa-audio-player';
+import { GenreCategory } from './lib/genresData';
+import { GenreExploreGrid } from './components/GenreExploreGrid';
+import { GenreDetailView } from './components/GenreDetailView';
 
 // 10 Playlists Padrão Oficiais (Motor de Áudio Integral via YouTube Music Engine)
 const INITIAL_PLAYLISTS: Playlist[] = [
@@ -245,6 +248,8 @@ export default function App() {
     artists: [],
     playlists: []
   });
+  // Gêneros Musicais & Descoberta Estilo eSound
+  const [selectedGenre, setSelectedGenre] = useState<GenreCategory | null>(null);
 
   // Modal de Inspeção e Execução de Álbum / Playlist / Artista
   const [viewingEntity, setViewingEntity] = useState<{
@@ -1413,6 +1418,28 @@ export default function App() {
     showToast(`Tocando ${entity.songs.length} faixas de "${entity.name}"!`);
   };
 
+  // Reprodução em lote para Gêneros Estilo eSound
+  const handlePlayAllGenre = (tracks: Song[]) => {
+    if (!tracks || tracks.length === 0) {
+      showToast('Nenhuma música encontrada neste gênero.');
+      return;
+    }
+    setQueue(tracks);
+    playSong(tracks[0], tracks);
+    showToast(`Tocando ${tracks.length} músicas deste gênero!`);
+  };
+
+  const handleShufflePlayGenre = (tracks: Song[]) => {
+    if (!tracks || tracks.length === 0) {
+      showToast('Nenhuma música encontrada neste gênero.');
+      return;
+    }
+    const shuffled = [...tracks].sort(() => Math.random() - 0.5);
+    setQueue(shuffled);
+    playSong(shuffled[0], shuffled);
+    showToast(`Modo Aleatório: tocando ${shuffled.length} músicas!`);
+  };
+
   // Salva o álbum ou playlist encontrada na biblioteca do usuário e sincroniza com a nuvem
   const handleSaveEntityToLibrary = (entity: {
     type: 'album' | 'playlist' | 'artist';
@@ -1864,36 +1891,71 @@ export default function App() {
           </div>
         )}
 
-        {/* VIEW 2: SEARCH CATEGORIZADO (MÚSICAS, ÁLBUNS, ARTISTAS, PLAYLISTS) */}
+        {/* VIEW 2: SEARCH CATEGORIZADO & HUB DE ESTILOS (ESOUND STYLE) */}
         {activeTab === 'search' && !selectedPlaylist && (
           <div className="space-y-6 max-w-5xl mx-auto">
-            {/* Campo de Busca */}
-            <div className="relative">
-              <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  handleSearch(e.target.value);
+            {selectedGenre && !searchQuery ? (
+              <GenreDetailView
+                genre={selectedGenre}
+                onBack={() => setSelectedGenre(null)}
+                onPlaySong={(song, queue) => playSong(song, queue)}
+                onPlayAll={handlePlayAllGenre}
+                onShufflePlay={handleShufflePlayGenre}
+                onOpenEntity={handleOpenEntity}
+                onAddToPlaylist={(song) => {
+                  setSongToAddToPlaylist(song);
+                  setIsAddToPlaylistModalOpen(true);
                 }}
-                placeholder="Buscar músicas, álbuns, artistas ou playlists..."
-                className="h-12 w-full rounded-2xl bg-[#1e1e1e] border border-white/10 pl-11 pr-10 text-sm text-white placeholder-neutral-400 outline-none focus:border-[#1DB954] transition shadow-lg"
+                onDownloadSong={handleDownloadSong}
+                onToggleFavorite={toggleFavorite}
+                favoriteSongIds={favoriteSongIds}
+                currentSongId={currentSong?.id}
+                isPlaying={isPlaying}
               />
-              {isSearching ? (
-                <Loader2 size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-[#1DB954] animate-spin" />
-              ) : searchQuery ? (
-                <button
-                  onClick={() => {
-                    setSearchQuery('');
-                    handleSearch('');
-                  }}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white"
-                >
-                  <X size={16} />
-                </button>
-              ) : null}
-            </div>
+            ) : (
+              <>
+                {/* Header da Tela de Busca estilo eSound */}
+                <div className="flex items-center justify-between pt-1">
+                  <div>
+                    <h2 className="text-2xl font-black text-white tracking-tight">Buscar</h2>
+                    <p className="text-xs text-neutral-400 mt-0.5">O que você quer ouvir?</p>
+                  </div>
+                  <button
+                    onClick={() => setIsSettingsModalOpen(true)}
+                    className="p-2.5 rounded-full bg-white/5 hover:bg-white/10 text-neutral-400 hover:text-white transition active:scale-95 border border-white/5"
+                    title="Configurações"
+                  >
+                    <Settings size={20} />
+                  </button>
+                </div>
+
+                {/* Campo de Busca */}
+                <div className="relative">
+                  <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      handleSearch(e.target.value);
+                    }}
+                    placeholder="O que você quer ouvir? (músicas, álbuns, artistas...)"
+                    className="h-12 w-full rounded-2xl bg-[#1e1e1e] border border-white/10 pl-11 pr-10 text-sm text-white placeholder-neutral-400 outline-none focus:border-[#1DB954] transition shadow-lg"
+                  />
+                  {isSearching ? (
+                    <Loader2 size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-[#1DB954] animate-spin" />
+                  ) : searchQuery ? (
+                    <button
+                      onClick={() => {
+                        setSearchQuery('');
+                        handleSearch('');
+                      }}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white"
+                    >
+                      <X size={16} />
+                    </button>
+                  ) : null}
+                </div>
 
             {/* Pílulas de Filtro por Categoria */}
             <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
@@ -2147,11 +2209,10 @@ export default function App() {
                 )}
               </div>
             ) : (
-              <div className="py-16 text-center text-neutral-500 text-sm space-y-2">
-                <Search size={32} className="mx-auto text-neutral-600 opacity-60" />
-                <p>Busque músicas, álbuns de estúdio, artistas ou playlists públicas.</p>
-                <p className="text-xs text-neutral-600">Encontre qualquer conteúdo e ouça direto no Montanha Music Lab.</p>
-              </div>
+              /* Quando o campo de busca estiver vazio: Exibe o Grid de Estilos Musicais eSound */
+              <GenreExploreGrid onSelectGenre={(genre) => setSelectedGenre(genre)} />
+            )}
+              </>
             )}
           </div>
         )}
