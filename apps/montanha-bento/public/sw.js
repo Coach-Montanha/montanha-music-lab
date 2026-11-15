@@ -1,5 +1,5 @@
-// Service Worker para Able Music Player PWA - Network First com Cache de Contingência
-const CACHE_NAME = 'able-music-v4';
+// Service Worker para Montanha Music Lab PWA - Network First com Cache de Contingência
+const CACHE_NAME = 'montanha-music-v6';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -22,7 +22,32 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // 1. Navegação de páginas (HTML): SEMPRE Network-First para evitar tela branca por versão antiga
+  const url = event.request.url;
+
+  // 1. NUNCA intercepta fluxos de áudio, vídeo ou mídias de CDNs (Garante Range 206 nativo ininterrupto com tela apagada)
+  if (
+    event.request.destination === 'audio' ||
+    event.request.destination === 'video' ||
+    url.includes('saavncdn.com') ||
+    url.includes('itunes.apple.com') ||
+    url.includes('audio-ssl') ||
+    url.includes('dzcdn.net') ||
+    url.includes('deezer.com') ||
+    url.includes('googlevideo.com') ||
+    url.includes('youtube.com') ||
+    url.includes('piped') ||
+    url.includes('supabase') ||
+    url.includes('/api/') ||
+    url.endsWith('.mp4') ||
+    url.endsWith('.mp3') ||
+    url.endsWith('.m4a') ||
+    url.endsWith('.webm') ||
+    url.endsWith('.wav')
+  ) {
+    return;
+  }
+
+  // 2. Navegação de páginas (HTML): SEMPRE Network-First para garantir código fresco
   if (event.request.mode === 'navigate' || event.request.destination === 'document') {
     event.respondWith(
       fetch(event.request)
@@ -35,17 +60,6 @@ self.addEventListener('fetch', (event) => {
         })
         .catch(() => caches.match(event.request))
     );
-    return;
-  }
-
-  // 2. Ignora requisições de áudio externo, YouTube ou APIs dinâmicas
-  if (
-    event.request.url.includes('youtube.com') ||
-    event.request.url.includes('itunes.apple.com') ||
-    event.request.url.includes('piped') ||
-    event.request.url.includes('supabase') ||
-    event.request.url.includes('/api/')
-  ) {
     return;
   }
 

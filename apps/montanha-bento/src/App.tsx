@@ -51,17 +51,8 @@ import { AuthGateway } from './components/AuthGateway';
 import { SettingsModal } from './components/SettingsModal';
 import { mediaSessionController } from './lib/mediaSession';
 import { fetchRealTrackCover, cacheImageLocally, downloadImageFile, enrichPlaylistTracks } from './lib/coverEngine';
-import { audioAnchor } from './lib/audioAnchor';
 import { fetchAudioStream } from './lib/audioStreamEngine';
 import { SilentHoldKeeper, GestureGuardian } from 'pwa-audio-player';
-
-declare global {
-  interface Window {
-    YT: any;
-    onYouTubeIframeAPIReady: () => void;
-    ytPlayer: any;
-  }
-}
 
 // 10 Playlists Padrão Oficiais (Motor de Áudio Integral via YouTube Music Engine)
 const INITIAL_PLAYLISTS: Playlist[] = [
@@ -540,117 +531,31 @@ export default function App() {
     };
   }, [isPlaying]);
 
-  // Manutenção Limpa e Contínua de Áudio em Background ao Travar a Tela do Celular (Android / iOS)
+  // Manutenção Contínua de Áudio em Background ao Travar a Tela do Celular (Android / iOS)
   useEffect(() => {
-    audioAnchor.init();
     const handleVisibility = () => {
       if (document.hidden) {
-        // Quando a tela escurece ou o app vai para background:
+        // Ao apagar a tela ou alternar app: garante que o elemento de áudio continue ativo
         if (isPlayingRef.current && !userInitiatedPauseRef.current) {
-          // Mantém a sessão de áudio do SO ativa via âncora 100% silenciosa
-          audioAnchor.play();
-          try {
-            if (window.ytPlayer && typeof window.ytPlayer.playVideo === 'function') {
-              window.ytPlayer.playVideo();
-            }
-          } catch {}
+          if (audioRef.current && audioRef.current.paused && audioRef.current.src) {
+            audioRef.current.play().catch(() => {});
+          }
         }
       } else {
-        // Ao reativar a tela, se estava tocando e não foi pausado pelo usuário, garante que o player continue
+        // Ao reativar a tela: garante sincronia perfeita
         if (isPlayingRef.current && !userInitiatedPauseRef.current) {
-          try {
-            if (window.ytPlayer && typeof window.ytPlayer.getPlayerState === 'function') {
-              if (window.ytPlayer.getPlayerState() !== 1) {
-                window.ytPlayer.playVideo();
-              }
-            }
-            if (audioRef.current && audioRef.current.paused && audioRef.current.src) {
-              audioRef.current.play().catch(() => {});
-            }
-          } catch {}
+          if (audioRef.current && audioRef.current.paused && audioRef.current.src) {
+            audioRef.current.play().catch(() => {});
+          }
         }
       }
     };
     document.addEventListener('visibilitychange', handleVisibility);
-    return () => document.removeEventListener('visibilitychange', handleVisibility);
-  }, []);
-
-  // Inicialização do YouTube Iframe API
-  useEffect(() => {
-    const initYt = () => {
-      if (window.YT && window.YT.Player && !window.ytPlayer) {
-        try {
-          window.ytPlayer = new window.YT.Player('able-yt-player', {
-            height: '240',
-            width: '320',
-            videoId: currentSong?.youtubeId || 'ytQ5CYE1VZw',
-            playerVars: {
-              autoplay: 1,
-              controls: 0,
-              disablekb: 1,
-              fs: 0,
-              rel: 0,
-              playsinline: 1
-            },
-            events: {
-              onReady: (event: any) => {
-                try {
-                  event.target.setVolume(Math.round(volume * 100));
-                  if (!isMuted) event.target.unMute();
-                } catch {}
-              },
-              onStateChange: (event: any) => {
-                if (event.data === 1) {
-                  try {
-                    if (event.target && typeof event.target.unMute === 'function' && !isMuted) {
-                      event.target.unMute();
-                    }
-                    if (event.target && typeof event.target.setVolume === 'function') {
-                      event.target.setVolume(Math.round(volume * 100));
-                    }
-                  } catch {}
-                  setIsPlaying(true);
-                  isPlayingRef.current = true;
-                  userInitiatedPauseRef.current = false;
-                  audioAnchor.play();
-                } else if (event.data === 2) {
-                  setIsPlaying(false);
-                  isPlayingRef.current = false;
-                  mediaSessionController.updatePlaybackState(false);
-                  if (userInitiatedPauseRef.current) {
-                    audioAnchor.pause();
-                  } else {
-                    // Pausa involuntária (tela apagada, troca de app ou tela de bloqueio)
-                    // NÃO aceita a pausa: retoma imediatamente a reprodução contínua com som
-                    audioAnchor.play();
-                    setTimeout(() => {
-                      if (!userInitiatedPauseRef.current && window.ytPlayer && typeof window.ytPlayer.playVideo === 'function') {
-                        try {
-                          if (typeof window.ytPlayer.unMute === 'function' && !isMuted) window.ytPlayer.unMute();
-                          if (typeof window.ytPlayer.setVolume === 'function') window.ytPlayer.setVolume(Math.round(volume * 100));
-                          window.ytPlayer.playVideo();
-                        } catch {}
-                      }
-                    }, 50);
-                  }
-                } else if (event.data === 0) {
-                  // Fim da música no YouTube: aciona o handler mais recente
-                  handleNextSongRef.current();
-                }
-              }
-            }
-          });
-        } catch (e) {
-          console.warn('YouTube Player:', e);
-        }
-      }
+    window.addEventListener('focus', handleVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', handleVisibility);
     };
-
-    if (window.YT && window.YT.Player) {
-      initYt();
-    } else {
-      window.onYouTubeIframeAPIReady = initYt;
-    }
   }, []);
 
   // Inicialização do SilentHoldKeeper (Blindagem de Hardware Audio Session no Mobile PWA)
@@ -697,62 +602,16 @@ export default function App() {
               handleNextSongRef.current();
             }
           }
-        } else if (window.ytPlayer && typeof window.ytPlayer.getCurrentTime === 'function') {
-          try {
-            const state = typeof window.ytPlayer.getPlayerState === 'function' ? window.ytPlayer.getPlayerState() : -1;
-            if (state === 1) {
-              // Garante que o som nunca fique mudo inadvertidamente no Android ao apagar a tela
-              if (typeof window.ytPlayer.isMuted === 'function' && window.ytPlayer.isMuted() && !isMuted) {
-                try { window.ytPlayer.unMute(); } catch {}
-              }
-              if (typeof window.ytPlayer.getVolume === 'function') {
-                const targetVol = Math.round(volume * 100);
-                if (window.ytPlayer.getVolume() < targetVol && !isMuted) {
-                  try { window.ytPlayer.setVolume(targetVol); } catch {}
-                }
-              }
-
-              const cur = window.ytPlayer.getCurrentTime() || 0;
-              const dur = window.ytPlayer.getDuration() || 0;
-              setCurrentTime(Math.floor(cur));
-              if (dur > 0 && Math.floor(dur) !== duration) {
-                setDuration(Math.floor(dur));
-              }
-
-              // Auto-avanço determinístico: se o vídeo chegou ao fim no mobile
-              if (dur > 10 && cur >= dur - 1) {
-                handleNextSongRef.current();
-              }
-            } else if (state === 2 && !userInitiatedPauseRef.current && isPlayingRef.current) {
-              // Retomada contínua caso o Android pause em background
-              try {
-                if (typeof window.ytPlayer.unMute === 'function' && !isMuted) window.ytPlayer.unMute();
-                if (typeof window.ytPlayer.setVolume === 'function') window.ytPlayer.setVolume(Math.round(volume * 100));
-                window.ytPlayer.playVideo();
-              } catch {}
-            }
-          } catch {}
         }
       }, 500);
     }
     return () => clearInterval(interval);
   }, [isPlaying, duration]);
 
-  // Sincronização Imediata de Volume e Mute entre <audio> e fallback do player
+  // Sincronização Imediata de Volume e Mute no <audio>
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.volume = isMuted ? 0 : volume;
-    }
-    if (window.ytPlayer) {
-      try {
-        if (typeof window.ytPlayer.setVolume === 'function') {
-          window.ytPlayer.setVolume(Math.round(volume * 100));
-        }
-        if (typeof window.ytPlayer.mute === 'function' && typeof window.ytPlayer.unMute === 'function') {
-          if (isMuted) window.ytPlayer.mute();
-          else window.ytPlayer.unMute();
-        }
-      } catch {}
     }
   }, [volume, isMuted]);
 
@@ -798,7 +657,6 @@ export default function App() {
 
   const handlePlay = () => {
     userInitiatedPauseRef.current = false;
-    audioAnchor.play();
     setIsPlaying(true);
     isPlayingRef.current = true;
     mediaSessionController.updatePlaybackState(true);
@@ -822,20 +680,6 @@ export default function App() {
       return;
     }
 
-    // 3. Fallback para YouTube Player se o áudio HTML5 não estiver carregado
-    if (window.ytPlayer && typeof window.ytPlayer.playVideo === 'function') {
-      try {
-        if (typeof window.ytPlayer.unMute === 'function' && !isMuted) {
-          window.ytPlayer.unMute();
-        }
-        if (typeof window.ytPlayer.setVolume === 'function') {
-          window.ytPlayer.setVolume(Math.round(volume * 100));
-        }
-        window.ytPlayer.playVideo();
-        return;
-      } catch {}
-    }
-
     if (currentSong) {
       playSong(currentSong);
     }
@@ -843,7 +687,6 @@ export default function App() {
 
   const handlePause = () => {
     userInitiatedPauseRef.current = true;
-    audioAnchor.pause();
     setIsPlaying(false);
     isPlayingRef.current = false;
     mediaSessionController.updatePlaybackState(false);
@@ -861,9 +704,6 @@ export default function App() {
       }
     }
 
-    if (window.ytPlayer && typeof window.ytPlayer.pauseVideo === 'function') {
-      try { window.ytPlayer.pauseVideo(); } catch {}
-    }
     if (audioRef.current) {
       try { audioRef.current.pause(); } catch {}
     }
@@ -891,21 +731,25 @@ export default function App() {
 
   const handleSeek = (newTime: number) => {
     setCurrentTime(newTime);
+    if (silentHoldRef.current?.isHolding()) {
+      silentHoldRef.current.updateSavedPauseTime(newTime);
+    }
     if (audioRef.current && audioRef.current.src) {
       audioRef.current.currentTime = newTime;
     }
-    if (window.ytPlayer && typeof window.ytPlayer.seekTo === 'function') {
-      try { window.ytPlayer.seekTo(newTime, true); } catch {}
-    }
+    mediaSessionController.updatePositionState({
+      duration,
+      position: newTime,
+      playbackRate: 1
+    });
   };
 
-  // Motor Padrão AbleMusic (YouTube Music Stream Completo 100% da Duração)
+  // Motor Padrão Montanha Music Lab (HTML5 Audio com Streaming 320kbps e Background-Safe)
   const playSong = async (song: Song, newQueue?: Song[]) => {
     userInitiatedPauseRef.current = false;
-    audioAnchor.play();
     setCurrentSong(song);
     setCurrentTime(0);
-    setDuration(song.duration || 240);
+    setDuration(song.duration || 210);
     setIsPlaying(true);
     isPlayingRef.current = true;
     if (newQueue) setQueue(newQueue);
@@ -929,9 +773,6 @@ export default function App() {
     const offlineBlob = await getOfflineBlob(song.id);
     if (offlineBlob && audioRef.current) {
       try {
-        if (window.ytPlayer && typeof window.ytPlayer.pauseVideo === 'function') {
-          window.ytPlayer.pauseVideo();
-        }
         const blobUrl = URL.createObjectURL(offlineBlob);
         audioRef.current.src = blobUrl;
         audioRef.current.volume = isMuted ? 0 : volume;
@@ -942,42 +783,19 @@ export default function App() {
       }
     }
 
-    // 2. MOTOR YOUTUBE MUSIC (ÁUDIO INTEGRAL VIA BACKEND SERVERLESS SEM ERROS DE CORS)
+    // 2. MOTOR RESILIENTE DE STREAMING (320kbps Akamai CDN / Multi-Mirror Invidious / Deezer)
     let ytId = song.youtubeId;
-    if (!ytId) {
+    if (!ytId || ytId.startsWith('itunes-') || ytId.startsWith('sp-') || ytId.startsWith('deezer-')) {
+      const query = `${song.name} ${song.artist}`.trim();
       try {
-        const query = `${song.name} ${song.artist}`;
-        // 1ª Tentativa: nossa API Serverless interna (Zero CORS, 100% estável)
         const apiRes = await fetch(`/api/youtube-search?q=${encodeURIComponent(query)}`, {
-          signal: AbortSignal.timeout(4000)
+          signal: AbortSignal.timeout(3000)
         });
         if (apiRes.ok) {
           const apiData = await apiRes.json();
           if (apiData?.videoId) ytId = apiData.videoId;
         }
       } catch {}
-
-      // 2ª Tentativa: Instâncias Piped / Invidious públicas como contingência
-      if (!ytId) {
-        try {
-          const piped = await fetch(`https://api.piped.private.coffee/search?q=${encodeURIComponent(`${song.name} ${song.artist}`)}&filter=music_songs`, { signal: AbortSignal.timeout(3000) });
-          if (piped.ok) {
-            const pData = await piped.json();
-            const first = pData.items?.find((i: any) => i.type === 'stream');
-            if (first?.url) ytId = first.url.replace('/watch?v=', '').split('&')[0];
-          }
-        } catch {}
-      }
-
-      if (!ytId) {
-        try {
-          const inv = await fetch(`https://inv.bp.projectsegfau.lt/api/v1/search?q=${encodeURIComponent(`${song.name} ${song.artist}`)}&type=video`, { signal: AbortSignal.timeout(3000) });
-          if (inv.ok) {
-            const d = await inv.json();
-            if (d[0]?.videoId) ytId = d[0].videoId;
-          }
-        } catch {}
-      }
     }
 
     if (ytId) {
@@ -986,14 +804,10 @@ export default function App() {
       ytId = song.youtubeId || 'ytQ5CYE1VZw';
     }
 
-    // 2. MOTOR DE STREAMING EM TAG <audio> PURA (Background-safe ininterrupto com tela apagada)
     try {
       silentHoldRef.current?.reset();
       const stream = await fetchAudioStream(ytId, song.name, song.artist, song.audioUrl);
       if (stream?.url && audioRef.current) {
-        if (window.ytPlayer && typeof window.ytPlayer.pauseVideo === 'function') {
-          try { window.ytPlayer.pauseVideo(); } catch {}
-        }
         audioRef.current.src = stream.url;
         audioRef.current.currentTime = 0;
         audioRef.current.volume = isMuted ? 0 : volume;
@@ -1003,6 +817,7 @@ export default function App() {
         await audioRef.current.play();
         setIsPlaying(true);
         isPlayingRef.current = true;
+        userInitiatedPauseRef.current = false;
         mediaSessionController.updatePlaybackState(true);
 
         // Pré-carregamento contínuo da próxima faixa para auto-avanço sem bloqueio de gesto no mobile
@@ -1025,93 +840,23 @@ export default function App() {
         return;
       }
     } catch (streamErr) {
-      console.warn('Erro ao reproduzir stream de áudio direto, usando fallback:', streamErr);
+      console.warn('Erro ao reproduzir stream de áudio direto, tentando fallback:', streamErr);
     }
 
-    // Pausa qualquer áudio HTML5 para não sobrepor se usar fallback
-    if (audioRef.current) {
-      audioRef.current.pause();
-    }
-
-    // Fallback: Reproduz via YouTube Music Engine caso o streaming direto falhe
-    if (window.ytPlayer && typeof window.ytPlayer.loadVideoById === 'function') {
-      try {
-        window.ytPlayer.loadVideoById({ videoId: ytId, startSeconds: 0 });
-        if (typeof window.ytPlayer.unMute === 'function' && !isMuted) window.ytPlayer.unMute();
-        if (typeof window.ytPlayer.setVolume === 'function') window.ytPlayer.setVolume(Math.round(volume * 100));
-        window.ytPlayer.playVideo();
-        setIsPlaying(true);
-        return;
-      } catch (e) {
-        console.warn('YouTube Load Error:', e);
-      }
-    }
-
-    // Inicialização dinâmica caso o player ainda esteja carregando
-    if (window.YT && window.YT.Player) {
-      try {
-        window.ytPlayer = new window.YT.Player('able-yt-player', {
-          height: '240',
-          width: '320',
-          videoId: ytId,
-          playerVars: { autoplay: 1, controls: 0, disablekb: 1, fs: 0, rel: 0, playsinline: 1 },
-          events: {
-            onReady: (e: any) => {
-              try {
-                e.target.setVolume(Math.round(volume * 100));
-                if (!isMuted) e.target.unMute();
-                e.target.playVideo();
-              } catch {}
-            },
-            onStateChange: (e: any) => {
-              if (e.data === 1) {
-                try {
-                  if (e.target && typeof e.target.unMute === 'function' && !isMuted) {
-                    e.target.unMute();
-                  }
-                  if (e.target && typeof e.target.setVolume === 'function') {
-                    e.target.setVolume(Math.round(volume * 100));
-                  }
-                } catch {}
-                setIsPlaying(true);
-                isPlayingRef.current = true;
-                userInitiatedPauseRef.current = false;
-                audioAnchor.play();
-              } else if (e.data === 2) {
-                setIsPlaying(false);
-                isPlayingRef.current = false;
-                mediaSessionController.updatePlaybackState(false);
-                if (userInitiatedPauseRef.current) {
-                  audioAnchor.pause();
-                } else {
-                  // Pausa involuntária (tela apagada, troca de app ou tela de bloqueio)
-                  audioAnchor.play();
-                  setTimeout(() => {
-                    if (!userInitiatedPauseRef.current && window.ytPlayer && typeof window.ytPlayer.playVideo === 'function') {
-                      try {
-                        if (typeof window.ytPlayer.unMute === 'function' && !isMuted) window.ytPlayer.unMute();
-                        if (typeof window.ytPlayer.setVolume === 'function') window.ytPlayer.setVolume(Math.round(volume * 100));
-                        window.ytPlayer.playVideo();
-                      } catch {}
-                    }
-                  }, 50);
-                }
-              } else if (e.data === 0) {
-                handleNextSongRef.current();
-              }
-            }
-          }
-        });
-        setIsPlaying(true);
-        return;
-      } catch {}
-    }
-
-    // Fallback de emergência (caso o YouTube esteja totalmente bloqueado pela rede do usuário)
+    // Fallback de emergência (caso o streaming direto falhe, toca áudio direto ou preview do item)
     if (song.audioUrl && audioRef.current) {
-      audioRef.current.src = song.audioUrl;
-      audioRef.current.volume = isMuted ? 0 : volume;
-      await audioRef.current.play().catch(console.warn);
+      try {
+        audioRef.current.src = song.audioUrl;
+        audioRef.current.currentTime = 0;
+        audioRef.current.volume = isMuted ? 0 : volume;
+        await audioRef.current.play().catch(console.warn);
+        setIsPlaying(true);
+        isPlayingRef.current = true;
+        userInitiatedPauseRef.current = false;
+        mediaSessionController.updatePlaybackState(true);
+      } catch (e) {
+        console.warn('Erro no fallback de áudio:', e);
+      }
     }
   };
 
@@ -1660,12 +1405,31 @@ export default function App() {
         !currentUser ? 'filter blur-2xl brightness-40 pointer-events-none scale-[0.98]' : 'filter-none brightness-100 scale-100'
       }`}>
       
-      {/* PLAYER DE ÁUDIO OCULTO (HTML5 Audio) */}
+      {/* MOTOR DE ÁUDIO HTML5 ULTRA-RESILIENTE (Background-Safe sem interferência de vídeo) */}
       <audio
         ref={audioRef}
+        preload="auto"
+        playsInline={true}
+        crossOrigin="anonymous"
+        style={{
+          position: 'fixed',
+          bottom: 0,
+          right: 0,
+          width: '1px',
+          height: '1px',
+          opacity: 0.01,
+          pointerEvents: 'none',
+          zIndex: -1
+        }}
         onTimeUpdate={() => {
           if (audioRef.current) {
-            setCurrentTime(Math.floor(audioRef.current.currentTime));
+            const cur = Math.floor(audioRef.current.currentTime);
+            setCurrentTime(cur);
+            mediaSessionController.updatePositionState({
+              duration: audioRef.current.duration || duration,
+              position: cur,
+              playbackRate: 1
+            });
           }
         }}
         onLoadedMetadata={() => {
@@ -1674,7 +1438,16 @@ export default function App() {
           }
         }}
         onEnded={handleNextSong}
-        className="hidden"
+        onPause={() => {
+          // Se o sistema operacional ou tela apagada enviou pause involuntário enquanto deveria estar tocando:
+          if (isPlayingRef.current && !userInitiatedPauseRef.current) {
+            setTimeout(() => {
+              if (isPlayingRef.current && !userInitiatedPauseRef.current && audioRef.current?.paused) {
+                audioRef.current.play().catch(() => {});
+              }
+            }, 50);
+          }
+        }}
       />
 
       {/* TOAST NOTIFICATION (Posicionado abaixo do Header para não cobrir botões) */}
