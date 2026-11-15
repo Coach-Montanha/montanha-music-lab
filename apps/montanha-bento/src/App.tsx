@@ -215,9 +215,19 @@ export default function App() {
   const gestureGuardianRef = useRef<GestureGuardian | null>(null);
   const isPlayingRef = useRef<boolean>(false);
   const userInitiatedPauseRef = useRef<boolean>(false);
+  const isSwitchingRef = useRef<boolean>(false);
+  const playRequestIdRef = useRef<number>(0);
   const handleNextSongRef = useRef<() => void>(() => {});
+  const handlePrevSongRef = useRef<() => void>(() => {});
+  const handlePlayRef = useRef<() => void>(() => {});
+  const handlePauseRef = useRef<() => void>(() => {});
+  const handleSeekRef = useRef<(t: number) => void>(() => {});
   const nextSongStreamRef = useRef<{ id: string; url: string; duration?: number } | null>(null);
   const originalQueueRef = useRef<Song[]>([]);
+  const queueRef = useRef<Song[]>([]);
+  const currentSongRef = useRef<Song>(currentSong);
+  queueRef.current = queue;
+  currentSongRef.current = currentSong;
 
   // Full Screen Player Sheet
   const [isFullScreenPlayer, setIsFullScreenPlayer] = useState<boolean>(false);
@@ -585,7 +595,7 @@ export default function App() {
     }
   }, []);
 
-  // Sincronização em Tempo Real do Progresso de Áudio & Auto-Avanço Contínuo
+  // Sincronização em Tempo Real do Progresso de Áudio (Auto-avanço gerenciado exclusivamente pelo onEnded nativo)
   useEffect(() => {
     let interval: any = null;
     if (isPlaying) {
@@ -597,10 +607,6 @@ export default function App() {
             const dur = Math.floor(audioRef.current.duration);
             if (dur > 0 && dur !== duration) {
               setDuration(dur);
-            }
-            // Auto-avanço ininterrupto de playlist quando a música chega ao final
-            if (dur > 10 && cur >= dur - 1) {
-              handleNextSongRef.current();
             }
           }
         }
@@ -718,17 +724,27 @@ export default function App() {
     }
   };
 
+  handlePlayRef.current = handlePlay;
+  handlePauseRef.current = handlePause;
+
+  // Registro único dos handlers MediaSession e AudioSession (evita re-binding e quedas de sessão no SO)
   useEffect(() => {
+    if ('audioSession' in navigator) {
+      try {
+        (navigator as any).audioSession.type = 'playback';
+      } catch {}
+    }
+
     mediaSessionController.setupActionHandlers({
-      onPlay: () => handlePlay(),
-      onPause: () => handlePause(),
-      onPrevious: () => handlePrevSong(),
-      onNext: () => handleNextSong(),
+      onPlay: () => handlePlayRef.current(),
+      onPause: () => handlePauseRef.current(),
+      onPrevious: () => handlePrevSongRef.current(),
+      onNext: () => handleNextSongRef.current(),
       onSeekTo: (details) => {
-        if (details.seekTime !== undefined) handleSeek(details.seekTime);
+        if (details.seekTime !== undefined) handleSeekRef.current(details.seekTime);
       }
     });
-  }, [queue, currentSong, isPlaying, volume, isMuted]);
+  }, []);
 
   const handleSeek = (newTime: number) => {
     setCurrentTime(newTime);
@@ -744,9 +760,12 @@ export default function App() {
       playbackRate: 1
     });
   };
+  handleSeekRef.current = handleSeek;
 
   // Motor Padrão Montanha Music Lab (HTML5 Audio com Streaming 320kbps e Background-Safe)
   const playSong = async (song: Song, newQueue?: Song[]) => {
+    const reqId = ++playRequestIdRef.current;
+    isSwitchingRef.current = true;
     userInitiatedPauseRef.current = false;
     setCurrentSong(song);
     setCurrentTime(0);
@@ -755,6 +774,7 @@ export default function App() {
     isPlayingRef.current = true;
     if (newQueue) setQueue(newQueue);
     showToast(`Tocando: ${song.name}`);
+    mediaSessionController.updatePlaybackState(true);
 
     // Incrementa contador de reprodução para Músicas em Destaque (Mais Tocadas da Conta)
     setPlayCounts((prev) => {
@@ -772,15 +792,17 @@ export default function App() {
 
     // 1. TENTA REPRODUÇÃO OFFLINE A PARTIR DO INDEXEDDB (Se tiver sido baixada)
     const offlineBlob = await getOfflineBlob(song.id);
+    if (reqId !== playRequestIdRef.current) return;
     if (offlineBlob && audioRef.current) {
       try {
         const blobUrl = URL.createObjectURL(offlineBlob);
         audioRef.current.src = blobUrl;
         audioRef.current.volume = isMuted ? 0 : volume;
         await audioRef.current.play();
+        isSwitchingRef.current = false;
         return;
-      } catch (err) {
-        console.warn('Erro ao reproduzir blob offline:', err);
+      } catch (err: any) {
+        if (err?.name !== 'AbortError') console.warn('Erro ao reproduzir blob offline:', err);
       }
     }
 
@@ -799,6 +821,8 @@ export default function App() {
       } catch {}
     }
 
+    if (reqId !== playRequestIdRef.current) return;
+
     if (ytId) {
       song.youtubeId = ytId;
     } else {
@@ -808,6 +832,8 @@ export default function App() {
     try {
       silentHoldRef.current?.reset();
       const stream = await fetchAudioStream(ytId, song.name, song.artist, song.audioUrl);
+      if (reqId !== playRequestIdRef.current) return;
+
       if (stream?.url && audioRef.current) {
         audioRef.current.src = stream.url;
         audioRef.current.currentTime = 0;
@@ -822,10 +848,11 @@ export default function App() {
         mediaSessionController.updatePlaybackState(true);
 
         // Pré-carregamento contínuo da próxima faixa para auto-avanço sem bloqueio de gesto no mobile
-        if (queue.length > 1) {
-          const currentIdx = queue.findIndex(s => s.id === song.id);
-          const nextIdx = (currentIdx + 1) % queue.length;
-          const nextSong = queue[nextIdx];
+        const currentQ = queueRef.current;
+        if (currentQ.length > 1) {
+          const currentIdx = currentQ.findIndex(s => s.id === song.id);
+          const nextIdx = (currentIdx + 1) % currentQ.length;
+          const nextSong = currentQ[nextIdx];
           if (nextSong) {
             fetchAudioStream(nextSong.youtubeId, nextSong.name, nextSong.artist, nextSong.audioUrl)
               .then(ns => {
@@ -841,9 +868,17 @@ export default function App() {
         }
         return;
       }
-    } catch (streamErr) {
-      console.warn('Erro ao reproduzir stream de áudio direto, tentando fallback:', streamErr);
+    } catch (streamErr: any) {
+      if (streamErr?.name !== 'AbortError') {
+        console.warn('Erro ao reproduzir stream de áudio direto, tentando fallback:', streamErr);
+      }
+    } finally {
+      if (reqId === playRequestIdRef.current) {
+        isSwitchingRef.current = false;
+      }
     }
+
+    if (reqId !== playRequestIdRef.current) return;
 
     // Fallback de emergência (caso o streaming direto falhe, toca áudio direto ou preview do item)
     if (song.audioUrl && audioRef.current) {
@@ -851,38 +886,46 @@ export default function App() {
         audioRef.current.src = song.audioUrl;
         audioRef.current.currentTime = 0;
         audioRef.current.volume = isMuted ? 0 : volume;
-        await audioRef.current.play().catch(console.warn);
+        await audioRef.current.play().catch((e) => {
+          if (e?.name !== 'AbortError') console.warn(e);
+        });
         setIsPlaying(true);
         isPlayingRef.current = true;
         userInitiatedPauseRef.current = false;
         mediaSessionController.updatePlaybackState(true);
-      } catch (e) {
-        console.warn('Erro no fallback de áudio:', e);
+      } catch (e: any) {
+        if (e?.name !== 'AbortError') console.warn('Erro no fallback de áudio:', e);
+      } finally {
+        if (reqId === playRequestIdRef.current) {
+          isSwitchingRef.current = false;
+        }
       }
     }
   };
 
   const handleNextSong = () => {
-    if (isRepeat && currentSong) {
+    if (isRepeat && currentSongRef.current) {
       if (audioRef.current) {
         audioRef.current.currentTime = 0;
-        audioRef.current.play().catch(() => playSong(currentSong));
+        audioRef.current.play().catch(() => playSong(currentSongRef.current));
       }
       return;
     }
-    if (queue.length === 0) return;
-    const currentIdx = queue.findIndex((s) => s.id === currentSong.id);
+    const currentQ = queueRef.current;
+    if (currentQ.length === 0) return;
+    const currentIdx = currentQ.findIndex((s) => s.id === currentSongRef.current?.id);
     let nextIdx = currentIdx + 1;
-    if (nextIdx >= queue.length || nextIdx < 0) nextIdx = 0;
-    const nextSong = queue[nextIdx];
+    if (nextIdx >= currentQ.length || nextIdx < 0) nextIdx = 0;
+    const nextSong = currentQ[nextIdx];
+    if (!nextSong) return;
 
     // Se a próxima faixa já teve stream resolvido, toca de forma SÍNCRONA no mesmo tick do evento ended
-    // (Impede que o navegador revogue o foco de áudio em background no mobile)
+    // (Garante continuidade no Android e iOS sem revogação de foco de áudio)
     if (nextSongStreamRef.current && nextSongStreamRef.current.id === nextSong.id && audioRef.current) {
+      isSwitchingRef.current = true;
       const stream = nextSongStreamRef.current;
       audioRef.current.src = stream.url;
       audioRef.current.currentTime = 0;
-      audioRef.current.play().catch(() => {});
       setCurrentSong(nextSong);
       setCurrentTime(0);
       if (stream.duration) setDuration(stream.duration);
@@ -891,9 +934,22 @@ export default function App() {
       userInitiatedPauseRef.current = false;
       mediaSessionController.updatePlaybackState(true);
 
+      audioRef.current.play().catch((err: any) => {
+        if (err?.name === 'AbortError') return;
+        if (err?.name === 'NotAllowedError') {
+          setIsPlaying(false);
+          isPlayingRef.current = false;
+          mediaSessionController.updatePlaybackState(false);
+          return;
+        }
+        playSong(nextSong);
+      }).finally(() => {
+        isSwitchingRef.current = false;
+      });
+
       // Pré-carrega imediatamente a seguinte (N+2)
-      const afterNextIdx = (nextIdx + 1) % queue.length;
-      const afterNextSong = queue[afterNextIdx];
+      const afterNextIdx = (nextIdx + 1) % currentQ.length;
+      const afterNextSong = currentQ[afterNextIdx];
       if (afterNextSong) {
         fetchAudioStream(afterNextSong.youtubeId, afterNextSong.name, afterNextSong.artist, afterNextSong.audioUrl)
           .then((ns) => {
@@ -909,16 +965,18 @@ export default function App() {
     playSong(nextSong);
   };
 
-  // Mantém a referência de handleNextSong sempre atualizada para YouTube Player e timers
+  // Mantém referências atualizadas
   handleNextSongRef.current = handleNextSong;
 
   const handlePrevSong = () => {
-    if (queue.length === 0) return;
-    const currentIdx = queue.findIndex((s) => s.id === currentSong.id);
+    const currentQ = queueRef.current;
+    if (currentQ.length === 0) return;
+    const currentIdx = currentQ.findIndex((s) => s.id === currentSongRef.current?.id);
     let prevIdx = currentIdx - 1;
-    if (prevIdx < 0) prevIdx = queue.length - 1;
-    playSong(queue[prevIdx]);
+    if (prevIdx < 0) prevIdx = currentQ.length - 1;
+    playSong(currentQ[prevIdx]);
   };
+  handlePrevSongRef.current = handlePrevSong;
 
   // BOTÃO SHUFFLE REAL: Embaralha imediatamente a fila de execução visível
   const toggleShuffle = () => {
@@ -1476,15 +1534,32 @@ export default function App() {
         }}
         onEnded={handleNextSong}
         onPause={() => {
-          // Se a música acabou naturalmente, não interfere no fluxo de avanço para a próxima
-          if (audioRef.current?.ended) return;
+          // Se a música acabou naturalmente ou estamos no meio da transição de faixa (troca de src), ignora
+          if (audioRef.current?.ended || isSwitchingRef.current) return;
           // Se o sistema operacional ou tela apagada enviou pause involuntário enquanto deveria estar tocando:
           if (isPlayingRef.current && !userInitiatedPauseRef.current) {
             setTimeout(() => {
-              if (isPlayingRef.current && !userInitiatedPauseRef.current && audioRef.current?.paused && !audioRef.current?.ended) {
+              if (
+                isPlayingRef.current &&
+                !userInitiatedPauseRef.current &&
+                !isSwitchingRef.current &&
+                audioRef.current?.paused &&
+                !audioRef.current?.ended
+              ) {
                 audioRef.current.play().catch(() => {});
               }
-            }, 50);
+            }, 100);
+          }
+        }}
+        onError={(e) => {
+          console.warn('HTML5 Audio error:', e);
+          if (isSwitchingRef.current) return;
+          if (isPlayingRef.current) {
+            setTimeout(() => {
+              if (isPlayingRef.current && !isSwitchingRef.current) {
+                handleNextSongRef.current();
+              }
+            }, 500);
           }
         }}
       />
