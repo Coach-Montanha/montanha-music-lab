@@ -11,6 +11,23 @@ export interface StreamResult {
 }
 
 const streamCache = new Map<string, StreamResult>();
+const inflight = new Map<string, Promise<StreamResult | null>>();
+
+export function invalidateStream(song: { id?: string; youtubeId?: string; name?: string; artist?: string } | string) {
+  if (typeof song === 'string') {
+    streamCache.delete(song);
+    inflight.delete(song);
+    return;
+  }
+  const cleanId = (song.youtubeId || '').replace(/^yt-/, '').split('&')[0].trim();
+  const cacheKey = cleanId || `${song.name || ''}-${song.artist || ''}`;
+  streamCache.delete(cacheKey);
+  inflight.delete(cacheKey);
+  if (song.id) {
+    streamCache.delete(song.id);
+    inflight.delete(song.id);
+  }
+}
 
 function sanitizeTitle(str: string): string {
   return (str || '')
@@ -18,7 +35,7 @@ function sanitizeTitle(str: string): string {
     .replace(/\[.*?\]/g, '')
     .replace(/feat\..*$/i, '')
     .replace(/ft\..*$/i, '')
-    .replace(/[^\w\s-]/g, ' ')
+    .replace(/[^\p{L}\p{N}\s-]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -104,7 +121,7 @@ async function fetchFromDeezer(title: string, artist: string): Promise<StreamRes
   return null;
 }
 
-export async function fetchAudioStream(
+export function fetchAudioStream(
   youtubeId?: string,
   songName?: string,
   artistName?: string,
@@ -114,48 +131,59 @@ export async function fetchAudioStream(
   const cacheKey = cleanId || `${songName || ''}-${artistName || ''}`;
 
   if (streamCache.has(cacheKey)) {
-    return streamCache.get(cacheKey)!;
+    return Promise.resolve(streamCache.get(cacheKey)!);
   }
 
-  // Passo 1: Busca via Serverless API interna (Sem problemas de CORS no Mobile)
-  if (songName || cleanId) {
-    const internalResult = await fetchFromInternalApi(songName || '', artistName || '', cleanId);
-    if (internalResult) {
-      streamCache.set(cacheKey, internalResult);
-      return internalResult;
+  if (inflight.has(cacheKey)) {
+    return inflight.get(cacheKey)!;
+  }
+
+  const promise = (async () => {
+    // Passo 1: Busca via Serverless API interna (Sem problemas de CORS no Mobile)
+    if (songName || cleanId) {
+      const internalResult = await fetchFromInternalApi(songName || '', artistName || '', cleanId);
+      if (internalResult) {
+        streamCache.set(cacheKey, internalResult);
+        return internalResult;
+      }
     }
-  }
 
-  // Passo 2: Busca direta no Saavn (Akamai 320kbps MP4)
-  if (songName) {
-    const saavnResult = await fetchFromSaavnDirect(songName, artistName || '');
-    if (saavnResult) {
-      streamCache.set(cacheKey, saavnResult);
-      return saavnResult;
+    // Passo 2: Busca direta no Saavn (Akamai 320kbps MP4)
+    if (songName) {
+      const saavnResult = await fetchFromSaavnDirect(songName, artistName || '');
+      if (saavnResult) {
+        streamCache.set(cacheKey, saavnResult);
+        return saavnResult;
+      }
     }
-  }
 
-  // Passo 3: Deezer CDN Fallback
-  if (songName) {
-    const deezerResult = await fetchFromDeezer(songName, artistName || '');
-    if (deezerResult) {
-      streamCache.set(cacheKey, deezerResult);
-      return deezerResult;
+    // Passo 3: Deezer CDN Fallback
+    if (songName) {
+      const deezerResult = await fetchFromDeezer(songName, artistName || '');
+      if (deezerResult) {
+        streamCache.set(cacheKey, deezerResult);
+        return deezerResult;
+      }
     }
-  }
 
-  // Passo 4: Fallback do objeto original
-  if (fallbackAudioUrl && fallbackAudioUrl.startsWith('http')) {
-    const fallbackResult: StreamResult = {
-      url: fallbackAudioUrl,
-      duration: 30,
-      mimeType: 'audio/mpeg',
-      title: songName,
-      artist: artistName,
-      source: 'deezer'
-    };
-    return fallbackResult;
-  }
+    // Passo 4: Fallback do objeto original
+    if (fallbackAudioUrl && fallbackAudioUrl.startsWith('http')) {
+      const fallbackResult: StreamResult = {
+        url: fallbackAudioUrl,
+        duration: 30,
+        mimeType: 'audio/mpeg',
+        title: songName,
+        artist: artistName,
+        source: 'deezer'
+      };
+      return fallbackResult;
+    }
 
-  return null;
+    return null;
+  })().finally(() => {
+    inflight.delete(cacheKey);
+  });
+
+  inflight.set(cacheKey, promise);
+  return promise;
 }

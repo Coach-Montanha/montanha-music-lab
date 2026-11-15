@@ -18,19 +18,23 @@ export class MediaSessionController {
   updateMetadata(track: TrackMetadata) {
     if (!('mediaSession' in navigator)) return;
 
-    navigator.mediaSession.metadata = new MediaMetadata({
-      title: track.title,
-      artist: track.artist || 'Able Music',
-      album: track.album || 'Able Player Library',
-      artwork: track.artworkUrl
-        ? [
-            { src: track.artworkUrl, sizes: '96x96', type: 'image/jpeg' },
-            { src: track.artworkUrl, sizes: '128x128', type: 'image/jpeg' },
-            { src: track.artworkUrl, sizes: '256x256', type: 'image/jpeg' },
-            { src: track.artworkUrl, sizes: '512x512', type: 'image/jpeg' },
-          ]
-        : [],
-    });
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: track.title,
+        artist: track.artist || 'Able Music',
+        album: track.album || 'Able Player Library',
+        artwork: track.artworkUrl
+          ? [
+              { src: track.artworkUrl, sizes: '96x96' },
+              { src: track.artworkUrl, sizes: '128x128' },
+              { src: track.artworkUrl, sizes: '256x256' },
+              { src: track.artworkUrl, sizes: '512x512' },
+            ]
+          : [],
+      });
+    } catch (e) {
+      console.warn('Erro ao atualizar MediaMetadata:', e);
+    }
   }
 
   setupActionHandlers(handlers: {
@@ -42,37 +46,48 @@ export class MediaSessionController {
   }) {
     if (!('mediaSession' in navigator)) return;
 
-    try {
-      navigator.mediaSession.setActionHandler('play', handlers.onPlay);
-      navigator.mediaSession.setActionHandler('pause', handlers.onPause);
+    const safeSet = (action: MediaSessionAction, fn: MediaSessionActionHandler | null) => {
+      try {
+        navigator.mediaSession.setActionHandler(action, fn);
+      } catch (err) {
+        console.warn(`MediaSession action [${action}] não suportada:`, err);
+      }
+    };
 
-      if (handlers.onPrevious) {
-        navigator.mediaSession.setActionHandler('previoustrack', handlers.onPrevious);
-      }
-      if (handlers.onNext) {
-        navigator.mediaSession.setActionHandler('nexttrack', handlers.onNext);
-      }
-      if (handlers.onSeekTo) {
-        navigator.mediaSession.setActionHandler('seekto', (details) => {
-          if (details.seekTime !== undefined && handlers.onSeekTo) {
-            handlers.onSeekTo(details);
-          }
-        });
-      }
-    } catch (e) {
-      console.warn('Erro ao registrar MediaSession actions:', e);
+    safeSet('play', handlers.onPlay);
+    safeSet('pause', handlers.onPause);
+
+    if (handlers.onPrevious) {
+      safeSet('previoustrack', handlers.onPrevious);
+    }
+    if (handlers.onNext) {
+      safeSet('nexttrack', handlers.onNext);
+    }
+    if (handlers.onSeekTo) {
+      safeSet('seekto', (details) => {
+        if (details.seekTime !== undefined && handlers.onSeekTo) {
+          handlers.onSeekTo(details);
+        }
+      });
     }
   }
 
   updatePlaybackState(isPlaying: boolean) {
     if (!('mediaSession' in navigator)) return;
-    navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+    try {
+      navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+    } catch {}
   }
 
   updatePositionState(state: { duration: number; playbackRate?: number; position: number }) {
     if (!('mediaSession' in navigator) || !navigator.mediaSession.setPositionState) return;
     try {
-      if (state.duration > 0 && state.position <= state.duration) {
+      if (
+        Number.isFinite(state.duration) &&
+        state.duration > 0 &&
+        state.position >= 0 &&
+        state.position <= state.duration
+      ) {
         navigator.mediaSession.setPositionState({
           duration: state.duration,
           playbackRate: state.playbackRate || 1,

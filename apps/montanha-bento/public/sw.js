@@ -1,7 +1,7 @@
-// Service Worker para Montanha Music Lab PWA - Network First com Cache de Contingência
-const CACHE_NAME = 'montanha-music-v6';
+// Service Worker para Montanha Music Lab PWA - Network First com Cache Estático Same-Origin
+const CACHE_NAME = 'montanha-music-v7';
 
-self.addEventListener('install', (event) => {
+self.addEventListener('install', () => {
   self.skipWaiting();
 });
 
@@ -11,7 +11,6 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         keys.map((key) => {
           if (key !== CACHE_NAME) {
-            console.log('Removendo cache antigo:', key);
             return caches.delete(key);
           }
         })
@@ -22,57 +21,47 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  const url = event.request.url;
+  const req = event.request;
+  // Apenas requisições GET podem ser cacheadas
+  if (req.method !== 'GET') return;
 
-  // 1. NUNCA intercepta fluxos de áudio, vídeo ou mídias de CDNs (Garante Range 206 nativo ininterrupto com tela apagada)
-  if (
-    event.request.destination === 'audio' ||
-    event.request.destination === 'video' ||
-    url.includes('saavncdn.com') ||
-    url.includes('itunes.apple.com') ||
-    url.includes('audio-ssl') ||
-    url.includes('dzcdn.net') ||
-    url.includes('deezer.com') ||
-    url.includes('googlevideo.com') ||
-    url.includes('youtube.com') ||
-    url.includes('piped') ||
-    url.includes('supabase') ||
-    url.includes('/api/') ||
-    url.endsWith('.mp4') ||
-    url.endsWith('.mp3') ||
-    url.endsWith('.m4a') ||
-    url.endsWith('.webm') ||
-    url.endsWith('.wav')
-  ) {
-    return;
-  }
+  const url = new URL(req.url);
 
-  // 2. Navegação de páginas (HTML): SEMPRE Network-First para garantir código fresco
-  if (event.request.mode === 'navigate' || event.request.destination === 'document') {
+  // 1. NUNCA intercepta requisições cross-origin (CDNs externos, Saavn, Deezer, YouTube, Supabase)
+  if (url.origin !== self.location.origin) return;
+
+  // 2. NUNCA intercepta endpoints serverless dinâmicos
+  if (url.pathname.startsWith('/api/')) return;
+
+  // 3. NUNCA intercepta mídias ou requisições de Range (Garante Range 206 nativo do navegador)
+  if (req.headers.has('range') || ['audio', 'video'].includes(req.destination)) return;
+
+  // 4. Navegação de páginas (HTML): SEMPRE Network-First para garantir código fresco
+  if (req.mode === 'navigate' || req.destination === 'document') {
     event.respondWith(
-      fetch(event.request)
+      fetch(req)
         .then((response) => {
           if (response && response.status === 200) {
             const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+            caches.open(CACHE_NAME).then((cache) => cache.put(req, clone)).catch(() => {});
           }
           return response;
         })
-        .catch(() => caches.match(event.request))
+        .catch(() => caches.match(req))
     );
     return;
   }
 
-  // 3. Demais recursos estáticos: Network-First com fallback para cache
+  // 5. Demais recursos estáticos same-origin (JS, CSS, SVGs, imagens locais): Network-First com fallback
   event.respondWith(
-    fetch(event.request)
+    fetch(req)
       .then((networkResponse) => {
         if (networkResponse && networkResponse.status === 200) {
           const clone = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          caches.open(CACHE_NAME).then((cache) => cache.put(req, clone)).catch(() => {});
         }
         return networkResponse;
       })
-      .catch(() => caches.match(event.request))
+      .catch(() => caches.match(req))
   );
 });
