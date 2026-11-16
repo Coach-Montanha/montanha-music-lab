@@ -1,6 +1,7 @@
 // Serverless Function /api/stream - Montanha Music Lab
-// Resolve áudio de alta fidelidade (320kbps MP4 Akamai / Invidious / Deezer)
+// Resolve áudio de alta fidelidade (320kbps MP4 Akamai / YouTube Audio Completo)
 // Com CORS liberado para navegadores, PWAs e mobile (iOS / Android)
+// ZERO PREVIEWS DE 30s: Apenas faixas integrais de alta duração
 
 function sanitizeTitle(str) {
   return (str || '')
@@ -8,7 +9,7 @@ function sanitizeTitle(str) {
     .replace(/\[.*?\]/g, '')
     .replace(/feat\..*$/i, '')
     .replace(/ft\..*$/i, '')
-    .replace(/[^\w\s-]/g, ' ')
+    .replace(/[^\p{L}\p{N}\s'-]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -17,18 +18,67 @@ function extractArtistCandidates(artistStr) {
   if (!artistStr) return [];
   const rawList = artistStr
     .split(/[,&/]|feat\.|ft\.|x\s+/i)
-    .map(a => a.trim().replace(/[^\w\s-]/g, ' ').replace(/\s+/g, ' ').trim())
+    .map(a => sanitizeTitle(a))
     .filter(a => a.length > 1);
 
   const candidates = [];
+  const cleanedFull = sanitizeTitle(artistStr);
+  if (cleanedFull && !candidates.includes(cleanedFull)) {
+    candidates.push(cleanedFull);
+  }
   for (const a of rawList) {
     if (!candidates.includes(a)) candidates.push(a);
   }
-  const cleanedFull = artistStr.split(',')[0].trim();
-  if (cleanedFull && !candidates.includes(cleanedFull)) {
-    candidates.unshift(cleanedFull);
+  const firstWord = rawList[0]?.split(' ')[0];
+  if (firstWord && firstWord.length > 2 && !candidates.includes(firstWord)) {
+    candidates.push(firstWord);
   }
   return candidates.length > 0 ? candidates : [artistStr.trim()];
+}
+
+async function searchYouTubeVideoId(query) {
+  if (!query) return null;
+  try {
+    const ytSearchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3500);
+
+    const ytResp = await fetch(ytSearchUrl, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept-Language': 'en-US,en;q=0.9'
+      }
+    });
+    clearTimeout(timeout);
+
+    if (ytResp.ok) {
+      const html = await ytResp.text();
+      const match = html.match(/"videoId":"([a-zA-Z0-9_-]{11})"/);
+      if (match && match[1]) {
+        return match[1];
+      }
+    }
+  } catch {}
+
+  // Fallback Invidious / Piped search
+  const searchMirrors = [
+    `https://yt.chocolatemoo53.com/api/v1/search?q=${encodeURIComponent(query)}&type=video`,
+    `https://invidious.nerdvpn.de/api/v1/search?q=${encodeURIComponent(query)}&type=video`
+  ];
+  for (const mirror of searchMirrors) {
+    try {
+      const r = await fetch(mirror, { signal: AbortSignal.timeout(3000) });
+      if (r.ok) {
+        const data = await r.json();
+        if (Array.isArray(data) && data[0]?.videoId) {
+          return data[0].videoId;
+        }
+      }
+    } catch {}
+  }
+
+  return null;
 }
 
 export default async function handler(req, res) {
@@ -47,7 +97,7 @@ export default async function handler(req, res) {
   const cleanT = sanitizeTitle(title);
   const candidates = extractArtistCandidates(artist);
 
-  // 1. TIER 1: JioSaavn 320kbps MP4 via Fast-Saavn (Akamai CDN - Zero Bloqueio de YouTube)
+  // 1. TIER 1: JioSaavn 320kbps MP4 via Fast-Saavn (Akamai CDN - Músicas Integrais em Alta Fidelidade)
   if (cleanT) {
     for (const cand of candidates) {
       try {
@@ -95,40 +145,23 @@ export default async function handler(req, res) {
     }
   }
 
-  // 2. TIER 2: Deezer API
-  if (cleanT) {
-    try {
-      const q = `${cleanT} ${candidates[0] || ''}`.trim();
-      const dzRes = await fetch(`https://api.deezer.com/search?q=${encodeURIComponent(q)}&limit=1`, {
-        signal: AbortSignal.timeout(3000)
-      });
-      if (dzRes.ok) {
-        const dzData = await dzRes.json();
-        const track = dzData?.data?.[0];
-        if (track?.preview) {
-          return res.status(200).json({
-            url: track.preview,
-            duration: track.duration || 30,
-            mimeType: 'audio/mpeg',
-            title: track.title || title,
-            artist: track.artist?.name || artist,
-            source: 'deezer'
-          });
-        }
-      }
-    } catch {}
+  // 2. TIER 2: YouTube Audio Completo via Invidious (Com Resolução Automática de ID se Não Fornecido)
+  let youtubeId = id.replace(/^yt-/, '').split('&')[0];
+  if (!youtubeId || !/^[a-zA-Z0-9_-]{11}$/.test(youtubeId)) {
+    if (cleanT) {
+      const query = `${cleanT} ${candidates[0] || artist}`.trim();
+      youtubeId = await searchYouTubeVideoId(query);
+    }
   }
 
-  // 3. TIER 3: Invidious Audio Stream Resolver
-  const youtubeId = id.replace(/^yt-/, '').split('&')[0];
-  const mirrors = ['https://yt.chocolatemoo53.com', 'https://inv.nadeko.net', 'https://echostreamz.com'];
-
   if (youtubeId && /^[a-zA-Z0-9_-]{11}$/.test(youtubeId)) {
+    const mirrors = ['https://yt.chocolatemoo53.com', 'https://invidious.nerdvpn.de', 'https://inv.nadeko.net'];
+
     for (const host of mirrors) {
       try {
         const invRes = await fetch(`${host}/api/v1/videos/${youtubeId}`, {
           headers: { 'User-Agent': 'Mozilla/5.0' },
-          signal: AbortSignal.timeout(3000)
+          signal: AbortSignal.timeout(3500)
         });
         if (invRes.ok) {
           const data = await invRes.json();

@@ -177,8 +177,35 @@ export function fetchAudioStream(
       }
     }
 
+    // Passo 2.5: Resolução sob demanda via YouTube Search + Invidious (Áudio Completo)
+    if (songName) {
+      try {
+        const query = `${sanitizeTitle(songName)} ${(artistName || '').split(',')[0].trim()}`.trim();
+        const ytRes = await fetch(`/api/youtube-search?q=${encodeURIComponent(query)}`, {
+          signal: AbortSignal.timeout(3500)
+        });
+        if (ytRes.ok) {
+          const ytData = await ytRes.json();
+          if (ytData?.videoId) {
+            const ytStream = await fetchFromInternalApi(songName, artistName || '', ytData.videoId);
+            if (ytStream) {
+              streamCache.set(cacheKey, ytStream);
+              return ytStream;
+            }
+          }
+        }
+      } catch {}
+    }
+
     // Passo 3: Fallback do objeto original (apenas se for áudio completo, rejeita previews de 30s)
-    if (fallbackAudioUrl && fallbackAudioUrl.startsWith('http') && !fallbackAudioUrl.includes('preview') && !fallbackAudioUrl.includes('dzcdn.net')) {
+    if (
+      fallbackAudioUrl &&
+      fallbackAudioUrl.startsWith('http') &&
+      !fallbackAudioUrl.includes('preview') &&
+      !fallbackAudioUrl.includes('dzcdn.net') &&
+      !fallbackAudioUrl.includes('apple.com') &&
+      !fallbackAudioUrl.includes('mzstatic')
+    ) {
       const fallbackResult: StreamResult = {
         url: fallbackAudioUrl,
         duration: 210,

@@ -67,8 +67,7 @@ export async function searchCategorized(
               artist: item.artistName || 'Artista',
               album: item.collectionName,
               thumbnail: (item.artworkUrl100 || '').replace('100x100bb', '600x600bb'),
-              duration: item.trackTimeMillis ? Math.round(item.trackTimeMillis / 1000) : 210,
-              audioUrl: item.previewUrl
+              duration: item.trackTimeMillis ? Math.round(item.trackTimeMillis / 1000) : 210
             }))
           }))
           .catch(() => ({ type: 'songs', items: [] }))
@@ -170,8 +169,7 @@ export async function fetchEntityTracks(
               artist: item.artistName || artistName || 'Artista',
               album: item.collectionName,
               thumbnail: (item.artworkUrl100 || '').replace('100x100bb', '600x600bb'),
-              duration: item.trackTimeMillis ? Math.round(item.trackTimeMillis / 1000) : 210,
-              audioUrl: item.previewUrl
+              duration: item.trackTimeMillis ? Math.round(item.trackTimeMillis / 1000) : 210
             });
           }
         }
@@ -194,8 +192,7 @@ export async function fetchEntityTracks(
           artist: item.artistName || artistName,
           album: item.collectionName,
           thumbnail: (item.artworkUrl100 || '').replace('100x100bb', '600x600bb'),
-          duration: item.trackTimeMillis ? Math.round(item.trackTimeMillis / 1000) : 210,
-          audioUrl: item.previewUrl
+          duration: item.trackTimeMillis ? Math.round(item.trackTimeMillis / 1000) : 210
         }));
       }
     } catch {}

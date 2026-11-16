@@ -162,8 +162,29 @@ export default defineConfig({
             }
           }
 
-          // Tier 2: Invidious YouTube Resolver
-          const youtubeId = id.replace(/^yt-/, '').split('&')[0];
+          // Tier 2: Invidious YouTube Resolver (Com Resolução Automática de ID)
+          let youtubeId = id.replace(/^yt-/, '').split('&')[0];
+          if (!youtubeId || !/^[a-zA-Z0-9_-]{11}$/.test(youtubeId)) {
+            if (cleanT) {
+              try {
+                const query = `${cleanT} ${Array.from(candidates)[0] || artist}`.trim();
+                const ytResp = await fetch(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`, {
+                  headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept-Language': 'en-US,en;q=0.9'
+                  }
+                });
+                if (ytResp.ok) {
+                  const html = await ytResp.text();
+                  const match = html.match(/"videoId":"([a-zA-Z0-9_-]{11})"/);
+                  if (match && match[1]) {
+                    youtubeId = match[1];
+                  }
+                }
+              } catch {}
+            }
+          }
+
           const mirrors = ['https://yt.chocolatemoo53.com', 'https://invidious.nerdvpn.de', 'https://inv.nadeko.net'];
           if (youtubeId && /^[a-zA-Z0-9_-]{11}$/.test(youtubeId)) {
             for (const host of mirrors) {

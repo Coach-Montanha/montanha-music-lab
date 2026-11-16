@@ -879,11 +879,19 @@ export default function App() {
     }
 
     if (!streamUrl) {
-      if (song.audioUrl) {
+      // Rejeita terminantemente previews de 30s da Deezer / Apple
+      const isPreview = (url?: string) =>
+        Boolean(url && (url.includes('preview') || url.includes('dzcdn.net') || url.includes('apple.com') || url.includes('mzstatic')));
+
+      if (song.audioUrl && !isPreview(song.audioUrl)) {
         streamUrl = song.audioUrl;
-        streamDuration = 30;
+        streamDuration = song.duration || 210;
       } else {
         isSwitchingRef.current = false;
+        showToast(`Áudio integral não disponível para "${song.name}". Pulando para a próxima...`);
+        setTimeout(() => {
+          handleNextSongRef.current();
+        }, 800);
         return;
       }
     }
@@ -1009,12 +1017,18 @@ export default function App() {
   const handleDownloadSong = async (song: Song) => {
     showToast(`Baixando "${song.name}" para offline...`);
 
-    let audioSourceUrl = song.audioUrl;
-    if (!audioSourceUrl) {
+    const isPreview = (url?: string) =>
+      Boolean(url && (url.includes('preview') || url.includes('dzcdn.net') || url.includes('apple.com') || url.includes('mzstatic')));
+
+    let audioSourceUrl: string | null = null;
+    if (song.audioUrl && !isPreview(song.audioUrl)) {
+      audioSourceUrl = song.audioUrl;
+    } else {
       try {
-        const r = await fetch(`https://api.deezer.com/search?q=${encodeURIComponent(song.name + ' ' + song.artist)}`);
-        const data = await r.json();
-        audioSourceUrl = data?.data?.[0]?.preview;
+        const streamRes = await fetchAudioStream(song.youtubeId, song.name, song.artist);
+        if (streamRes?.url) {
+          audioSourceUrl = streamRes.url;
+        }
       } catch {}
     }
 
@@ -1079,11 +1093,24 @@ export default function App() {
       return updated;
     });
 
+    const isPreview = (url?: string) =>
+      Boolean(url && (url.includes('preview') || url.includes('dzcdn.net') || url.includes('apple.com') || url.includes('mzstatic')));
+
     for (let i = 0; i < playlist.songs.length; i++) {
       const song = playlist.songs[i];
-      if (song.audioUrl) {
+      let streamUrl: string | null = null;
+      if (song.audioUrl && !isPreview(song.audioUrl)) {
+        streamUrl = song.audioUrl;
+      } else {
         try {
-          const resp = await fetch(song.audioUrl);
+          const streamRes = await fetchAudioStream(song.youtubeId, song.name, song.artist);
+          if (streamRes?.url) streamUrl = streamRes.url;
+        } catch {}
+      }
+
+      if (streamUrl && !isPreview(streamUrl)) {
+        try {
+          const resp = await fetch(streamUrl);
           if (resp.ok) {
             const blob = await resp.blob();
             await storeOfflineBlob(song.id, blob);

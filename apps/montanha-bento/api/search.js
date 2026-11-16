@@ -53,7 +53,7 @@ export default async function handler(req, res) {
           album: t.album?.title || '',
           thumbnail: cover,
           duration: t.duration || 210,
-          audioUrl: t.preview || ''
+          audioUrl: ''
         };
       });
 
@@ -89,7 +89,7 @@ export default async function handler(req, res) {
               album: t.album?.title || '',
               thumbnail: t.album?.cover_xl || t.album?.cover_big || t.album?.cover_medium,
               duration: t.duration || 210,
-              audioUrl: t.preview || ''
+              audioUrl: ''
             }))
           }))
           .catch(() => ({ type: 'songs', items: [] }))
