@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   ArrowLeft,
   Play,
@@ -12,7 +12,8 @@ import {
   ListPlus,
   Download,
   Sparkles,
-  MoreVertical
+  MoreVertical,
+  RefreshCw
 } from 'lucide-react';
 import { Song, SearchAlbum, SearchArtist } from '../types';
 import { GenreCategory, GenreThemedPlaylist } from '../lib/genresData';
@@ -29,6 +30,7 @@ interface GenreDetailViewProps {
     subtitle?: string;
     cover: string;
     rawId?: string | number;
+    tracks?: Song[];
   }) => void;
   onAddToPlaylist: (song: Song) => void;
   onDownloadSong: (song: Song) => void;
@@ -52,6 +54,15 @@ export const GenreDetailView: React.FC<GenreDetailViewProps> = ({
   currentSongId,
   isPlaying = false
 }) => {
+  const [randomSeed, setRandomSeed] = useState<number>(0);
+
+  // Seleciona aleatoriamente apenas 3 playlists de referência do catálogo de 30+
+  const displayedPlaylists = useMemo(() => {
+    if (!genre.playlists || genre.playlists.length === 0) return [];
+    if (genre.playlists.length <= 3) return genre.playlists;
+    const shuffled = [...genre.playlists].sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, 3);
+  }, [genre.id, genre.playlists, randomSeed]);
   return (
     <div className="space-y-8 animate-fade-in pb-16">
       {/* Top Bar com Botão Voltar & Título */}
@@ -219,17 +230,30 @@ export const GenreDetailView: React.FC<GenreDetailViewProps> = ({
         </div>
       </div>
 
-      {/* 2. SEÇÃO: PLAYLISTS DO TEMA */}
-      {genre.playlists && genre.playlists.length > 0 && (
+      {/* 2. SEÇÃO: PLAYLISTS DO TEMA (3 ESCOLHIDAS ALEATORIAMENTE DO ACERVO DE 30+) */}
+      {displayedPlaylists && displayedPlaylists.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-black uppercase tracking-wider text-neutral-300 flex items-center gap-2">
-              <ListMusic size={16} className="text-[#1DB954]" />
-              <span>Playlists do Gênero</span>
-            </h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-black uppercase tracking-wider text-neutral-300 flex items-center gap-2">
+                <ListMusic size={16} className="text-[#1DB954]" />
+                <span>Playlists do Gênero</span>
+              </h3>
+              <span className="text-[11px] text-neutral-400 font-semibold bg-white/5 px-2.5 py-0.5 rounded-full border border-white/5">
+                3 de {genre.playlists.length}
+              </span>
+            </div>
+            <button
+              onClick={() => setRandomSeed((s) => s + 1)}
+              className="flex items-center gap-1.5 text-xs font-bold text-[#1DB954] hover:text-[#1ed760] transition px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 active:scale-95 border border-white/5"
+              title="Sortear outras 3 playlists de referência"
+            >
+              <RefreshCw size={12} />
+              <span>Sortear Outras</span>
+            </button>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
-            {genre.playlists.map((playlist) => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
+            {displayedPlaylists.map((playlist) => (
               <div
                 key={playlist.id}
                 onClick={() =>
@@ -237,18 +261,19 @@ export const GenreDetailView: React.FC<GenreDetailViewProps> = ({
                     type: 'playlist',
                     name: playlist.name,
                     subtitle: playlist.creator,
-                    cover: playlist.cover
+                    cover: playlist.cover,
+                    tracks: playlist.tracks
                   })
                 }
-                className="group p-3 rounded-2xl bg-[#181818] hover:bg-[#242424] transition duration-200 cursor-pointer border border-white/5 flex flex-col"
+                className="group p-4 rounded-2xl bg-[#181818] hover:bg-[#242424] transition duration-200 cursor-pointer border border-white/5 flex flex-col"
               >
                 <div
-                  className="aspect-square w-full rounded-xl overflow-hidden mb-3 shadow-lg relative flex items-center justify-center p-3 text-center"
+                  className="aspect-square w-full rounded-xl overflow-hidden mb-3 shadow-lg relative flex items-center justify-center p-4 text-center"
                   style={{
                     background: playlist.gradient || genre.gradient
                   }}
                 >
-                  <span className="text-white font-black text-sm drop-shadow leading-snug line-clamp-3">
+                  <span className="text-white font-black text-base sm:text-lg drop-shadow-md leading-snug line-clamp-3">
                     {playlist.name}
                   </span>
                   <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md text-[10px] text-white px-2 py-0.5 rounded-full font-bold">

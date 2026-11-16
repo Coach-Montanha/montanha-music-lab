@@ -1387,7 +1387,18 @@ export default function App() {
     subtitle?: string;
     cover: string;
     rawId?: string | number;
+    tracks?: Song[];
   }) => {
+    // 1. Se as faixas já foram fornecidas (ex: playlists de referência com faixas predefinidas), carrega instantaneamente
+    if (entity.tracks && entity.tracks.length > 0) {
+      setViewingEntity({
+        ...entity,
+        songs: entity.tracks,
+        loading: false
+      });
+      return;
+    }
+
     setViewingEntity({
       ...entity,
       songs: [],
@@ -1397,11 +1408,33 @@ export default function App() {
     try {
       if (entity.rawId) {
         const tracks = await fetchEntityTracks(entity.rawId, entity.type, entity.name);
-        setViewingEntity((prev) => (prev ? { ...prev, songs: tracks, loading: false } : null));
-      } else {
-        const local = playlists.find((p) => p.id === entity.name);
-        setViewingEntity((prev) => (prev ? { ...prev, songs: local?.songs || [], loading: false } : null));
+        if (tracks && tracks.length > 0) {
+          setViewingEntity((prev) => (prev ? { ...prev, songs: tracks, loading: false } : null));
+          return;
+        }
       }
+
+      // Procura por ID ou Nome nas playlists locais do usuário
+      const local = playlists.find((p) => p.id === entity.name || p.name === entity.name);
+      if (local && local.songs && local.songs.length > 0) {
+        setViewingEntity((prev) => (prev ? { ...prev, songs: local.songs, loading: false } : null));
+        return;
+      }
+
+      // Fallback Inteligente: Busca online faixas correspondentes ao nome da playlist no Deezer/iTunes
+      const searchRes = await searchCategorized(entity.name, 'songs');
+      if (searchRes.songs && searchRes.songs.length > 0) {
+        setViewingEntity((prev) => (prev ? { ...prev, songs: searchRes.songs, loading: false } : null));
+        return;
+      }
+
+      // Fallback de Contingência: Se ainda vazio, usa as músicas do gênero atual
+      if (selectedGenre && selectedGenre.topTracks && selectedGenre.topTracks.length > 0) {
+        setViewingEntity((prev) => (prev ? { ...prev, songs: selectedGenre.topTracks, loading: false } : null));
+        return;
+      }
+
+      setViewingEntity((prev) => (prev ? { ...prev, loading: false } : null));
     } catch {
       setViewingEntity((prev) => (prev ? { ...prev, loading: false } : null));
     }
