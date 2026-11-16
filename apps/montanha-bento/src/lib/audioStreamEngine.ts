@@ -68,7 +68,7 @@ async function fetchFromInternalApi(title: string, artist: string, youtubeId?: s
     if (youtubeId) params.set('id', youtubeId);
 
     const res = await fetch(`/api/stream?${params.toString()}`, {
-      signal: AbortSignal.timeout(4500)
+      signal: AbortSignal.timeout(3500)
     });
     if (res.ok) {
       const data = await res.json();
@@ -87,58 +87,39 @@ async function fetchFromInternalApi(title: string, artist: string, youtubeId?: s
   return null;
 }
 
-// 2. TIER 2: Fast-Saavn Direto (Contingência com Múltiplos Candidatos)
+// 2. TIER 2: Fast-Saavn Direto (Busca Concorrente Ultrarrápida em Paralelo)
 async function fetchFromSaavnDirect(title: string, artist: string): Promise<StreamResult | null> {
   const cleanT = sanitizeTitle(title);
   if (!cleanT) return null;
   const candidates = getArtistCandidates(artist);
+  if (cleanT.length > 4) candidates.push(cleanT);
 
-  for (const cand of candidates) {
-    try {
-      const res = await fetch(
-        `https://fast-saavn.vercel.app/api?title=${encodeURIComponent(cleanT)}&artist=${encodeURIComponent(cand)}`,
-        { signal: AbortSignal.timeout(3000) }
-      );
-      if (res.ok) {
-        const id = (await res.text()).trim();
-        if (id && id.length > 5 && !id.includes('error') && !id.includes('not found')) {
-          return {
-            url: `https://aac.saavncdn.com/${id}_320.mp4`,
-            duration: 210,
-            mimeType: 'audio/mp4',
-            title,
-            artist: cand,
-            source: 'saavn-320'
-          };
-        }
+  const promises = candidates.slice(0, 3).map(async (cand) => {
+    const res = await fetch(
+      `https://fast-saavn.vercel.app/api?title=${encodeURIComponent(cleanT)}&artist=${encodeURIComponent(cand)}`,
+      { signal: AbortSignal.timeout(2000) }
+    );
+    if (res.ok) {
+      const id = (await res.text()).trim();
+      if (id && id.length > 5 && !id.includes('error') && !id.includes('not found')) {
+        return {
+          url: `https://aac.saavncdn.com/${id}_320.mp4`,
+          duration: 210,
+          mimeType: 'audio/mp4',
+          title,
+          artist: cand,
+          source: 'saavn-320' as const
+        };
       }
-    } catch {}
-  }
+    }
+    throw new Error('not found');
+  });
 
-  // Tentativa somente com título se for bem específico
-  if (cleanT.length > 4) {
-    try {
-      const res = await fetch(
-        `https://fast-saavn.vercel.app/api?title=${encodeURIComponent(cleanT)}&artist=${encodeURIComponent(cleanT)}`,
-        { signal: AbortSignal.timeout(2500) }
-      );
-      if (res.ok) {
-        const id = (await res.text()).trim();
-        if (id && id.length > 5 && !id.includes('error') && !id.includes('not found')) {
-          return {
-            url: `https://aac.saavncdn.com/${id}_320.mp4`,
-            duration: 210,
-            mimeType: 'audio/mp4',
-            title,
-            artist,
-            source: 'saavn-320'
-          };
-        }
-      }
-    } catch {}
+  try {
+    return await Promise.any(promises);
+  } catch {
+    return null;
   }
-
-  return null;
 }
 
 export function fetchAudioStream(
@@ -168,33 +149,13 @@ export function fetchAudioStream(
       }
     }
 
-    // Passo 2: Busca direta no Saavn (Akamai 320kbps MP4 Completo)
+    // Passo 2: Busca direta no Saavn (Akamai 320kbps MP4 Completo em paralelo)
     if (songName) {
       const saavnResult = await fetchFromSaavnDirect(songName, artistName || '');
       if (saavnResult) {
         streamCache.set(cacheKey, saavnResult);
         return saavnResult;
       }
-    }
-
-    // Passo 2.5: Resolução sob demanda via YouTube Search + Invidious (Áudio Completo)
-    if (songName) {
-      try {
-        const query = `${sanitizeTitle(songName)} ${(artistName || '').split(',')[0].trim()}`.trim();
-        const ytRes = await fetch(`/api/youtube-search?q=${encodeURIComponent(query)}`, {
-          signal: AbortSignal.timeout(3500)
-        });
-        if (ytRes.ok) {
-          const ytData = await ytRes.json();
-          if (ytData?.videoId) {
-            const ytStream = await fetchFromInternalApi(songName, artistName || '', ytData.videoId);
-            if (ytStream) {
-              streamCache.set(cacheKey, ytStream);
-              return ytStream;
-            }
-          }
-        }
-      } catch {}
     }
 
     // Passo 3: Fallback do objeto original (apenas se for áudio completo, rejeita previews de 30s)

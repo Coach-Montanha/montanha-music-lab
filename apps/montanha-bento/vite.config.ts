@@ -113,53 +113,39 @@ export default defineConfig({
           const firstWord = rawArtists[0]?.split(' ')[0];
           if (firstWord && firstWord.length > 2) candidates.add(firstWord);
 
-          // Tier 1: Saavn 320kbps MP4 Completo
+          // Tier 1: Saavn 320kbps MP4 Completo com busca paralela ultrarrápida
           if (cleanT) {
-            for (const cand of candidates) {
-              try {
-                const saavnRes = await fetch(
-                  `https://fast-saavn.vercel.app/api?title=${encodeURIComponent(cleanT)}&artist=${encodeURIComponent(cand)}`
-                );
-                if (saavnRes.ok) {
-                  const streamId = (await saavnRes.text()).trim();
-                  if (streamId && streamId.length > 5 && !streamId.includes('error') && !streamId.includes('not found')) {
-                    res.statusCode = 200;
-                    res.end(JSON.stringify({
-                      url: `https://aac.saavncdn.com/${streamId}_320.mp4`,
-                      duration: 210,
-                      mimeType: 'audio/mp4',
-                      title,
-                      artist: cand,
-                      source: 'saavn-320'
-                    }));
-                    return;
-                  }
-                }
-              } catch {}
-            }
+            const candidateList = Array.from(candidates);
+            if (cleanT.length > 4) candidateList.push(cleanT);
 
-            if (cleanT.length > 4) {
-              try {
-                const saavnRes = await fetch(
-                  `https://fast-saavn.vercel.app/api?title=${encodeURIComponent(cleanT)}&artist=${encodeURIComponent(cleanT)}`
-                );
-                if (saavnRes.ok) {
-                  const streamId = (await saavnRes.text()).trim();
-                  if (streamId && streamId.length > 5 && !streamId.includes('error') && !streamId.includes('not found')) {
-                    res.statusCode = 200;
-                    res.end(JSON.stringify({
-                      url: `https://aac.saavncdn.com/${streamId}_320.mp4`,
-                      duration: 210,
-                      mimeType: 'audio/mp4',
-                      title,
-                      artist,
-                      source: 'saavn-320'
-                    }));
-                    return;
-                  }
+            const saavnPromises = candidateList.slice(0, 3).map(async (cand) => {
+              const saavnRes = await fetch(
+                `https://fast-saavn.vercel.app/api?title=${encodeURIComponent(cleanT)}&artist=${encodeURIComponent(cand)}`
+              );
+              if (saavnRes.ok) {
+                const streamId = (await saavnRes.text()).trim();
+                if (streamId && streamId.length > 5 && !streamId.includes('error') && !streamId.includes('not found')) {
+                  return { streamId, cand };
                 }
-              } catch {}
-            }
+              }
+              throw new Error('not found');
+            });
+
+            try {
+              const winner = await Promise.any(saavnPromises);
+              if (winner?.streamId) {
+                res.statusCode = 200;
+                res.end(JSON.stringify({
+                  url: `https://aac.saavncdn.com/${winner.streamId}_320.mp4`,
+                  duration: 210,
+                  mimeType: 'audio/mp4',
+                  title,
+                  artist: winner.cand,
+                  source: 'saavn-320'
+                }));
+                return;
+              }
+            } catch {}
           }
 
           // Tier 2: Invidious YouTube Resolver (Com Resolução Automática de ID)

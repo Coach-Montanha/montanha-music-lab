@@ -35,6 +35,8 @@ interface GenreDetailViewProps {
   onAddToPlaylist: (song: Song) => void;
   onDownloadSong: (song: Song) => void;
   onToggleFavorite: (songId: string) => void;
+  onReplaceSong?: (song: Song) => void;
+  unavailableSongIds?: string[];
   favoriteSongIds: string[];
   currentSongId?: string;
   isPlaying?: boolean;
@@ -50,6 +52,8 @@ export const GenreDetailView: React.FC<GenreDetailViewProps> = ({
   onAddToPlaylist,
   onDownloadSong,
   onToggleFavorite,
+  onReplaceSong,
+  unavailableSongIds = [],
   favoriteSongIds,
   currentSongId,
   isPlaying = false
@@ -136,12 +140,18 @@ export const GenreDetailView: React.FC<GenreDetailViewProps> = ({
         <div className="space-y-2">
           {genre.topTracks.map((song, idx) => {
             const isCurrent = currentSongId === song.id;
+            const isUnavailable = unavailableSongIds.includes(song.id);
             return (
               <div
                 key={song.id}
-                onClick={() => onPlaySong(song, genre.topTracks)}
+                onClick={() => {
+                  if (isUnavailable) return;
+                  onPlaySong(song, genre.topTracks);
+                }}
                 className={`flex items-center justify-between p-3 rounded-2xl transition cursor-pointer group border ${
-                  isCurrent
+                  isUnavailable
+                    ? 'opacity-50 hover:opacity-75 bg-red-950/15 border-red-500/20 cursor-not-allowed'
+                    : isCurrent
                     ? 'bg-[#1DB954]/10 border-[#1DB954]/30 shadow-md'
                     : 'bg-[#181818] hover:bg-[#242424] border-white/5'
                 }`}
@@ -162,7 +172,9 @@ export const GenreDetailView: React.FC<GenreDetailViewProps> = ({
                     <img
                       src={song.thumbnail}
                       alt={song.name}
-                      className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
+                      className={`h-full w-full object-cover group-hover:scale-105 transition duration-300 ${
+                        isUnavailable ? 'grayscale contrast-125' : ''
+                      }`}
                     />
                     {isCurrent && (
                       <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
@@ -177,15 +189,37 @@ export const GenreDetailView: React.FC<GenreDetailViewProps> = ({
                   <div className="min-w-0">
                     <p
                       className={`text-sm font-bold truncate transition ${
-                        isCurrent ? 'text-[#1DB954]' : 'text-white group-hover:text-[#1DB954]'
+                        isUnavailable
+                          ? 'text-red-400 line-through'
+                          : isCurrent
+                          ? 'text-[#1DB954]'
+                          : 'text-white group-hover:text-[#1DB954]'
                       }`}
                     >
                       {song.name}
                     </p>
-                    <p className="text-xs text-neutral-400 truncate mt-0.5">
-                      {song.artist}
-                      {song.album ? ` • ${song.album}` : ''}
-                    </p>
+                    {isUnavailable ? (
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-[10px] font-bold text-red-400 uppercase">Indisponível</span>
+                        {onReplaceSong && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onReplaceSong(song);
+                            }}
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400 hover:text-emerald-300 underline underline-offset-2 transition active:scale-95"
+                          >
+                            <RefreshCw size={11} />
+                            <span>Substituir</span>
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-neutral-400 truncate mt-0.5">
+                        {song.artist}
+                        {song.album ? ` • ${song.album}` : ''}
+                      </p>
+                    )}
                   </div>
                 </div>
 

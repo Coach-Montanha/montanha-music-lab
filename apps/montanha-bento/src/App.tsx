@@ -268,6 +268,75 @@ export default function App() {
   const [isImporting, setIsImporting] = useState<boolean>(false);
   const [importProgressText, setImportProgressText] = useState<string>('');
 
+  // Músicas Indisponíveis (Com Falha de Áudio na Fonte) & Fluxo de Substituição
+  const [unavailableSongIds, setUnavailableSongIds] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem('able_unavailable_songs');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [replacingSongContext, setReplacingSongContext] = useState<{
+    targetSong: Song;
+    playlistId?: string;
+  } | null>(null);
+
+  const markSongUnavailable = (songId: string) => {
+    setUnavailableSongIds((prev) => {
+      if (prev.includes(songId)) return prev;
+      const updated = [...prev, songId];
+      try { localStorage.setItem('able_unavailable_songs', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+  };
+
+  const markSongAvailable = (songId: string) => {
+    setUnavailableSongIds((prev) => {
+      const updated = prev.filter((id) => id !== songId);
+      try { localStorage.setItem('able_unavailable_songs', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+  };
+
+  const handleStartReplaceSong = (song: Song, playlistId?: string) => {
+    setReplacingSongContext({ targetSong: song, playlistId });
+    setActiveTab('search');
+    setSearchQuery(`${song.name} ${song.artist}`);
+    handleSearch(`${song.name} ${song.artist}`);
+    showToast(`Buscando alternativas para "${song.name}". Escolha uma versão para substituir.`);
+  };
+
+  const handleApplySongReplacement = (newSong: Song) => {
+    if (!replacingSongContext) return;
+    const { targetSong, playlistId } = replacingSongContext;
+
+    if (playlistId) {
+      setPlaylists((prev) => {
+        const updated = prev.map((pl) => {
+          if (pl.id !== playlistId) return pl;
+          const updatedSongs = pl.songs.map((s) => (s.id === targetSong.id ? newSong : s));
+          return { ...pl, songs: updatedSongs };
+        });
+        if (currentUser?.id) {
+          syncCloudPlaylists(currentUser.id, updated);
+        }
+        return updated;
+      });
+
+      if (selectedPlaylist && selectedPlaylist.id === playlistId) {
+        setSelectedPlaylist((prev) =>
+          prev ? { ...prev, songs: prev.songs.map((s) => (s.id === targetSong.id ? newSong : s)) } : null
+        );
+      }
+    }
+
+    markSongAvailable(targetSong.id);
+    setReplacingSongContext(null);
+    showToast(`"${newSong.name}" substituiu "${targetSong.name}" com sucesso!`);
+  };
+
   // Contador de reproduções por música (Músicas Mais Tocadas da Conta)
   const [playCounts, setPlayCounts] = useState<Record<string, number>>(() => {
     try {
@@ -778,29 +847,32 @@ export default function App() {
     return null;
   };
 
+  const preloadTimeoutRef = useRef<any>(null);
   const schedulePreload = (currentSongItem: Song) => {
-    const currentQ = queueRef.current;
-    if (currentQ.length <= 1) return;
-    const currentIdx = currentQ.findIndex((s) => s.id === currentSongItem.id);
-    const nextIdx = (currentIdx + 1) % currentQ.length;
-    const nextSong = currentQ[nextIdx];
-    if (!nextSong) return;
+    if (preloadTimeoutRef.current) clearTimeout(preloadTimeoutRef.current);
+    preloadTimeoutRef.current = setTimeout(() => {
+      const currentQ = queueRef.current;
+      if (currentQ.length <= 1) return;
+      const currentIdx = currentQ.findIndex((s) => s.id === currentSongItem.id);
+      const nextIdx = (currentIdx + 1) % currentQ.length;
+      const nextSong = currentQ[nextIdx];
+      if (!nextSong || unavailableSongIds.includes(nextSong.id)) return;
 
-    fetchAudioStream(nextSong.youtubeId, nextSong.name, nextSong.artist, nextSong.audioUrl)
-      .then((ns) => {
-        if (ns?.url) {
-          nextSongStreamRef.current = { id: nextSong.id, url: ns.url, duration: ns.duration };
-        }
-      })
-      .catch(() => {});
+      fetchAudioStream(nextSong.youtubeId, nextSong.name, nextSong.artist, nextSong.audioUrl)
+        .then((ns) => {
+          if (ns?.url) {
+            nextSongStreamRef.current = { id: nextSong.id, url: ns.url, duration: ns.duration };
+          }
+        })
+        .catch(() => {});
+    }, 2000);
   };
 
-  // Recomputa o preload quando a fila ou a música atual mudam (ex: shuffle ou reordenação)
   useEffect(() => {
-    if (currentSong) {
-      schedulePreload(currentSong);
-    }
-  }, [queue, currentSong]);
+    return () => {
+      if (preloadTimeoutRef.current) clearTimeout(preloadTimeoutRef.current);
+    };
+  }, []);
 
   // Motor Unificado Padrão Montanha Music Lab (HTML5 Audio com Streaming 320kbps e Background-Safe)
   const playSong = async (song: Song, newQueue?: Song[], retry = 0) => {
@@ -887,11 +959,9 @@ export default function App() {
         streamUrl = song.audioUrl;
         streamDuration = song.duration || 210;
       } else {
+        markSongUnavailable(song.id);
         isSwitchingRef.current = false;
-        showToast(`Áudio integral não disponível para "${song.name}". Pulando para a próxima...`);
-        setTimeout(() => {
-          handleNextSongRef.current();
-        }, 800);
+        showToast(`"${song.name}" está indisponível na fonte. Toque em "Substituir por semelhante".`);
         return;
       }
     }
@@ -1968,12 +2038,37 @@ export default function App() {
                 }}
                 onDownloadSong={handleDownloadSong}
                 onToggleFavorite={toggleFavorite}
+                onReplaceSong={handleStartReplaceSong}
+                unavailableSongIds={unavailableSongIds}
                 favoriteSongIds={favoriteSongIds}
                 currentSongId={currentSong?.id}
                 isPlaying={isPlaying}
               />
             ) : (
               <>
+                {/* Banner de Substituição Ativa de Música */}
+                {replacingSongContext && (
+                  <div className="flex items-center justify-between p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-white animate-fade-in shadow-lg">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <RefreshCw size={16} className="text-[#1DB954] shrink-0 animate-spin" />
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-white truncate">
+                          Substituindo <span className="text-[#1DB954] font-black">{replacingSongContext.targetSong.name}</span>
+                        </p>
+                        <p className="text-[11px] text-neutral-400 truncate">
+                          Escolha uma das versões abaixo para atualizar sua playlist automaticamente.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setReplacingSongContext(null)}
+                      className="text-xs font-semibold text-neutral-400 hover:text-white px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 shrink-0"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                )}
+
                 {/* Header da Tela de Busca estilo eSound */}
                 <div className="flex items-center justify-between pt-1">
                   <div>
@@ -2226,6 +2321,19 @@ export default function App() {
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
+                              {replacingSongContext && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleApplySongReplacement(song);
+                                  }}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#1DB954] hover:bg-[#1ed760] text-black text-xs font-bold shadow transition active:scale-95 mr-1"
+                                  title="Substituir a faixa por esta versão"
+                                >
+                                  <RefreshCw size={12} />
+                                  <span>Substituir</span>
+                                </button>
+                              )}
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -2586,20 +2694,62 @@ export default function App() {
             {/* LISTA DE MÚSICAS DA PLAYLIST */}
             <div className="space-y-1">
               {selectedPlaylist.songs.length > 0 ? (
-                selectedPlaylist.songs.map((song, idx) => (
-                  <div
-                    key={`${song.id}-${idx}`}
-                    onClick={() => playSong(song, selectedPlaylist.songs)}
-                    className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition cursor-pointer group"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="text-xs font-mono text-neutral-500 w-5">{idx + 1}</span>
-                      <img src={song.thumbnail} alt={song.name} className="h-10 w-10 rounded-lg object-cover" />
-                      <div className="min-w-0">
-                        <p className="text-sm font-bold text-white truncate group-hover:text-[#1DB954]">{song.name}</p>
-                        <p className="text-xs text-neutral-400 truncate">{song.artist}</p>
+                selectedPlaylist.songs.map((song, idx) => {
+                  const isUnavailable = unavailableSongIds.includes(song.id);
+                  return (
+                    <div
+                      key={`${song.id}-${idx}`}
+                      onClick={() => {
+                        if (isUnavailable) {
+                          showToast(`"${song.name}" está indisponível na fonte. Toque em "Substituir por semelhante".`);
+                          return;
+                        }
+                        playSong(song, selectedPlaylist.songs);
+                      }}
+                      className={`flex items-center justify-between p-3 rounded-xl transition group ${
+                        isUnavailable
+                          ? 'bg-red-950/20 border border-red-500/20 opacity-60 hover:opacity-85 cursor-not-allowed'
+                          : 'hover:bg-white/5 cursor-pointer'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="text-xs font-mono text-neutral-500 w-5">{idx + 1}</span>
+                        <img
+                          src={song.thumbnail}
+                          alt={song.name}
+                          className={`h-10 w-10 rounded-lg object-cover ${isUnavailable ? 'grayscale contrast-125' : ''}`}
+                        />
+                        <div className="min-w-0">
+                          <p
+                            className={`text-sm font-bold truncate ${
+                              isUnavailable
+                                ? 'text-red-400 line-through'
+                                : 'text-white group-hover:text-[#1DB954]'
+                            }`}
+                          >
+                            {song.name}
+                          </p>
+                          {isUnavailable ? (
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-[10px] font-bold text-red-400 uppercase tracking-wide">
+                                Áudio indisponível
+                              </span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleStartReplaceSong(song, selectedPlaylist.id);
+                                }}
+                                className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400 hover:text-emerald-300 underline underline-offset-2 transition active:scale-95"
+                              >
+                                <RefreshCw size={11} />
+                                <span>Substituir por semelhante</span>
+                              </button>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-neutral-400 truncate">{song.artist}</p>
+                          )}
+                        </div>
                       </div>
-                    </div>
                     <div className="flex items-center gap-1.5 sm:gap-2">
                       {/* BAIXAR CAPA DA MÚSICA */}
                       <button
@@ -2652,7 +2802,8 @@ export default function App() {
                       <span className="text-xs text-neutral-500 font-mono w-12 text-right">{formatTime(song.duration || 210)}</span>
                     </div>
                   </div>
-                ))
+                );
+              })
               ) : (
                 <div className="py-12 text-center text-neutral-500 text-sm space-y-3">
                   <p>Esta playlist ainda não tem músicas.</p>
@@ -2954,29 +3105,66 @@ export default function App() {
                   <span>Carregando faixas em alta fidelidade...</span>
                 </div>
               ) : viewingEntity.songs.length > 0 ? (
-                viewingEntity.songs.map((song, idx) => (
-                  <div
-                    key={song.id || idx}
-                    onClick={() => {
-                      setQueue(viewingEntity.songs);
-                      playSong(song, viewingEntity.songs);
-                    }}
-                    className="flex items-center justify-between p-2.5 rounded-xl hover:bg-white/5 transition cursor-pointer group"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="w-5 text-center text-xs text-neutral-500 font-mono group-hover:text-[#1DB954]">
-                        {idx + 1}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="text-sm font-bold text-white truncate group-hover:text-[#1DB954]">{song.name}</p>
-                        <p className="text-xs text-neutral-400 truncate">{song.artist}</p>
+                viewingEntity.songs.map((song, idx) => {
+                  const isUnavailable = unavailableSongIds.includes(song.id);
+                  return (
+                    <div
+                      key={song.id || idx}
+                      onClick={() => {
+                        if (isUnavailable) {
+                          showToast(`"${song.name}" está indisponível na fonte. Toque em "Substituir por semelhante".`);
+                          return;
+                        }
+                        setQueue(viewingEntity.songs);
+                        playSong(song, viewingEntity.songs);
+                      }}
+                      className={`flex items-center justify-between p-2.5 rounded-xl transition group ${
+                        isUnavailable
+                          ? 'bg-red-950/20 border border-red-500/20 opacity-60 hover:opacity-85 cursor-not-allowed'
+                          : 'hover:bg-white/5 cursor-pointer'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="w-5 text-center text-xs text-neutral-500 font-mono group-hover:text-[#1DB954]">
+                          {idx + 1}
+                        </span>
+                        <div className="min-w-0">
+                          <p
+                            className={`text-sm font-bold truncate ${
+                              isUnavailable
+                                ? 'text-red-400 line-through'
+                                : 'text-white group-hover:text-[#1DB954]'
+                            }`}
+                          >
+                            {song.name}
+                          </p>
+                          {isUnavailable ? (
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-[10px] font-bold text-red-400 uppercase tracking-wide">
+                                Áudio indisponível
+                              </span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleStartReplaceSong(song);
+                                }}
+                                className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400 hover:text-emerald-300 underline underline-offset-2 transition active:scale-95"
+                              >
+                                <RefreshCw size={11} />
+                                <span>Substituir</span>
+                              </button>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-neutral-400 truncate">{song.artist}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-neutral-400 font-mono">
+                        <span>{song.duration ? formatTime(song.duration) : ''}</span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 text-xs text-neutral-400 font-mono">
-                      <span>{song.duration ? formatTime(song.duration) : ''}</span>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <div className="py-12 text-center text-neutral-500 text-xs">
                   Nenhuma faixa encontrada para este item.
