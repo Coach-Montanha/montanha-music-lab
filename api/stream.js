@@ -1,5 +1,5 @@
 // Serverless Function /api/stream - Montanha Music Lab
-// Resolve áudio de alta fidelidade (320kbps MP4 Akamai / Invidious / Deezer)
+// Resolve áudio de alta fidelidade (320kbps MP4 Akamai / Invidious)
 // Com CORS liberado para navegadores, PWAs e mobile (iOS / Android)
 
 function sanitizeTitle(str) {
@@ -8,7 +8,7 @@ function sanitizeTitle(str) {
     .replace(/\[.*?\]/g, '')
     .replace(/feat\..*$/i, '')
     .replace(/ft\..*$/i, '')
-    .replace(/[^\w\s-]/g, ' ')
+    .replace(/[^\p{L}\p{N}\s'-]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -17,16 +17,20 @@ function extractArtistCandidates(artistStr) {
   if (!artistStr) return [];
   const rawList = artistStr
     .split(/[,&/]|feat\.|ft\.|x\s+/i)
-    .map(a => a.trim().replace(/[^\w\s-]/g, ' ').replace(/\s+/g, ' ').trim())
+    .map(a => sanitizeTitle(a))
     .filter(a => a.length > 1);
 
   const candidates = [];
+  const cleanedFull = sanitizeTitle(artistStr);
+  if (cleanedFull && !candidates.includes(cleanedFull)) {
+    candidates.push(cleanedFull);
+  }
   for (const a of rawList) {
     if (!candidates.includes(a)) candidates.push(a);
   }
-  const cleanedFull = artistStr.split(',')[0].trim();
-  if (cleanedFull && !candidates.includes(cleanedFull)) {
-    candidates.unshift(cleanedFull);
+  const firstWord = rawList[0]?.split(' ')[0];
+  if (firstWord && firstWord.length > 2 && !candidates.includes(firstWord)) {
+    candidates.push(firstWord);
   }
   return candidates.length > 0 ? candidates : [artistStr.trim()];
 }
@@ -47,7 +51,7 @@ export default async function handler(req, res) {
   const cleanT = sanitizeTitle(title);
   const candidates = extractArtistCandidates(artist);
 
-  // 1. TIER 1: JioSaavn 320kbps MP4 via Fast-Saavn (Akamai CDN - Zero Bloqueio de YouTube)
+  // 1. TIER 1: JioSaavn 320kbps MP4 via Fast-Saavn (Akamai CDN - Zero Bloqueio e Músicas Completas)
   if (cleanT) {
     for (const cand of candidates) {
       try {
@@ -95,33 +99,9 @@ export default async function handler(req, res) {
     }
   }
 
-  // 2. TIER 2: Deezer API
-  if (cleanT) {
-    try {
-      const q = `${cleanT} ${candidates[0] || ''}`.trim();
-      const dzRes = await fetch(`https://api.deezer.com/search?q=${encodeURIComponent(q)}&limit=1`, {
-        signal: AbortSignal.timeout(3000)
-      });
-      if (dzRes.ok) {
-        const dzData = await dzRes.json();
-        const track = dzData?.data?.[0];
-        if (track?.preview) {
-          return res.status(200).json({
-            url: track.preview,
-            duration: track.duration || 30,
-            mimeType: 'audio/mpeg',
-            title: track.title || title,
-            artist: track.artist?.name || artist,
-            source: 'deezer'
-          });
-        }
-      }
-    } catch {}
-  }
-
-  // 3. TIER 3: Invidious Audio Stream Resolver
+  // 2. TIER 2: Invidious Audio Stream Resolver (Áudio Completo do YouTube)
   const youtubeId = id.replace(/^yt-/, '').split('&')[0];
-  const mirrors = ['https://yt.chocolatemoo53.com', 'https://inv.nadeko.net', 'https://echostreamz.com'];
+  const mirrors = ['https://yt.chocolatemoo53.com', 'https://invidious.nerdvpn.de', 'https://inv.nadeko.net'];
 
   if (youtubeId && /^[a-zA-Z0-9_-]{11}$/.test(youtubeId)) {
     for (const host of mirrors) {

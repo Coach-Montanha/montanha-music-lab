@@ -35,9 +35,28 @@ function sanitizeTitle(str: string): string {
     .replace(/\[.*?\]/g, '')
     .replace(/feat\..*$/i, '')
     .replace(/ft\..*$/i, '')
-    .replace(/[^\p{L}\p{N}\s-]/gu, ' ')
+    .replace(/[^\p{L}\p{N}\s'-]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function getArtistCandidates(artistStr: string): string[] {
+  if (!artistStr) return [];
+  const rawList = artistStr
+    .split(/[,&/]|feat\.|ft\.|x\s+/i)
+    .map(a => sanitizeTitle(a))
+    .filter(a => a.length > 1);
+
+  const candidates = new Set<string>();
+  const full = sanitizeTitle(artistStr);
+  if (full) candidates.add(full);
+  for (const a of rawList) {
+    if (a) candidates.add(a);
+  }
+  const firstWord = rawList[0]?.split(' ')[0];
+  if (firstWord && firstWord.length > 2) candidates.add(firstWord);
+
+  return Array.from(candidates);
 }
 
 // 1. TIER 1: Nosso Endpoint Serverless Próprio /api/stream (Zero Erros de CORS no Navegador)
@@ -68,56 +87,57 @@ async function fetchFromInternalApi(title: string, artist: string, youtubeId?: s
   return null;
 }
 
-// 2. TIER 2: Fast-Saavn Direto (Contingência)
+// 2. TIER 2: Fast-Saavn Direto (Contingência com Múltiplos Candidatos)
 async function fetchFromSaavnDirect(title: string, artist: string): Promise<StreamResult | null> {
   const cleanT = sanitizeTitle(title);
   if (!cleanT) return null;
-  const cleanA = (artist || '').split(',')[0].trim();
+  const candidates = getArtistCandidates(artist);
 
-  try {
-    const res = await fetch(
-      `https://fast-saavn.vercel.app/api?title=${encodeURIComponent(cleanT)}&artist=${encodeURIComponent(cleanA)}`,
-      { signal: AbortSignal.timeout(3000) }
-    );
-    if (res.ok) {
-      const id = (await res.text()).trim();
-      if (id && id.length > 5 && !id.includes('error') && !id.includes('not found')) {
-        return {
-          url: `https://aac.saavncdn.com/${id}_320.mp4`,
-          duration: 210,
-          mimeType: 'audio/mp4',
-          title,
-          artist,
-          source: 'saavn-320'
-        };
+  for (const cand of candidates) {
+    try {
+      const res = await fetch(
+        `https://fast-saavn.vercel.app/api?title=${encodeURIComponent(cleanT)}&artist=${encodeURIComponent(cand)}`,
+        { signal: AbortSignal.timeout(3000) }
+      );
+      if (res.ok) {
+        const id = (await res.text()).trim();
+        if (id && id.length > 5 && !id.includes('error') && !id.includes('not found')) {
+          return {
+            url: `https://aac.saavncdn.com/${id}_320.mp4`,
+            duration: 210,
+            mimeType: 'audio/mp4',
+            title,
+            artist: cand,
+            source: 'saavn-320'
+          };
+        }
       }
-    }
-  } catch {}
-  return null;
-}
+    } catch {}
+  }
 
-// 3. TIER 3: Deezer API Aberta (Contingência)
-async function fetchFromDeezer(title: string, artist: string): Promise<StreamResult | null> {
-  try {
-    const q = `${sanitizeTitle(title)} ${(artist || '').split(',')[0].trim()}`.trim();
-    const res = await fetch(`https://api.deezer.com/search?q=${encodeURIComponent(q)}&limit=1`, {
-      signal: AbortSignal.timeout(3000)
-    });
-    if (res.ok) {
-      const data = await res.json();
-      const track = data?.data?.[0];
-      if (track?.preview) {
-        return {
-          url: track.preview,
-          duration: track.duration || 30,
-          mimeType: 'audio/mpeg',
-          title: track.title || title,
-          artist: track.artist?.name || artist,
-          source: 'deezer'
-        };
+  // Tentativa somente com título se for bem específico
+  if (cleanT.length > 4) {
+    try {
+      const res = await fetch(
+        `https://fast-saavn.vercel.app/api?title=${encodeURIComponent(cleanT)}&artist=${encodeURIComponent(cleanT)}`,
+        { signal: AbortSignal.timeout(2500) }
+      );
+      if (res.ok) {
+        const id = (await res.text()).trim();
+        if (id && id.length > 5 && !id.includes('error') && !id.includes('not found')) {
+          return {
+            url: `https://aac.saavncdn.com/${id}_320.mp4`,
+            duration: 210,
+            mimeType: 'audio/mp4',
+            title,
+            artist,
+            source: 'saavn-320'
+          };
+        }
       }
-    }
-  } catch {}
+    } catch {}
+  }
+
   return null;
 }
 
@@ -139,7 +159,7 @@ export function fetchAudioStream(
   }
 
   const promise = (async () => {
-    // Passo 1: Busca via Serverless API interna (Sem problemas de CORS no Mobile)
+    // Passo 1: Busca via Serverless API interna (Saavn 320kbps + Invidious YouTube Completo)
     if (songName || cleanId) {
       const internalResult = await fetchFromInternalApi(songName || '', artistName || '', cleanId);
       if (internalResult) {
@@ -148,7 +168,7 @@ export function fetchAudioStream(
       }
     }
 
-    // Passo 2: Busca direta no Saavn (Akamai 320kbps MP4)
+    // Passo 2: Busca direta no Saavn (Akamai 320kbps MP4 Completo)
     if (songName) {
       const saavnResult = await fetchFromSaavnDirect(songName, artistName || '');
       if (saavnResult) {
@@ -157,24 +177,15 @@ export function fetchAudioStream(
       }
     }
 
-    // Passo 3: Deezer CDN Fallback
-    if (songName) {
-      const deezerResult = await fetchFromDeezer(songName, artistName || '');
-      if (deezerResult) {
-        streamCache.set(cacheKey, deezerResult);
-        return deezerResult;
-      }
-    }
-
-    // Passo 4: Fallback do objeto original
-    if (fallbackAudioUrl && fallbackAudioUrl.startsWith('http')) {
+    // Passo 3: Fallback do objeto original (apenas se for áudio completo, rejeita previews de 30s)
+    if (fallbackAudioUrl && fallbackAudioUrl.startsWith('http') && !fallbackAudioUrl.includes('preview') && !fallbackAudioUrl.includes('dzcdn.net')) {
       const fallbackResult: StreamResult = {
         url: fallbackAudioUrl,
-        duration: 30,
-        mimeType: 'audio/mpeg',
+        duration: 210,
+        mimeType: 'audio/mp4',
         title: songName,
         artist: artistName,
-        source: 'deezer'
+        source: 'saavn-320'
       };
       return fallbackResult;
     }

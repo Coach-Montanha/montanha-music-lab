@@ -90,54 +90,116 @@ export default defineConfig({
           const artist = (urlObj.searchParams.get('artist') || urlObj.searchParams.get('a') || '').trim();
           const id = (urlObj.searchParams.get('id') || '').trim();
 
-          const cleanT = title.replace(/\(.*?\)/g, '').replace(/\[.*?\]/g, '').replace(/feat\..*$/i, '').trim();
-          const artists = artist.split(/[,&/]|feat\.|ft\./i).map(a => a.trim()).filter(Boolean);
-          if (artists.length === 0 && artist) artists.push(artist.trim());
+          const cleanT = (title || '')
+            .replace(/\(.*?\)/g, '')
+            .replace(/\[.*?\]/g, '')
+            .replace(/feat\..*$/i, '')
+            .replace(/ft\..*$/i, '')
+            .replace(/[^\p{L}\p{N}\s'-]/gu, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
 
-          // Tier 1: Saavn
-          for (const cand of artists) {
-            try {
-              const saavnRes = await fetch(
-                `https://fast-saavn.vercel.app/api?title=${encodeURIComponent(cleanT)}&artist=${encodeURIComponent(cand)}`
-              );
-              if (saavnRes.ok) {
-                const streamId = (await saavnRes.text()).trim();
-                if (streamId && streamId.length > 5 && !streamId.includes('error') && !streamId.includes('not found')) {
-                  res.statusCode = 200;
-                  res.end(JSON.stringify({
-                    url: `https://aac.saavncdn.com/${streamId}_320.mp4`,
-                    duration: 210,
-                    mimeType: 'audio/mp4',
-                    title,
-                    artist: cand,
-                    source: 'saavn-320'
-                  }));
-                  return;
+          const rawArtists = (artist || '')
+            .split(/[,&/]|feat\.|ft\.|x\s+/i)
+            .map(a => a.replace(/[^\p{L}\p{N}\s'-]/gu, ' ').replace(/\s+/g, ' ').trim())
+            .filter(a => a.length > 1);
+
+          const candidates = new Set<string>();
+          const cleanArtist = (artist || '').replace(/[^\p{L}\p{N}\s'-]/gu, ' ').replace(/\s+/g, ' ').trim();
+          if (cleanArtist) candidates.add(cleanArtist);
+          for (const a of rawArtists) {
+            if (a) candidates.add(a);
+          }
+          const firstWord = rawArtists[0]?.split(' ')[0];
+          if (firstWord && firstWord.length > 2) candidates.add(firstWord);
+
+          // Tier 1: Saavn 320kbps MP4 Completo
+          if (cleanT) {
+            for (const cand of candidates) {
+              try {
+                const saavnRes = await fetch(
+                  `https://fast-saavn.vercel.app/api?title=${encodeURIComponent(cleanT)}&artist=${encodeURIComponent(cand)}`
+                );
+                if (saavnRes.ok) {
+                  const streamId = (await saavnRes.text()).trim();
+                  if (streamId && streamId.length > 5 && !streamId.includes('error') && !streamId.includes('not found')) {
+                    res.statusCode = 200;
+                    res.end(JSON.stringify({
+                      url: `https://aac.saavncdn.com/${streamId}_320.mp4`,
+                      duration: 210,
+                      mimeType: 'audio/mp4',
+                      title,
+                      artist: cand,
+                      source: 'saavn-320'
+                    }));
+                    return;
+                  }
                 }
-              }
-            } catch {}
+              } catch {}
+            }
+
+            if (cleanT.length > 4) {
+              try {
+                const saavnRes = await fetch(
+                  `https://fast-saavn.vercel.app/api?title=${encodeURIComponent(cleanT)}&artist=${encodeURIComponent(cleanT)}`
+                );
+                if (saavnRes.ok) {
+                  const streamId = (await saavnRes.text()).trim();
+                  if (streamId && streamId.length > 5 && !streamId.includes('error') && !streamId.includes('not found')) {
+                    res.statusCode = 200;
+                    res.end(JSON.stringify({
+                      url: `https://aac.saavncdn.com/${streamId}_320.mp4`,
+                      duration: 210,
+                      mimeType: 'audio/mp4',
+                      title,
+                      artist,
+                      source: 'saavn-320'
+                    }));
+                    return;
+                  }
+                }
+              } catch {}
+            }
           }
 
-          // Tier 2: Deezer
-          try {
-            const dzRes = await fetch(`https://api.deezer.com/search?q=${encodeURIComponent(`${cleanT} ${artists[0] || ''}`)}&limit=1`);
-            if (dzRes.ok) {
-              const dzData = await dzRes.json();
-              const track = dzData?.data?.[0];
-              if (track?.preview) {
-                res.statusCode = 200;
-                res.end(JSON.stringify({
-                  url: track.preview,
-                  duration: track.duration || 30,
-                  mimeType: 'audio/mpeg',
-                  title: track.title || title,
-                  artist: track.artist?.name || artist,
-                  source: 'deezer'
-                }));
-                return;
-              }
+          // Tier 2: Invidious YouTube Resolver
+          const youtubeId = id.replace(/^yt-/, '').split('&')[0];
+          const mirrors = ['https://yt.chocolatemoo53.com', 'https://invidious.nerdvpn.de', 'https://inv.nadeko.net'];
+          if (youtubeId && /^[a-zA-Z0-9_-]{11}$/.test(youtubeId)) {
+            for (const host of mirrors) {
+              try {
+                const invRes = await fetch(`${host}/api/v1/videos/${youtubeId}`, {
+                  headers: { 'User-Agent': 'Mozilla/5.0' }
+                });
+                if (invRes.ok) {
+                  const data = await invRes.json();
+                  const audios = (data.adaptiveFormats || []).filter(
+                    (f: any) => f.type && (f.type.startsWith('audio/mp4') || f.type.startsWith('audio/webm'))
+                  );
+                  if (audios.length > 0) {
+                    audios.sort((a: any, b: any) => {
+                      const aMp4 = a.type.startsWith('audio/mp4') ? 1 : 0;
+                      const bMp4 = b.type.startsWith('audio/webm') ? 0 : 1;
+                      if (aMp4 !== bMp4) return bMp4 - aMp4;
+                      return (parseInt(b.bitrate) || 0) - (parseInt(a.bitrate) || 0);
+                    });
+                    const best = audios[0];
+                    const proxied = best.url.replace(new URL(best.url).origin, host);
+                    res.statusCode = 200;
+                    res.end(JSON.stringify({
+                      url: proxied,
+                      duration: Number(data.lengthSeconds) || 210,
+                      mimeType: best.type.split(';')[0] || 'audio/mp4',
+                      title: data.title || title,
+                      artist: data.author || artist,
+                      source: 'invidious'
+                    }));
+                    return;
+                  }
+                }
+              } catch {}
             }
-          } catch {}
+          }
 
           res.statusCode = 404;
           res.end(JSON.stringify({ error: 'Áudio não encontrado' }));
