@@ -55,6 +55,7 @@ import { AuthGateway } from './components/AuthGateway';
 import { SettingsModal } from './components/SettingsModal';
 import { AudioScrubber } from './components/AudioScrubber';
 import { mediaSessionController } from './lib/mediaSession';
+import { audioAnchor } from './lib/audioAnchor';
 import { fetchRealTrackCover, cacheImageLocally, downloadImageFile, enrichPlaylistTracks } from './lib/coverEngine';
 import { fetchAudioStream, invalidateStream, getCachedStream } from './lib/audioStreamEngine';
 import { SilentHoldKeeper, GestureGuardian } from 'pwa-audio-player';
@@ -771,6 +772,7 @@ export default function App() {
     setIsPlaying(true);
     isPlayingRef.current = true;
     mediaSessionController.updatePlaybackState(true);
+    audioAnchor.play();
 
     // 1. Se estiver retido no SilentHoldKeeper, retoma a música real imediatamente
     if (silentHoldRef.current?.isHolding()) {
@@ -778,6 +780,7 @@ export default function App() {
         setIsPlaying(true);
         isPlayingRef.current = true;
         mediaSessionController.updatePlaybackState(true);
+        audioAnchor.play();
       });
       if (resumed) return;
     }
@@ -801,6 +804,7 @@ export default function App() {
     setIsPlaying(false);
     isPlayingRef.current = false;
     mediaSessionController.updatePlaybackState(false);
+    audioAnchor.pause();
 
     // 1. Interceptação pelo SilentHoldKeeper: evita CoreAudio decoder eviction no Android/iOS
     if (audioRef.current && silentHoldRef.current) {
@@ -929,6 +933,7 @@ export default function App() {
     const reqId = ++playRequestIdRef.current;
     isSwitchingRef.current = true;
     userInitiatedPauseRef.current = false;
+    audioAnchor.play();
 
     setCurrentSong(song);
     setCurrentTime(0);
@@ -997,19 +1002,6 @@ export default function App() {
       }
     }
 
-    // =========================================================================
-    // CONTINUOUS AUDIO BRIDGE: Se a faixa não estiver em cache prévio,
-    // toca imediatamente o micro-áudio silencioso para MANTER O HARDWARE AUDIO
-    // SESSION DO SO ATIVO enquanto a requisição de rede resolve em background.
-    // =========================================================================
-    if (!audio.src || audio.ended || audio.paused) {
-      try {
-        audio.src = SILENT_BRIDGE_AUDIO;
-        audio.volume = 0.01;
-        audio.play().catch(() => {});
-      } catch {}
-    }
-
     // 1. TENTA REPRODUÇÃO OFFLINE A PARTIR DO INDEXEDDB
     try {
       const offlineBlob = await getOfflineBlob(song.id);
@@ -1049,6 +1041,12 @@ export default function App() {
         markSongUnavailable(song.id);
         isSwitchingRef.current = false;
         showToast(`"${song.name}" está indisponível na fonte. Toque em "Substituir por semelhante".`);
+        // Se estiver em background com tela bloqueada, avança para a próxima música para não travar a playlist
+        setTimeout(() => {
+          if (isPlayingRef.current) {
+            handleNextSongRef.current();
+          }
+        }, 1000);
         return;
       }
     }
@@ -1082,6 +1080,11 @@ export default function App() {
       }
       console.warn('Erro ao reproduzir stream após retry:', err);
       isSwitchingRef.current = false;
+      setTimeout(() => {
+        if (isPlayingRef.current) {
+          handleNextSongRef.current();
+        }
+      }, 1000);
     }
   };
 
@@ -1244,13 +1247,10 @@ export default function App() {
     showToast('Música removida dos downloads.');
   };
 
-  // SELEÇÃO DE PLAYLIST: ABRE E RELACIONA A FILA AUTOMATICAMENTE
+  // SELEÇÃO DE PLAYLIST: APENAS ABRE A PLAYLIST PARA VISUALIZAÇÃO
+  // (A fila de reprodução é relacionada exclusivamente ao tocar a playlist ou faixa)
   const handleSelectPlaylist = (pl: Playlist) => {
     setSelectedPlaylist(pl);
-    if (pl.songs && pl.songs.length > 0) {
-      setQueue(pl.songs);
-      queueRef.current = pl.songs;
-    }
   };
 
   // DOWNLOAD DE PLAYLIST COMPLETA
@@ -1926,6 +1926,7 @@ export default function App() {
           setIsPlaying(true);
           isPlayingRef.current = true;
           mediaSessionController.updatePlaybackState(true);
+          audioAnchor.play();
           if (currentSongRef.current) {
             mediaSessionController.updateMetadata({
               title: currentSongRef.current.name,
@@ -1939,11 +1940,16 @@ export default function App() {
           if (audioRef.current) {
             const cur = Math.floor(audioRef.current.currentTime);
             setCurrentTime(cur);
+            const dur = audioRef.current.duration || duration;
             mediaSessionController.updatePositionState({
-              duration: audioRef.current.duration || duration,
+              duration: dur,
               position: cur,
               playbackRate: 1
             });
+            // Pré-carrega a próxima faixa com antecedência nos últimos 20 segundos se ainda não carregou
+            if (dur > 25 && cur >= dur - 20 && !nextSongStreamRef.current && currentSongRef.current) {
+              schedulePreload(currentSongRef.current);
+            }
           }
         }}
         onLoadedMetadata={() => {
@@ -1951,7 +1957,17 @@ export default function App() {
             setDuration(Math.floor(audioRef.current.duration));
           }
         }}
-        onEnded={handleNextSong}
+        onEnded={() => {
+          if (isSwitchingRef.current) return;
+          const a = audioRef.current;
+          // Prevenção contra falsos disparos imediatos (apenas se tiver menos de 1 segundo de reprodução)
+          if (a && a.currentTime < 1 && a.duration > 5) {
+            return;
+          }
+          // Garante que o audioAnchor continue ativo no Motorola durante a transição
+          audioAnchor.play();
+          handleNextSongRef.current();
+        }}
         onPause={() => {
           const a = audioRef.current;
           if (!a || a.ended || isSwitchingRef.current) return;
@@ -2058,7 +2074,7 @@ export default function App() {
           >
             <Sparkles size={14} className={isEnrichingAllCovers ? "animate-spin text-[#1DB954]" : "text-[#1DB954]"} />
             <span className="hidden sm:inline">
-              {isEnrichingAllCovers ? `Atualizando (${enrichAllProgress.current}/${enrichAllProgress.total})` : 'Atualizar Capas'}
+              {isEnrichingAllCovers ? `Atualizando (${enrichAllProgress.current}/${enrichAllProgress.total})` : 'Atualizar'}
             </span>
           </button>
 
@@ -2137,7 +2153,7 @@ export default function App() {
                   title="Atualizar capas oficiais e verificar se há músicas quebradas em todas as playlists"
                 >
                   <Sparkles size={14} className={isEnrichingAllCovers ? "animate-spin" : ""} />
-                  <span>{isEnrichingAllCovers ? `Escaneando (${enrichAllProgress.current}/${enrichAllProgress.total})...` : 'Atualizar Capas & Verificar Músicas'}</span>
+                  <span>{isEnrichingAllCovers ? `Atualizando (${enrichAllProgress.current}/${enrichAllProgress.total})...` : 'Atualizar'}</span>
                 </button>
                 <button
                   onClick={() => setIsImportModalOpen(true)}
