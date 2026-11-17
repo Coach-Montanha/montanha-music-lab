@@ -3,6 +3,9 @@
 @tailwind utilities;
 
 @layer base {
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
   body {
     background-color: #000000;
     color: #ffffff;
@@ -10,6 +13,13 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+}
+
+/* Apple Style Synced Lyrics Container */
+.lyrics-scroll {
+  scroll-behavior: smooth;
+  mask-image: linear-gradient(to bottom, transparent 0%, black 12%, black 88%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 12%, black 88%, transparent 100%);
 }
 
 /* Apple Bento Glass Card Effect */

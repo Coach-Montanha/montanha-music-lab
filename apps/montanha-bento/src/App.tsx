@@ -42,7 +42,8 @@ import {
   GripVertical,
   CheckSquare,
   Square,
-  ListOrdered
+  ListOrdered,
+  Mic2
 } from 'lucide-react';
 
 import { Song, Playlist, SearchAlbum, SearchArtist, SearchPlaylist, CategorizedSearchResults } from './types';
@@ -59,6 +60,7 @@ import { audioAnchor } from './lib/audioAnchor';
 import { browserOptimizer } from './lib/browserOptimizer';
 import { fetchRealTrackCover, cacheImageLocally, downloadImageFile, enrichPlaylistTracks } from './lib/coverEngine';
 import { fetchAudioStream, invalidateStream, getCachedStream } from './lib/audioStreamEngine';
+import { fetchLyrics, LyricsData } from './lib/lyricsEngine';
 import { SilentHoldKeeper, GestureGuardian } from 'pwa-audio-player';
 import { GenreCategory } from './lib/genresData';
 import { GenreExploreGrid } from './components/GenreExploreGrid';
@@ -221,8 +223,15 @@ export default function App() {
   const [volume, setVolume] = useState<number>(0.85);
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [isShuffle, setIsShuffle] = useState<boolean>(false);
+  const isShuffleRef = useRef<boolean>(false);
   const [isRepeat, setIsRepeat] = useState<boolean>(false);
   const [queue, setQueue] = useState<Song[]>(() => playlists[0]?.songs || INITIAL_PLAYLISTS[0].songs);
+
+  // Letras & Legendas Sincronizadas (LRCLIB)
+  const [showLyrics, setShowLyrics] = useState<boolean>(false);
+  const [lyricsData, setLyricsData] = useState<LyricsData | null>(null);
+  const [isLoadingLyrics, setIsLoadingLyrics] = useState<boolean>(false);
+  const activeLyricRef = useRef<HTMLParagraphElement | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const silentHoldRef = useRef<SilentHoldKeeper | null>(null);
@@ -759,6 +768,34 @@ export default function App() {
     }
   }, [currentSong]);
 
+  // Carregamento de Letras Sincronizadas da Faixa Ativa (LRCLIB Engine)
+  useEffect(() => {
+    if (!currentSong) return;
+    let isCancelled = false;
+    setIsLoadingLyrics(true);
+    fetchLyrics(currentSong.name, currentSong.artist, currentSong.duration)
+      .then((data) => {
+        if (!isCancelled) {
+          setLyricsData(data);
+          setIsLoadingLyrics(false);
+        }
+      })
+      .catch(() => {
+        if (!isCancelled) setIsLoadingLyrics(false);
+      });
+    return () => { isCancelled = true; };
+  }, [currentSong?.id, currentSong?.name, currentSong?.artist]);
+
+  // Auto-scroll da Letra Ativa na Visualização Apple Music Karaoke
+  useEffect(() => {
+    if (showLyrics && activeLyricRef.current) {
+      activeLyricRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center'
+      });
+    }
+  }, [currentTime, showLyrics]);
+
   // Watchdog de Preservação da MediaSession no Android / MIUI / HyperOS
   // Impede que o sistema operacional encerre o player na lock screen por timeout de inatividade
   useEffect(() => {
@@ -1149,25 +1186,33 @@ export default function App() {
   };
   handlePrevSongRef.current = handlePrevSong;
 
-  // BOTÃO SHUFFLE REAL: Embaralha imediatamente a fila de execução visível
-  const toggleShuffle = () => {
-    const nextShuffle = !isShuffle;
+  // BOTÃO SHUFFLE REAL: Embaralha imediatamente a fila de execução visível e sincroniza refs
+  const toggleShuffle = (overrideQueue?: Song[] | any, targetSong?: Song) => {
+    const nextShuffle = !isShuffleRef.current;
     setIsShuffle(nextShuffle);
+    isShuffleRef.current = nextShuffle;
+
+    const validOverride = Array.isArray(overrideQueue) ? overrideQueue : undefined;
+    const baseQueue = validOverride || (queueRef.current.length > 0 ? queueRef.current : queue);
+    const activeSong = targetSong || currentSongRef.current || currentSong;
 
     if (nextShuffle) {
-      originalQueueRef.current = [...queue];
-      const current = currentSong;
-      const rest = queue.filter((s) => s.id !== current.id);
-      for (let i = rest.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [rest[i], rest[j]] = [rest[j], rest[i]];
+      originalQueueRef.current = [...baseQueue];
+      if (baseQueue.length > 1) {
+        const rest = baseQueue.filter((s) => s.id !== activeSong?.id);
+        for (let i = rest.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [rest[i], rest[j]] = [rest[j], rest[i]];
+        }
+        const shuffledQueue = activeSong ? [activeSong, ...rest] : rest;
+        setQueue(shuffledQueue);
+        queueRef.current = shuffledQueue;
       }
-      const shuffledQueue = [current, ...rest];
-      setQueue(shuffledQueue);
       showToast('Modo aleatório ativado: fila embaralhada!');
     } else {
       if (originalQueueRef.current.length > 0) {
         setQueue(originalQueueRef.current);
+        queueRef.current = originalQueueRef.current;
       }
       showToast('Ordem sequencial restaurada.');
     }
@@ -2952,17 +2997,29 @@ export default function App() {
                     )}
                   </button>
 
-                  {/* BOTÃO SHUFFLE NA PLAYLIST */}
+                  {/* BOTÃO SHUFFLE NA PLAYLIST (Ativação Imediata no Primeiro Toque) */}
                   <button
                     onClick={() => {
                       if (selectedPlaylist.songs.length === 0) return;
-                      if (!selectedPlaylist.songs.some(s => s.id === currentSong.id)) {
-                        const randomIdx = Math.floor(Math.random() * selectedPlaylist.songs.length);
-                        playSong(selectedPlaylist.songs[randomIdx], selectedPlaylist.songs);
-                        if (!isShuffle) toggleShuffle();
-                      } else {
-                        toggleShuffle();
+                      if (isShuffleRef.current) {
+                        toggleShuffle(selectedPlaylist.songs);
+                        return;
                       }
+                      const randomIdx = Math.floor(Math.random() * selectedPlaylist.songs.length);
+                      const chosenSong = selectedPlaylist.songs[randomIdx];
+                      const rest = selectedPlaylist.songs.filter(s => s.id !== chosenSong.id);
+                      for (let i = rest.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [rest[i], rest[j]] = [rest[j], rest[i]];
+                      }
+                      const shuffled = [chosenSong, ...rest];
+                      originalQueueRef.current = [...selectedPlaylist.songs];
+                      setIsShuffle(true);
+                      isShuffleRef.current = true;
+                      setQueue(shuffled);
+                      queueRef.current = shuffled;
+                      playSong(chosenSong, shuffled);
+                      showToast('Modo aleatório ativado: tocando playlist embaralhada!');
                     }}
                     className={`flex h-10 w-10 items-center justify-center rounded-full border transition active:scale-95 ${
                       isShuffle
@@ -3061,6 +3118,14 @@ export default function App() {
                   const isSelectedForDeletion = selectedSongsForDeletion.includes(song.id);
                   const isDragging = draggingSongIdx === idx;
                   const isDragOver = dragOverSongIdx === idx && draggingSongIdx !== idx;
+                  const isPlayingThisSong = Boolean(
+                    currentSong && (
+                      currentSong.id === song.id ||
+                      (song.name && currentSong.name &&
+                       song.name.toLowerCase() === currentSong.name.toLowerCase() &&
+                       song.artist?.toLowerCase() === currentSong.artist?.toLowerCase())
+                    )
+                  );
 
                   return (
                     <div
@@ -3082,7 +3147,7 @@ export default function App() {
                         }
                         playSong(song, selectedPlaylist.songs);
                       }}
-                      className={`flex items-center justify-between p-2.5 sm:p-3 rounded-xl transition-all duration-150 group select-none ${
+                      className={`flex items-center justify-between p-2.5 sm:p-3 rounded-xl transition-all duration-150 group select-none outline-none focus:outline-none ${
                         isDragging ? 'opacity-40 scale-[0.98] bg-white/10' : ''
                       } ${
                         isDragOver ? 'border-t-2 border-t-[#1DB954] bg-[#1DB954]/10' : ''
@@ -3091,6 +3156,8 @@ export default function App() {
                           ? 'bg-red-950/40 border border-red-500/40'
                           : isUnavailable
                           ? 'bg-red-950/20 border border-red-500/20 opacity-60 hover:opacity-85 cursor-not-allowed'
+                          : isPlayingThisSong
+                          ? 'bg-[#1DB954]/15 border border-[#1DB954]/30 shadow-sm'
                           : 'hover:bg-white/5 cursor-pointer'
                       }`}
                     >
@@ -3122,8 +3189,14 @@ export default function App() {
                           >
                             {isSelectedForDeletion && <Check size={13} strokeWidth={3} />}
                           </div>
+                        ) : isPlayingThisSong && isPlaying ? (
+                          <span className="w-5 flex items-center justify-center flex-shrink-0 text-[#1DB954]" title="Tocando agora">
+                            <Volume2 size={15} className="animate-pulse" />
+                          </span>
                         ) : (
-                          <span className="text-xs font-mono text-neutral-500 w-5 flex-shrink-0 text-center">
+                          <span className={`text-xs font-mono w-5 flex-shrink-0 text-center ${
+                            isPlayingThisSong ? 'text-[#1DB954] font-bold' : 'text-neutral-500'
+                          }`}>
                             {idx + 1}
                           </span>
                         )}
@@ -3144,6 +3217,8 @@ export default function App() {
                                 ? 'text-red-400 line-through'
                                 : isSelectedForDeletion
                                 ? 'text-red-200'
+                                : isPlayingThisSong
+                                ? 'text-[#1DB954] font-black'
                                 : 'text-white group-hover:text-[#1DB954]'
                             }`}
                           >
@@ -3885,6 +3960,18 @@ export default function App() {
 
           {/* Direita: Controles Essenciais Touch-Friendly */}
           <div className="flex items-center gap-1.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+            {/* Letra no mobile mini-player */}
+            <button
+              onClick={() => {
+                setShowLyrics(true);
+                setIsFullScreenPlayer(true);
+              }}
+              className="p-2 rounded-xl text-neutral-300 hover:text-white transition"
+              title="Ver Letra / Karaokê"
+            >
+              <Mic2 size={18} />
+            </button>
+
             {/* Fila com badge */}
             <button
               onClick={() => setIsQueueOpen(!isQueueOpen)}
@@ -4009,6 +4096,18 @@ export default function App() {
           </div>
 
           <div className="flex items-center justify-end gap-2 sm:gap-3 w-1/3" onClick={(e) => e.stopPropagation()}>
+            {/* BOTÃO DE LETRAS / SINCRONIA KARAOKÊ */}
+            <button
+              onClick={() => {
+                setShowLyrics(true);
+                setIsFullScreenPlayer(true);
+              }}
+              className="p-2 rounded-xl text-neutral-400 hover:text-[#1DB954] hover:bg-white/5 transition"
+              title="Ver Letra / Karaokê"
+            >
+              <Mic2 size={18} />
+            </button>
+
             {/* BOTÃO DA FILA DE EXECUÇÃO */}
             <button
               onClick={() => setIsQueueOpen(!isQueueOpen)}
@@ -4079,6 +4178,13 @@ export default function App() {
             <span className="text-xs font-bold uppercase tracking-wider text-neutral-400">Tocando Agora</span>
             <div className="flex items-center gap-1">
               <button
+                onClick={() => setShowLyrics(!showLyrics)}
+                className={`rounded-full p-2 transition ${showLyrics ? 'text-[#1DB954] bg-[#1DB954]/20' : 'text-neutral-400 hover:text-white hover:bg-white/10'}`}
+                title={showLyrics ? 'Ver Capa' : 'Ver Letra / Karaokê'}
+              >
+                <Mic2 size={22} />
+              </button>
+              <button
                 onClick={() => {
                   setSongToAddToPlaylist(currentSong);
                   setIsAddToPlaylistModalOpen(true);
@@ -4098,11 +4204,66 @@ export default function App() {
             </div>
           </div>
 
-          {/* CAPA RESPONSIVA: CSS Units dvh / % para jamais transbordar em telas mobile */}
-          <div className="my-auto flex items-center justify-center w-full min-h-0 flex-1 py-2 sm:py-4">
-            <div className="w-auto h-full max-h-[35vh] sm:max-h-[44vh] aspect-square rounded-3xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.8)] border border-white/10 flex-shrink">
-              <img src={activeSong.thumbnail} alt={activeSong.name} className="w-full h-full object-cover" />
-            </div>
+          {/* CAPA OU LETRAS / LEGENDAS SINCRONIZADAS TIPO KARAOKÊ */}
+          <div className="my-auto flex items-center justify-center w-full min-h-0 flex-1 py-2 sm:py-4 overflow-hidden">
+            {showLyrics ? (
+              <div className="w-full max-w-xl h-full flex flex-col items-center justify-center relative">
+                {isLoadingLyrics ? (
+                  <div className="flex flex-col items-center justify-center gap-3 text-neutral-400 animate-pulse">
+                    <Mic2 size={36} className="text-[#1DB954] animate-bounce" />
+                    <span className="text-sm font-semibold tracking-wide">Buscando letra sincronizada...</span>
+                  </div>
+                ) : lyricsData?.isSynced && lyricsData.lines.length > 0 ? (
+                  <div className="lyrics-scroll w-full h-full max-h-[46vh] sm:max-h-[50vh] overflow-y-auto px-4 py-8 space-y-5 text-center scroll-smooth">
+                    {lyricsData.lines.map((line, idx) => {
+                      const isNext = lyricsData.lines[idx + 1] ? currentTime < lyricsData.lines[idx + 1].time : true;
+                      const isActive = currentTime >= line.time && isNext;
+                      return (
+                        <p
+                          key={idx}
+                          ref={isActive ? activeLyricRef : null}
+                          onClick={() => handleSeek(line.time)}
+                          className={`transition-all duration-300 cursor-pointer select-none leading-relaxed font-bold ${
+                            isActive
+                              ? 'text-white text-xl sm:text-2xl scale-105 drop-shadow-[0_2px_12px_rgba(29,185,84,0.4)]'
+                              : 'text-neutral-500 hover:text-neutral-300 text-base sm:text-lg'
+                          }`}
+                        >
+                          {line.text}
+                        </p>
+                      );
+                    })}
+                  </div>
+                ) : lyricsData?.plainText ? (
+                  <div className="lyrics-scroll w-full h-full max-h-[46vh] sm:max-h-[50vh] overflow-y-auto px-4 py-6 space-y-3 text-center">
+                    <span className="inline-block text-[10px] font-bold uppercase tracking-wider text-[#1DB954] bg-[#1DB954]/10 px-2 py-0.5 rounded-full mb-3">
+                      Letra Completa
+                    </span>
+                    {lyricsData.plainText.split('\n').map((line, idx) => (
+                      <p key={idx} className="text-neutral-300 text-sm sm:text-base leading-relaxed">
+                        {line}
+                      </p>
+                    ))}
+                  </div>
+                ) : lyricsData?.isInstrumental ? (
+                  <div className="flex flex-col items-center justify-center gap-2 text-neutral-400">
+                    <Music size={40} className="text-[#1DB954]" />
+                    <p className="text-base font-bold text-white">Faixa Instrumental</p>
+                    <p className="text-xs text-neutral-500">Aproveite a melodia sem vocais</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center gap-2 text-neutral-500 text-center px-6">
+                    <Mic2 size={36} className="text-neutral-600 mb-1" />
+                    <p className="text-sm font-semibold text-neutral-300">Nenhuma letra encontrada</p>
+                    <p className="text-xs text-neutral-500">Não localizamos letra sincronizada para esta faixa no momento.</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="w-auto h-full max-h-[35vh] sm:max-h-[44vh] aspect-square rounded-3xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.8)] border border-white/10 flex-shrink">
+                <img src={activeSong.thumbnail} alt={activeSong.name} className="w-full h-full object-cover" />
+              </div>
+            )}
           </div>
 
           {/* CONTROLES E SCRUBBER: Compactos e Perfeitamente Visíveis */}
@@ -4140,7 +4301,7 @@ export default function App() {
 
             <div className="flex items-center justify-between pt-1 sm:pt-2">
               <button
-                onClick={toggleShuffle}
+                onClick={() => toggleShuffle()}
                 className={`p-2 transition ${isShuffle ? 'text-[#1DB954]' : 'text-neutral-400 hover:text-white'}`}
                 title={isShuffle ? 'Modo Aleatório Ativado' : 'Ativar Modo Aleatório'}
               >
