@@ -56,11 +56,14 @@ import { SettingsModal } from './components/SettingsModal';
 import { AudioScrubber } from './components/AudioScrubber';
 import { mediaSessionController } from './lib/mediaSession';
 import { fetchRealTrackCover, cacheImageLocally, downloadImageFile, enrichPlaylistTracks } from './lib/coverEngine';
-import { fetchAudioStream, invalidateStream } from './lib/audioStreamEngine';
+import { fetchAudioStream, invalidateStream, getCachedStream } from './lib/audioStreamEngine';
 import { SilentHoldKeeper, GestureGuardian } from 'pwa-audio-player';
 import { GenreCategory } from './lib/genresData';
 import { GenreExploreGrid } from './components/GenreExploreGrid';
 import { GenreDetailView } from './components/GenreDetailView';
+
+// Micro-áudio WAV PCM para ponte contínua de hardware audio session (Background-Safe)
+const SILENT_BRIDGE_AUDIO = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
 
 // 10 Playlists Padrão Oficiais (Motor de Áudio Integral via YouTube Music Engine)
 const INITIAL_PLAYLISTS: Playlist[] = [
@@ -875,22 +878,42 @@ export default function App() {
   const preloadTimeoutRef = useRef<any>(null);
   const schedulePreload = (currentSongItem: Song) => {
     if (preloadTimeoutRef.current) clearTimeout(preloadTimeoutRef.current);
-    preloadTimeoutRef.current = setTimeout(() => {
+
+    const runPreload = () => {
       const currentQ = queueRef.current;
       if (currentQ.length <= 1) return;
       const currentIdx = currentQ.findIndex((s) => s.id === currentSongItem.id);
+      if (currentIdx === -1) return;
+
       const nextIdx = (currentIdx + 1) % currentQ.length;
       const nextSong = currentQ[nextIdx];
-      if (!nextSong || unavailableSongIds.includes(nextSong.id)) return;
+      if (nextSong && !unavailableSongIds.includes(nextSong.id)) {
+        fetchAudioStream(nextSong.youtubeId, nextSong.name, nextSong.artist, nextSong.audioUrl, nextSong.id)
+          .then((ns) => {
+            if (ns?.url) {
+              nextSongStreamRef.current = { id: nextSong.id, url: ns.url, duration: ns.duration };
+            }
+          })
+          .catch(() => {});
+      }
 
-      fetchAudioStream(nextSong.youtubeId, nextSong.name, nextSong.artist, nextSong.audioUrl)
-        .then((ns) => {
-          if (ns?.url) {
-            nextSongStreamRef.current = { id: nextSong.id, url: ns.url, duration: ns.duration };
-          }
-        })
-        .catch(() => {});
-    }, 2000);
+      // Pré-carrega faixa N+2 em segundo plano para garantir fila ininterrupta
+      if (currentQ.length > 2) {
+        const nextNextIdx = (currentIdx + 2) % currentQ.length;
+        const nextNextSong = currentQ[nextNextIdx];
+        if (nextNextSong && !unavailableSongIds.includes(nextNextSong.id)) {
+          fetchAudioStream(nextNextSong.youtubeId, nextNextSong.name, nextNextSong.artist, nextNextSong.audioUrl, nextNextSong.id)
+            .catch(() => {});
+        }
+      }
+    };
+
+    // Em tela bloqueada / background, executa IMEDIATAMENTE (sem setTimeout que o SO suspende)
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+      runPreload();
+    } else {
+      preloadTimeoutRef.current = setTimeout(runPreload, 250);
+    }
   };
 
   useEffect(() => {
@@ -909,10 +932,13 @@ export default function App() {
 
     setCurrentSong(song);
     setCurrentTime(0);
-    if (newQueue) setQueue(newQueue);
+    if (newQueue) {
+      setQueue(newQueue);
+      queueRef.current = newQueue;
+    }
     showToast(`Tocando: ${song.name}`);
 
-    // Atualização imperativa e imediata dos metadados da MediaSession
+    // Atualização imperativa e imediata dos metadados da MediaSession (SÍNCRONO)
     mediaSessionController.updateMetadata({
       title: song.name,
       artist: song.artist,
@@ -924,7 +950,7 @@ export default function App() {
       duration: song.duration || 210,
       position: 0,
       playbackRate: 1,
-    });
+    }, true);
 
     // Incrementa contador de reprodução para Músicas em Destaque
     setPlayCounts((prev) => {
@@ -940,43 +966,79 @@ export default function App() {
       return updated;
     });
 
-    // 1. TENTA REPRODUÇÃO OFFLINE A PARTIR DO INDEXEDDB
-    const offlineBlob = await getOfflineBlob(song.id);
-    if (reqId !== playRequestIdRef.current) return;
-    if (offlineBlob) {
+    // =========================================================================
+    // FAST-PATH SÍNCRONO: Se a URL já estiver disponível em memória (preload / cache),
+    // inicia a reprodução IMEDIATAMENTE sem nenhum `await` anterior.
+    // Isso garante que o Android / iOS considere a transição como contínua e NUNCA
+    // bloqueie o áudio em background na tela bloqueada.
+    // =========================================================================
+    const cachedStream = takePreloaded(song.id) || getCachedStream(song);
+    let streamUrl: string | null = cachedStream?.url || null;
+    let streamDuration: number | undefined = cachedStream?.duration;
+
+    if (streamUrl) {
+      audio.src = streamUrl;
+      audio.currentTime = 0;
+      audio.volume = isMuted ? 0 : volume;
+      if (streamDuration) setDuration(streamDuration);
+      schedulePreload(song);
+
       try {
+        await audio.play();
+        return;
+      } catch (err: any) {
+        if (reqId !== playRequestIdRef.current) return;
+        invalidateStream(song);
+        if (err?.name === 'AbortError') return;
+        if (retry < 1) {
+          return playSong(song, undefined, retry + 1);
+        }
+        console.warn('Erro ao reproduzir stream do cache síncrono:', err);
+      }
+    }
+
+    // =========================================================================
+    // CONTINUOUS AUDIO BRIDGE: Se a faixa não estiver em cache prévio,
+    // toca imediatamente o micro-áudio silencioso para MANTER O HARDWARE AUDIO
+    // SESSION DO SO ATIVO enquanto a requisição de rede resolve em background.
+    // =========================================================================
+    if (!audio.src || audio.ended || audio.paused) {
+      try {
+        audio.src = SILENT_BRIDGE_AUDIO;
+        audio.volume = 0.01;
+        audio.play().catch(() => {});
+      } catch {}
+    }
+
+    // 1. TENTA REPRODUÇÃO OFFLINE A PARTIR DO INDEXEDDB
+    try {
+      const offlineBlob = await getOfflineBlob(song.id);
+      if (reqId !== playRequestIdRef.current) return;
+      if (offlineBlob) {
         const blobUrl = URL.createObjectURL(offlineBlob);
         audio.src = blobUrl;
         audio.volume = isMuted ? 0 : volume;
         schedulePreload(song);
         await audio.play();
         return;
-      } catch (err: any) {
-        if (err?.name !== 'AbortError') console.warn('Erro ao reproduzir blob offline:', err);
       }
+    } catch (err: any) {
+      if (err?.name !== 'AbortError') console.warn('Erro ao ler blob offline:', err);
     }
 
-    // 2. CONSUMO DA FAIXA PRÉ-RESOLVIDA (Síncrono sem delay de rede)
-    let streamUrl: string | null = null;
-    let streamDuration: number | undefined = undefined;
+    // 2. RESOLUÇÃO REMOTA DA URL DE ÁUDIO
+    try {
+      const res = await fetchAudioStream(song.youtubeId, song.name, song.artist, song.audioUrl, song.id);
+      if (res?.url) {
+        streamUrl = res.url;
+        streamDuration = res.duration;
+      }
+    } catch {}
 
-    const preloaded = takePreloaded(song.id);
-    if (preloaded) {
-      streamUrl = preloaded.url;
-      streamDuration = preloaded.duration;
-    } else {
-      try {
-        const res = await fetchAudioStream(song.youtubeId, song.name, song.artist, song.audioUrl);
-        if (res?.url) {
-          streamUrl = res.url;
-          streamDuration = res.duration;
-        }
-      } catch {}
-      if (reqId !== playRequestIdRef.current) return;
-    }
+    if (reqId !== playRequestIdRef.current) return;
 
     if (!streamUrl) {
-      // Rejeita terminantemente previews de 30s da Deezer / Apple
+      // Rejeita previews de 30s da Deezer / Apple
       const isPreview = (url?: string) =>
         Boolean(url && (url.includes('preview') || url.includes('dzcdn.net') || url.includes('apple.com') || url.includes('mzstatic')));
 
@@ -987,6 +1049,10 @@ export default function App() {
         markSongUnavailable(song.id);
         isSwitchingRef.current = false;
         showToast(`"${song.name}" está indisponível na fonte. Toque em "Substituir por semelhante".`);
+        // Em background, tenta avançar para a próxima se houver falha
+        setTimeout(() => {
+          if (isPlayingRef.current) handleNextSongRef.current();
+        }, 600);
         return;
       }
     }
@@ -998,7 +1064,7 @@ export default function App() {
       setDuration(streamDuration);
     }
 
-    // Dispara preload antecipado da faixa seguinte (N+1) imediatamente
+    // Dispara preload antecipado da faixa seguinte imediatamente
     schedulePreload(song);
 
     try {
@@ -1009,9 +1075,8 @@ export default function App() {
 
       if (err?.name === 'AbortError') return;
       if (err?.name === 'NotAllowedError') {
-        setIsPlaying(false);
-        isPlayingRef.current = false;
-        mediaSessionController.updatePlaybackState(false);
+        // NÃO destrói o widget da MediaSession na lock screen!
+        console.warn('Reprodução contínua aguardando ativação do SO');
         isSwitchingRef.current = false;
         return;
       }
@@ -1034,7 +1099,13 @@ export default function App() {
     }
     const currentQ = queueRef.current;
     if (currentQ.length === 0) return;
-    const currentIdx = currentQ.findIndex((s) => s.id === currentSongRef.current?.id);
+    const curSong = currentSongRef.current;
+    let currentIdx = currentQ.findIndex((s) => s.id === curSong?.id);
+    if (currentIdx === -1 && curSong) {
+      currentIdx = currentQ.findIndex(
+        (s) => s.name?.toLowerCase() === curSong.name?.toLowerCase() && s.artist?.toLowerCase() === curSong.artist?.toLowerCase()
+      );
+    }
     let nextIdx = currentIdx + 1;
     if (nextIdx >= currentQ.length || nextIdx < 0) nextIdx = 0;
     const nextSong = currentQ[nextIdx];
@@ -1048,7 +1119,13 @@ export default function App() {
   const handlePrevSong = () => {
     const currentQ = queueRef.current;
     if (currentQ.length === 0) return;
-    const currentIdx = currentQ.findIndex((s) => s.id === currentSongRef.current?.id);
+    const curSong = currentSongRef.current;
+    let currentIdx = currentQ.findIndex((s) => s.id === curSong?.id);
+    if (currentIdx === -1 && curSong) {
+      currentIdx = currentQ.findIndex(
+        (s) => s.name?.toLowerCase() === curSong.name?.toLowerCase() && s.artist?.toLowerCase() === curSong.artist?.toLowerCase()
+      );
+    }
     let prevIdx = currentIdx - 1;
     if (prevIdx < 0) prevIdx = currentQ.length - 1;
     const prevSong = currentQ[prevIdx];

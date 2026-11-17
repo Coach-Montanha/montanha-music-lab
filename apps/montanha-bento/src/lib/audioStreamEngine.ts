@@ -13,6 +13,17 @@ export interface StreamResult {
 const streamCache = new Map<string, StreamResult>();
 const inflight = new Map<string, Promise<StreamResult | null>>();
 
+export function getCachedStream(song: { id?: string; youtubeId?: string; name?: string; artist?: string } | string): StreamResult | null {
+  if (typeof song === 'string') {
+    return streamCache.get(song) || null;
+  }
+  const cleanId = (song.youtubeId || '').replace(/^yt-/, '').split('&')[0].trim();
+  const cacheKey = cleanId || `${song.name || ''}-${song.artist || ''}`;
+  if (streamCache.has(cacheKey)) return streamCache.get(cacheKey)!;
+  if (song.id && streamCache.has(song.id)) return streamCache.get(song.id)!;
+  return null;
+}
+
 export function invalidateStream(song: { id?: string; youtubeId?: string; name?: string; artist?: string } | string) {
   if (typeof song === 'string') {
     streamCache.delete(song);
@@ -126,10 +137,15 @@ export function fetchAudioStream(
   youtubeId?: string,
   songName?: string,
   artistName?: string,
-  fallbackAudioUrl?: string
+  fallbackAudioUrl?: string,
+  songId?: string
 ): Promise<StreamResult | null> {
   const cleanId = (youtubeId || '').replace(/^yt-/, '').split('&')[0].trim();
   const cacheKey = cleanId || `${songName || ''}-${artistName || ''}`;
+
+  if (songId && streamCache.has(songId)) {
+    return Promise.resolve(streamCache.get(songId)!);
+  }
 
   if (streamCache.has(cacheKey)) {
     return Promise.resolve(streamCache.get(cacheKey)!);
@@ -145,6 +161,7 @@ export function fetchAudioStream(
       const internalResult = await fetchFromInternalApi(songName || '', artistName || '', cleanId);
       if (internalResult) {
         streamCache.set(cacheKey, internalResult);
+        if (songId) streamCache.set(songId, internalResult);
         return internalResult;
       }
     }
@@ -154,6 +171,7 @@ export function fetchAudioStream(
       const saavnResult = await fetchFromSaavnDirect(songName, artistName || '');
       if (saavnResult) {
         streamCache.set(cacheKey, saavnResult);
+        if (songId) streamCache.set(songId, saavnResult);
         return saavnResult;
       }
     }
