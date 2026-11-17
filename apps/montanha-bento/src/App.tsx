@@ -38,7 +38,11 @@ import {
   Disc,
   Users,
   Sliders,
-  Settings
+  Settings,
+  GripVertical,
+  CheckSquare,
+  Square,
+  ListOrdered
 } from 'lucide-react';
 
 import { Song, Playlist, SearchAlbum, SearchArtist, SearchPlaylist, CategorizedSearchResults } from './types';
@@ -349,6 +353,16 @@ export default function App() {
 
   const isCloudLoadedRef = useRef(false);
   const [isSyncingCloud, setIsSyncingCloud] = useState(false);
+
+  // Modo de Edição Geral da Playlist & Exclusão em Lote
+  const [isPlaylistEditingMode, setIsPlaylistEditingMode] = useState<boolean>(false);
+  const [selectedSongsForDeletion, setSelectedSongsForDeletion] = useState<string[]>([]);
+
+  // Reordenação de Faixas (Drag & Drop no Desktop e Touch no Mobile)
+  const [draggingSongIdx, setDraggingSongIdx] = useState<number | null>(null);
+  const [dragOverSongIdx, setDragOverSongIdx] = useState<number | null>(null);
+  const touchDragStartIdx = useRef<number | null>(null);
+  const touchCurrentOverIdx = useRef<number | null>(null);
 
   // Modal: Criar Playlist
   const [isCreatePlaylistModalOpen, setIsCreatePlaylistModalOpen] = useState<boolean>(false);
@@ -737,6 +751,17 @@ export default function App() {
       });
     }
   }, [currentSong]);
+
+  // Watchdog de Preservação da MediaSession no Android / MIUI / HyperOS
+  // Impede que o sistema operacional encerre o player na lock screen por timeout de inatividade
+  useEffect(() => {
+    const keepAliveTimer = setInterval(() => {
+      if (isPlayingRef.current && audioRef.current && !audioRef.current.paused) {
+        mediaSessionController.updatePlaybackState(true);
+      }
+    }, 12000);
+    return () => clearInterval(keepAliveTimer);
+  }, []);
 
   const handlePlay = () => {
     userInitiatedPauseRef.current = false;
@@ -1382,6 +1407,141 @@ export default function App() {
     }
 
     showToast('Música removida da playlist.');
+  };
+
+  // EXCLUSÃO EM LOTE NO MODO DE EDIÇÃO GERAL DA PLAYLIST
+  const handleRemoveMultipleSongs = (playlistId: string, songIds: string[]) => {
+    if (songIds.length === 0) return;
+    const toRemove = new Set(songIds);
+
+    setPlaylists((prev) =>
+      prev.map((pl) => {
+        if (pl.id === playlistId) {
+          return { ...pl, songs: pl.songs.filter((s) => !toRemove.has(s.id)) };
+        }
+        return pl;
+      })
+    );
+
+    if (selectedPlaylist?.id === playlistId) {
+      setSelectedPlaylist({
+        ...selectedPlaylist,
+        songs: selectedPlaylist.songs.filter((s) => !toRemove.has(s.id))
+      });
+    }
+
+    showToast(`${songIds.length} música${songIds.length > 1 ? 's' : ''} removida${songIds.length > 1 ? 's' : ''} da playlist.`);
+    setSelectedSongsForDeletion([]);
+    setIsPlaylistEditingMode(false);
+  };
+
+  const handleToggleSelectSongForDeletion = (songId: string) => {
+    setSelectedSongsForDeletion((prev) =>
+      prev.includes(songId) ? prev.filter((id) => id !== songId) : [...prev, songId]
+    );
+  };
+
+  const handleSelectAllSongsForDeletion = () => {
+    if (!selectedPlaylist) return;
+    if (selectedSongsForDeletion.length === selectedPlaylist.songs.length) {
+      setSelectedSongsForDeletion([]);
+    } else {
+      setSelectedSongsForDeletion(selectedPlaylist.songs.map((s) => s.id));
+    }
+  };
+
+  // REORDENAÇÃO DE MÚSICAS NA PLAYLIST (Touch e Mouse)
+  const handleReorderPlaylistSongs = (playlistId: string, fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0) return;
+
+    setPlaylists((prev) =>
+      prev.map((pl) => {
+        if (pl.id === playlistId) {
+          const reordered = [...pl.songs];
+          const [moved] = reordered.splice(fromIndex, 1);
+          reordered.splice(toIndex, 0, moved);
+          return { ...pl, songs: reordered };
+        }
+        return pl;
+      })
+    );
+
+    if (selectedPlaylist?.id === playlistId) {
+      const reordered = [...selectedPlaylist.songs];
+      const [moved] = reordered.splice(fromIndex, 1);
+      reordered.splice(toIndex, 0, moved);
+      setSelectedPlaylist({
+        ...selectedPlaylist,
+        songs: reordered
+      });
+    }
+  };
+
+  // HANDLERS TOUCH PARA ARRASTAR NO MOBILE
+  const handleTouchStartSong = (idx: number, e: React.TouchEvent) => {
+    touchDragStartIdx.current = idx;
+    touchCurrentOverIdx.current = idx;
+    setDraggingSongIdx(idx);
+    navigator.vibrate?.(25);
+  };
+
+  const handleTouchMoveSong = (e: React.TouchEvent) => {
+    if (touchDragStartIdx.current === null) return;
+    const touch = e.touches[0];
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    const row = el?.closest('[data-song-index]');
+    if (row) {
+      const overIdx = Number(row.getAttribute('data-song-index'));
+      if (!isNaN(overIdx) && overIdx !== touchCurrentOverIdx.current) {
+        touchCurrentOverIdx.current = overIdx;
+        setDragOverSongIdx(overIdx);
+        navigator.vibrate?.(10);
+      }
+    }
+  };
+
+  const handleTouchEndSong = () => {
+    if (
+      touchDragStartIdx.current !== null &&
+      touchCurrentOverIdx.current !== null &&
+      touchDragStartIdx.current !== touchCurrentOverIdx.current &&
+      selectedPlaylist
+    ) {
+      handleReorderPlaylistSongs(selectedPlaylist.id, touchDragStartIdx.current, touchCurrentOverIdx.current);
+      showToast('Ordem da playlist atualizada!');
+    }
+    touchDragStartIdx.current = null;
+    touchCurrentOverIdx.current = null;
+    setDraggingSongIdx(null);
+    setDragOverSongIdx(null);
+  };
+
+  // HANDLERS DESKTOP (HTML5 Drag & Drop)
+  const handleDragStartDesktop = (idx: number, e: React.DragEvent) => {
+    e.dataTransfer.setData('text/plain', String(idx));
+    setDraggingSongIdx(idx);
+  };
+
+  const handleDragOverDesktop = (idx: number, e: React.DragEvent) => {
+    e.preventDefault();
+    if (dragOverSongIdx !== idx) {
+      setDragOverSongIdx(idx);
+    }
+  };
+
+  const handleDropDesktop = (idx: number, e: React.DragEvent) => {
+    e.preventDefault();
+    if (draggingSongIdx !== null && draggingSongIdx !== idx && selectedPlaylist) {
+      handleReorderPlaylistSongs(selectedPlaylist.id, draggingSongIdx, idx);
+      showToast('Ordem da playlist atualizada!');
+    }
+    setDraggingSongIdx(null);
+    setDragOverSongIdx(null);
+  };
+
+  const handleDragEndDesktop = () => {
+    setDraggingSongIdx(null);
+    setDragOverSongIdx(null);
   };
 
   // IMPORTAÇÃO UNIVERSAL POR LINK (SPOTIFY OU YOUTUBE)
@@ -2585,6 +2745,22 @@ export default function App() {
                 </button>
 
                 <button
+                  onClick={() => {
+                    setIsPlaylistEditingMode(!isPlaylistEditingMode);
+                    setSelectedSongsForDeletion([]);
+                  }}
+                  className={`flex items-center gap-1.5 text-xs transition px-2.5 py-1.5 rounded-lg border ${
+                    isPlaylistEditingMode
+                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 font-bold'
+                      : 'text-neutral-300 hover:text-white bg-white/5 hover:bg-white/10 border-white/10'
+                  }`}
+                  title="Gerenciar e selecionar músicas para excluir ou reordenar"
+                >
+                  <ListOrdered size={15} />
+                  <span>{isPlaylistEditingMode ? 'Concluir' : 'Gerenciar Faixas'}</span>
+                </button>
+
+                <button
                   onClick={() => handleOpenEditPlaylist(selectedPlaylist)}
                   className="flex items-center gap-1.5 text-xs text-neutral-400 hover:text-white transition p-2 rounded-lg hover:bg-white/10"
                 >
@@ -2691,46 +2867,154 @@ export default function App() {
               </div>
             </div>
 
+            {/* BARRA DE FERRAMENTAS DO MODO DE EDIÇÃO GERAL DA PLAYLIST */}
+            {isPlaylistEditingMode && (
+              <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 bg-neutral-900/90 border border-neutral-700/60 rounded-2xl shadow-xl backdrop-blur-md animate-in fade-in duration-200">
+                <div className="flex items-center gap-2.5">
+                  <button
+                    onClick={handleSelectAllSongsForDeletion}
+                    className="flex items-center gap-1.5 text-xs font-semibold text-neutral-300 hover:text-white bg-white/10 px-3 py-1.5 rounded-lg transition"
+                  >
+                    {selectedSongsForDeletion.length === selectedPlaylist.songs.length && selectedPlaylist.songs.length > 0 ? (
+                      <>
+                        <CheckSquare size={14} className="text-[#1DB954]" />
+                        <span>Desmarcar Todas</span>
+                      </>
+                    ) : (
+                      <>
+                        <Square size={14} />
+                        <span>Selecionar Todas</span>
+                      </>
+                    )}
+                  </button>
+
+                  <span className="text-xs text-neutral-400 font-mono">
+                    {selectedSongsForDeletion.length} de {selectedPlaylist.songs.length} selecionada(s)
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {selectedSongsForDeletion.length > 0 && (
+                    <button
+                      onClick={() => handleRemoveMultipleSongs(selectedPlaylist.id, selectedSongsForDeletion)}
+                      className="flex items-center gap-1.5 text-xs font-bold text-white bg-red-600 hover:bg-red-500 active:scale-95 px-3.5 py-1.5 rounded-lg shadow-md transition"
+                    >
+                      <Trash2 size={14} />
+                      <span>Excluir Selecionadas ({selectedSongsForDeletion.length})</span>
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => {
+                      setIsPlaylistEditingMode(false);
+                      setSelectedSongsForDeletion([]);
+                    }}
+                    className="flex items-center gap-1 text-xs font-bold text-neutral-200 bg-white/10 hover:bg-white/20 active:scale-95 px-3 py-1.5 rounded-lg transition"
+                  >
+                    <span>Concluir</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* LISTA DE MÚSICAS DA PLAYLIST */}
             <div className="space-y-1">
               {selectedPlaylist.songs.length > 0 ? (
                 selectedPlaylist.songs.map((song, idx) => {
                   const isUnavailable = unavailableSongIds.includes(song.id);
+                  const isSelectedForDeletion = selectedSongsForDeletion.includes(song.id);
+                  const isDragging = draggingSongIdx === idx;
+                  const isDragOver = dragOverSongIdx === idx && draggingSongIdx !== idx;
+
                   return (
                     <div
                       key={`${song.id}-${idx}`}
+                      data-song-index={idx}
+                      draggable={true}
+                      onDragStart={(e) => handleDragStartDesktop(idx, e)}
+                      onDragOver={(e) => handleDragOverDesktop(idx, e)}
+                      onDrop={(e) => handleDropDesktop(idx, e)}
+                      onDragEnd={handleDragEndDesktop}
                       onClick={() => {
+                        if (isPlaylistEditingMode) {
+                          handleToggleSelectSongForDeletion(song.id);
+                          return;
+                        }
                         if (isUnavailable) {
                           showToast(`"${song.name}" está indisponível na fonte. Toque em "Substituir por semelhante".`);
                           return;
                         }
                         playSong(song, selectedPlaylist.songs);
                       }}
-                      className={`flex items-center justify-between p-3 rounded-xl transition group ${
-                        isUnavailable
+                      className={`flex items-center justify-between p-2.5 sm:p-3 rounded-xl transition-all duration-150 group select-none ${
+                        isDragging ? 'opacity-40 scale-[0.98] bg-white/10' : ''
+                      } ${
+                        isDragOver ? 'border-t-2 border-t-[#1DB954] bg-[#1DB954]/10' : ''
+                      } ${
+                        isSelectedForDeletion
+                          ? 'bg-red-950/40 border border-red-500/40'
+                          : isUnavailable
                           ? 'bg-red-950/20 border border-red-500/20 opacity-60 hover:opacity-85 cursor-not-allowed'
                           : 'hover:bg-white/5 cursor-pointer'
                       }`}
                     >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <span className="text-xs font-mono text-neutral-500 w-5">{idx + 1}</span>
+                      <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
+                        {/* HANDLE DE ARRASTE / REORDENAÇÃO (Touch & Mouse) */}
+                        <div
+                          className="touch-none cursor-grab active:cursor-grabbing p-1 text-neutral-500 hover:text-white transition flex-shrink-0"
+                          title="Arrastar para reordenar"
+                          onTouchStart={(e) => handleTouchStartSong(idx, e)}
+                          onTouchMove={handleTouchMoveSong}
+                          onTouchEnd={handleTouchEndSong}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <GripVertical size={16} />
+                        </div>
+
+                        {/* MODO DE EDIÇÃO: CHECKBOX DE SELEÇÃO */}
+                        {isPlaylistEditingMode ? (
+                          <div
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleSelectSongForDeletion(song.id);
+                            }}
+                            className={`h-5 w-5 rounded-md flex items-center justify-center border transition flex-shrink-0 cursor-pointer ${
+                              isSelectedForDeletion
+                                ? 'bg-red-500 border-red-500 text-white shadow-sm'
+                                : 'border-white/30 hover:border-white/60 bg-white/5'
+                            }`}
+                          >
+                            {isSelectedForDeletion && <Check size={13} strokeWidth={3} />}
+                          </div>
+                        ) : (
+                          <span className="text-xs font-mono text-neutral-500 w-5 flex-shrink-0 text-center">
+                            {idx + 1}
+                          </span>
+                        )}
+
                         <img
                           src={song.thumbnail}
                           alt={song.name}
-                          className={`h-10 w-10 rounded-lg object-cover ${isUnavailable ? 'grayscale contrast-125' : ''}`}
+                          className={`h-11 w-11 rounded-lg object-cover flex-shrink-0 shadow-md ${
+                            isUnavailable ? 'grayscale contrast-125' : ''
+                          }`}
                         />
-                        <div className="min-w-0">
+
+                        {/* TÍTULO E ARTISTA COM ESPAÇO AMPLO */}
+                        <div className="min-w-0 flex-1 pr-2">
                           <p
-                            className={`text-sm font-bold truncate ${
+                            className={`text-sm font-semibold truncate ${
                               isUnavailable
                                 ? 'text-red-400 line-through'
+                                : isSelectedForDeletion
+                                ? 'text-red-200'
                                 : 'text-white group-hover:text-[#1DB954]'
                             }`}
                           >
                             {song.name}
                           </p>
                           {isUnavailable ? (
-                            <div className="flex items-center gap-2 mt-1">
+                            <div className="flex items-center gap-2 mt-0.5">
                               <span className="text-[10px] font-bold text-red-400 uppercase tracking-wide">
                                 Áudio indisponível
                               </span>
@@ -2742,7 +3026,7 @@ export default function App() {
                                 className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400 hover:text-emerald-300 underline underline-offset-2 transition active:scale-95"
                               >
                                 <RefreshCw size={11} />
-                                <span>Substituir por semelhante</span>
+                                <span>Substituir</span>
                               </button>
                             </div>
                           ) : (
@@ -2750,60 +3034,57 @@ export default function App() {
                           )}
                         </div>
                       </div>
-                    <div className="flex items-center gap-1.5 sm:gap-2">
-                      {/* BAIXAR CAPA DA MÚSICA */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          downloadImageFile(song.thumbnail, song.name);
-                          showToast(`Capa de "${song.name}" baixada!`);
-                        }}
-                        className="p-1.5 sm:p-2 text-neutral-400 hover:text-white hover:bg-white/10 rounded-lg transition"
-                        title="Baixar capa desta faixa"
-                      >
-                        <ImageIcon size={15} />
-                      </button>
 
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSongToAddToPlaylist(song);
-                          setIsAddToPlaylistModalOpen(true);
-                        }}
-                        className="p-2 text-neutral-400 hover:text-white"
-                        title="Adicionar a outra playlist"
-                      >
-                        <ListPlus size={16} />
-                      </button>
+                      {/* LADO DIREITO DA LINHA */}
+                      <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+                        {isPlaylistEditingMode ? (
+                          /* BOTÃO DE EXCLUSÃO INDIVIDUAL NO MODO DE EDIÇÃO */
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveSongFromPlaylist(selectedPlaylist.id, song.id);
+                            }}
+                            className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded-lg transition"
+                            title="Excluir esta faixa da playlist"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        ) : (
+                          <>
+                            {/* ADICIONAR A OUTRA PLAYLIST */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSongToAddToPlaylist(song);
+                                setIsAddToPlaylistModalOpen(true);
+                              }}
+                              className="p-1.5 sm:p-2 text-neutral-400 hover:text-white hover:bg-white/10 rounded-lg transition"
+                              title="Adicionar a outra playlist"
+                            >
+                              <ListPlus size={16} />
+                            </button>
 
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDownloadSong(song);
-                        }}
-                        className="p-2 text-neutral-400 hover:text-white"
-                        title="Baixar Música"
-                      >
-                        <Download size={16} />
-                      </button>
+                            {/* BAIXAR MÚSICA PARA OFFLINE */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDownloadSong(song);
+                              }}
+                              className="p-1.5 sm:p-2 text-neutral-400 hover:text-white hover:bg-white/10 rounded-lg transition"
+                              title="Baixar Música"
+                            >
+                              <Download size={16} />
+                            </button>
+                          </>
+                        )}
 
-                      {/* REMOVER MÚSICA DA PLAYLIST */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRemoveSongFromPlaylist(selectedPlaylist.id, song.id);
-                        }}
-                        className="p-2 text-neutral-500 hover:text-red-400"
-                        title="Remover desta playlist"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-
-                      <span className="text-xs text-neutral-500 font-mono w-12 text-right">{formatTime(song.duration || 210)}</span>
+                        <span className="text-xs text-neutral-500 font-mono w-10 text-right pr-1">
+                          {formatTime(song.duration || 210)}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                );
-              })
+                  );
+                })
               ) : (
                 <div className="py-12 text-center text-neutral-500 text-sm space-y-3">
                   <p>Esta playlist ainda não tem músicas.</p>

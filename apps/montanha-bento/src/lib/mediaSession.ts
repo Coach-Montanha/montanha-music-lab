@@ -6,17 +6,26 @@ export interface TrackMetadata {
 }
 
 function normalizeArtwork(url?: string | null) {
-  if (!url || typeof url !== 'string' || !url.trim()) return [];
+  const fallback = [
+    { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+    { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+  ];
+
+  if (!url || typeof url !== 'string' || !url.trim()) return fallback;
+
   try {
     const absolute = new URL(url.trim(), window.location.href).href;
+    const isPng = absolute.toLowerCase().includes('.png');
+    const type = isPng ? 'image/png' : 'image/jpeg';
     return [
-      { src: absolute, sizes: '96x96' },
-      { src: absolute, sizes: '128x128' },
-      { src: absolute, sizes: '256x256' },
-      { src: absolute, sizes: '512x512' },
+      { src: absolute, sizes: '96x96', type },
+      { src: absolute, sizes: '128x128', type },
+      { src: absolute, sizes: '256x256', type },
+      { src: absolute, sizes: '512x512', type },
+      ...fallback,
     ];
   } catch {
-    return [];
+    return fallback;
   }
 }
 
@@ -90,20 +99,26 @@ export class MediaSessionController {
     } catch {}
   }
 
-  updatePositionState(state: { duration: number; playbackRate?: number; position: number }) {
+  private lastPositionUpdate = 0;
+
+  updatePositionState(state: { duration: number; playbackRate?: number; position: number }, force = false) {
     if (!('mediaSession' in navigator) || !navigator.mediaSession.setPositionState) return;
+    
+    // Throttling defensivo: limita a 1 chamada a cada 2.5s para evitar descarte pelo Android Notification IPC
+    const now = Date.now();
+    if (!force && now - this.lastPositionUpdate < 2500) {
+      return;
+    }
+
     try {
-      if (
-        Number.isFinite(state.duration) &&
-        state.duration > 0 &&
-        state.position >= 0 &&
-        state.position <= state.duration
-      ) {
+      if (Number.isFinite(state.duration) && state.duration > 0 && state.position >= 0) {
+        const safePosition = Math.min(state.position, state.duration);
         navigator.mediaSession.setPositionState({
           duration: state.duration,
           playbackRate: state.playbackRate || 1,
-          position: state.position,
+          position: safePosition,
         });
+        this.lastPositionUpdate = now;
       }
     } catch {}
   }
