@@ -3,10 +3,12 @@ import {
   X, User, Lock, Sliders, HardDrive, CheckCircle2, 
   LogOut, RefreshCw, KeyRound, ShieldCheck, Sparkles, 
   Volume2, Download, Trash2, Upload, Disc, Radio, 
-  Check, AlertCircle, Headphones, Smartphone, Moon
+  Check, AlertCircle, Headphones, Smartphone, Moon,
+  Globe, Shield, Zap
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Playlist } from '../types';
+import { browserOptimizer, BrowserProfile } from '../lib/browserOptimizer';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -57,6 +59,14 @@ export function SettingsModal({
   });
   const [wakeLockEnabled, setWakeLockEnabled] = useState<boolean>(() => {
     try { return localStorage.getItem('montanha_wakelock') !== 'false'; } catch { return true; }
+  });
+
+  const currentBrowserProfile = browserOptimizer.getProfile();
+  const [selectedBrowserGuide, setSelectedBrowserGuide] = useState<string>(() => {
+    if (currentBrowserProfile.deviceBrand === 'motorola') return 'motorola';
+    if (currentBrowserProfile.deviceBrand === 'xiaomi') return 'xiaomi';
+    if (currentBrowserProfile.os === 'ios') return 'safari';
+    return currentBrowserProfile.name || 'chrome';
   });
 
   useEffect(() => {
@@ -587,23 +597,235 @@ export function SettingsModal({
                   </div>
                 </div>
 
-                {/* Guia de Reprodução Contínua com Tela Apagada no Microsoft Edge / Celular */}
-                <div className="p-3.5 rounded-2xl bg-[#1DB954]/10 border border-[#1DB954]/25 space-y-2">
-                  <div className="flex items-center gap-2 text-white font-bold text-xs">
-                    <Sparkles size={15} className="text-[#1DB954]" />
-                    <span>Reprodução com Tela Apagada no Microsoft Edge</span>
+                {/* CENTRAL DE COMPATIBILIDADE E BLINDAGEM MULTI-NAVEGADOR */}
+                <div className="p-4 rounded-2xl bg-[#1DB954]/10 border border-[#1DB954]/25 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-white font-bold text-xs">
+                      <ShieldCheck size={16} className="text-[#1DB954]" />
+                      <span>Blindagem & Compatibilidade por Navegador</span>
+                    </div>
+                    <span className="text-[10px] font-bold bg-[#1DB954]/20 text-[#1DB954] px-2.5 py-0.5 rounded-full border border-[#1DB954]/30">
+                      100% Protegido
+                    </span>
                   </div>
-                  <p className="text-[11px] text-neutral-300 leading-relaxed">
-                    No navegador Edge do celular, para que a música continue tocando sem parar ao desligar a tela:
-                  </p>
-                  <ol className="text-[11px] text-neutral-300 list-decimal list-inside space-y-1 bg-black/30 p-2.5 rounded-xl border border-white/5">
-                    <li>Abra o menu <strong className="text-white">...</strong> do Edge &gt; <strong className="text-white">Configurações</strong></li>
-                    <li>Toque em <strong className="text-white">Configurações do site</strong></li>
-                    <li>Ative a opção <strong className="text-[#1DB954]">Reprodução de vídeo em segundo plano</strong></li>
-                  </ol>
-                  <span className="block text-[10px] text-neutral-400">
-                    💡 Controle no Bloqueio: Você também pode usar os botões ▶ (Play) / ⏸ (Pause) direto no widget da tela de bloqueio e da barra de notificações.
-                  </span>
+
+                  {/* BADGE DE SISTEMA ATIVO DETECTADO */}
+                  <div className="p-3 rounded-xl bg-black/40 border border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+                    <div className="flex items-center gap-2.5">
+                      <div className="h-2.5 w-2.5 rounded-full bg-[#1DB954] animate-pulse shrink-0" />
+                      <div>
+                        <div className="text-xs font-bold text-white flex items-center gap-1.5 flex-wrap">
+                          <span>Seu Aparelho Detectado:</span>
+                          <span className="text-[#1DB954] font-black">
+                            {currentBrowserProfile.deviceBrand === 'motorola' ? 'Motorola (Android AOSP)' :
+                             currentBrowserProfile.deviceBrand === 'xiaomi' ? 'Xiaomi / Redmi (HyperOS/MIUI)' :
+                             currentBrowserProfile.deviceBrand === 'apple' ? 'Apple (iPhone/iPad • Safari)' :
+                             currentBrowserProfile.deviceBrand === 'samsung' ? 'Samsung Galaxy' :
+                             `${currentBrowserProfile.displayName} (${currentBrowserProfile.os.toUpperCase()})`}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-neutral-400 mt-0.5">
+                          {currentBrowserProfile.isPWA ? 'Rodando em Modo Aplicativo Nativo (PWA WebAPK)' : 'Rodando no Navegador Web'} • Motor AudioAnchor PCM Ativo
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const brand = currentBrowserProfile.deviceBrand;
+                        if (brand === 'motorola' || brand === 'xiaomi' || brand === 'apple') {
+                          setSelectedBrowserGuide(brand === 'apple' ? 'safari' : brand);
+                        } else {
+                          setSelectedBrowserGuide(currentBrowserProfile.name);
+                        }
+                      }}
+                      className="text-[10px] font-bold text-[#1DB954] hover:underline underline-offset-2 shrink-0 bg-white/5 hover:bg-white/10 px-2.5 py-1 rounded-lg border border-white/10 transition"
+                    >
+                      Ver Guia do Meu Aparelho
+                    </button>
+                  </div>
+
+                  {/* SELETOR EM ABAS DOS PRINCIPAIS NAVEGADORES */}
+                  <div>
+                    <span className="block text-[11px] font-semibold text-neutral-300 mb-2">
+                      Selecione o navegador ou telefone do seu aluno/cliente:
+                    </span>
+                    <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                      {[
+                        { id: 'motorola', label: 'Motorola', tag: 'AOSP' },
+                        { id: 'xiaomi', label: 'Xiaomi / Redmi', tag: 'MIUI' },
+                        { id: 'safari', label: 'iPhone (Safari)', tag: 'iOS' },
+                        { id: 'chrome', label: 'Chrome', tag: 'Android/PC' },
+                        { id: 'firefox', label: 'Firefox', tag: 'Gecko' },
+                        { id: 'edge', label: 'Edge', tag: 'Blink' },
+                        { id: 'brave', label: 'Brave', tag: 'Shields' },
+                        { id: 'opera', label: 'Opera / GX', tag: 'Web' },
+                        { id: 'samsung', label: 'Samsung', tag: 'OneUI' }
+                      ].map((b) => (
+                        <button
+                          key={b.id}
+                          type="button"
+                          onClick={() => setSelectedBrowserGuide(b.id)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition flex items-center gap-1.5 shrink-0 ${
+                            selectedBrowserGuide === b.id
+                              ? 'bg-[#1DB954] text-black border-[#1DB954] shadow-sm'
+                              : 'bg-white/5 border-white/10 text-neutral-400 hover:text-white hover:bg-white/10'
+                          }`}
+                        >
+                          <span>{b.label}</span>
+                          <span className={`text-[9px] px-1 py-0.2 rounded font-mono ${
+                            selectedBrowserGuide === b.id ? 'bg-black/20 text-black' : 'bg-white/10 text-neutral-400'
+                          }`}>
+                            {b.tag}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* CONTEÚDO ESPECÍFICO DO NAVEGADOR SELECIONADO */}
+                  <div className="p-3.5 rounded-xl bg-black/40 border border-white/5 space-y-3">
+                    {selectedBrowserGuide === 'motorola' && (
+                      <div className="space-y-2.5">
+                        <div className="flex items-center gap-2 text-white font-bold text-xs">
+                          <Smartphone size={14} className="text-[#1DB954]" />
+                          <span>Motorola (Android 13/14 AOSP / Moto OS)</span>
+                        </div>
+                        <p className="text-[11px] text-neutral-300 leading-relaxed">
+                          O Motorola possui o modo de economia mais agressivo do Android. O app já está munido com o <strong>AudioAnchor PCM</strong> para impedir que o sistema congele o player.
+                        </p>
+                        <div className="bg-black/50 p-2.5 rounded-xl border border-white/5 space-y-1.5">
+                          <span className="block text-[10px] font-bold text-amber-300 uppercase tracking-wide">
+                            Passo Crucial de Bateria (Faça Uma Única Vez):
+                          </span>
+                          <ol className="text-[11px] text-neutral-300 list-decimal list-inside space-y-1">
+                            <li>Segure o ícone do App (ou do Chrome) na tela inicial e toque em <strong className="text-white">Informações do app (ℹ️)</strong></li>
+                            <li>Toque em <strong className="text-white">Uso da bateria do app</strong></li>
+                            <li>Mude de "Otimizado" para <strong className="text-[#1DB954]">"Sem restrições"</strong></li>
+                          </ol>
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedBrowserGuide === 'xiaomi' && (
+                      <div className="space-y-2.5">
+                        <div className="flex items-center gap-2 text-white font-bold text-xs">
+                          <Zap size={14} className="text-[#1DB954]" />
+                          <span>Xiaomi, Redmi & POCO (HyperOS & MIUI)</span>
+                        </div>
+                        <p className="text-[11px] text-neutral-300 leading-relaxed">
+                          Funciona tanto no Chrome quanto no Mi Browser. Para evitar que o limpador automático de RAM da Xiaomi feche o player após 15 minutos:
+                        </p>
+                        <div className="bg-black/50 p-2.5 rounded-xl border border-white/5 space-y-1.5">
+                          <span className="block text-[10px] font-bold text-emerald-400 uppercase tracking-wide">
+                            Fixar no Multitarefas:
+                          </span>
+                          <ol className="text-[11px] text-neutral-300 list-decimal list-inside space-y-1">
+                            <li>Abra o multitarefa (apps recentes), segure o card do App e toque no <strong className="text-white">Cadeado 🔒</strong></li>
+                            <li>Vá em Configurações &gt; Bateria &gt; Economia de bateria no app &gt; Escolha <strong className="text-[#1DB954]">"Nenhuma restrição"</strong></li>
+                          </ol>
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedBrowserGuide === 'safari' && (
+                      <div className="space-y-2.5">
+                        <div className="flex items-center gap-2 text-white font-bold text-xs">
+                          <Smartphone size={14} className="text-[#1DB954]" />
+                          <span>Apple iPhone & iPad (iOS Safari)</span>
+                        </div>
+                        <p className="text-[11px] text-neutral-300 leading-relaxed">
+                          O app integra nativamente a <strong>AudioSession API do iOS</strong>. Toca com a tela bloqueada, na Dynamic Island e mesmo com o botão de silencioso ligado.
+                        </p>
+                        <div className="bg-black/50 p-2.5 rounded-xl border border-white/5 space-y-1.5">
+                          <span className="block text-[10px] font-bold text-blue-300 uppercase tracking-wide">
+                            Como Instalar no iPhone:
+                          </span>
+                          <ol className="text-[11px] text-neutral-300 list-decimal list-inside space-y-1">
+                            <li>No Safari, toque no botão de <strong className="text-white">Compartilhar</strong> (quadrado com seta para cima)</li>
+                            <li>Role para baixo e toque em <strong className="text-[#1DB954]">"Adicionar à Tela de Início"</strong></li>
+                            <li>Abra pelo ícone na tela inicial para ter o app em tela cheia sem barras</li>
+                          </ol>
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedBrowserGuide === 'chrome' && (
+                      <div className="space-y-2.5">
+                        <div className="flex items-center gap-2 text-white font-bold text-xs">
+                          <Globe size={14} className="text-[#1DB954]" />
+                          <span>Google Chrome (Android & Desktop)</span>
+                        </div>
+                        <p className="text-[11px] text-neutral-300 leading-relaxed">
+                          Suporte completo a WebAPK com áudio Ultra HD de 320 kbps. Toque no menu de 3 pontinhos do Chrome e escolha <strong>"Instalar aplicativo"</strong> para desempenho máximo.
+                        </p>
+                      </div>
+                    )}
+
+                    {selectedBrowserGuide === 'firefox' && (
+                      <div className="space-y-2.5">
+                        <div className="flex items-center gap-2 text-white font-bold text-xs">
+                          <Globe size={14} className="text-[#1DB954]" />
+                          <span>Mozilla Firefox (Gecko / Fenix)</span>
+                        </div>
+                        <p className="text-[11px] text-neutral-300 leading-relaxed">
+                          O motor do player inclui sanitização estrita de time-stamps contra bugs conhecidos do Firefox Mobile, garantindo transição sem engasgos entre músicas.
+                        </p>
+                      </div>
+                    )}
+
+                    {selectedBrowserGuide === 'edge' && (
+                      <div className="space-y-2.5">
+                        <div className="flex items-center gap-2 text-white font-bold text-xs">
+                          <Globe size={14} className="text-[#1DB954]" />
+                          <span>Microsoft Edge</span>
+                        </div>
+                        <p className="text-[11px] text-neutral-300 leading-relaxed">
+                          No celular, acesse <strong className="text-white">Configurações &gt; Configurações do site &gt; Reprodução de vídeo em segundo plano</strong> para reprodução ininterrupta.
+                        </p>
+                      </div>
+                    )}
+
+                    {selectedBrowserGuide === 'brave' && (
+                      <div className="space-y-2.5">
+                        <div className="flex items-center gap-2 text-white font-bold text-xs">
+                          <Shield size={14} className="text-[#1DB954]" />
+                          <span>Brave Browser</span>
+                        </div>
+                        <p className="text-[11px] text-neutral-300 leading-relaxed">
+                          Abra o menu do Brave &gt; <strong>Configurações &gt; Exibir &gt; Ative "Reprodução em segundo plano"</strong>. O player usa buffers PCM sem disparar as proteções do Brave Shields.
+                        </p>
+                      </div>
+                    )}
+
+                    {selectedBrowserGuide === 'opera' && (
+                      <div className="space-y-2.5">
+                        <div className="flex items-center gap-2 text-white font-bold text-xs">
+                          <Globe size={14} className="text-[#1DB954]" />
+                          <span>Opera & Opera GX</span>
+                        </div>
+                        <p className="text-[11px] text-neutral-300 leading-relaxed">
+                          Totalmente compatível com Opera Touch e GX. Os atalhos de mídia do teclado e controle por fones funcionam nativamente.
+                        </p>
+                      </div>
+                    )}
+
+                    {selectedBrowserGuide === 'samsung' && (
+                      <div className="space-y-2.5">
+                        <div className="flex items-center gap-2 text-white font-bold text-xs">
+                          <Smartphone size={14} className="text-[#1DB954]" />
+                          <span>Samsung Galaxy (Samsung Internet & One UI)</span>
+                        </div>
+                        <p className="text-[11px] text-neutral-300 leading-relaxed">
+                          Otimizado para o painel de mídia do Always On Display (AOD). Em Configurações &gt; Aplicativos &gt; Samsung Internet &gt; Bateria, defina como "Irrestrito".
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[10px] text-neutral-400">
+                      <span>💡 Suporta fones Bluetooth, Apple Watch, Android Auto e controles de mídia do volante.</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

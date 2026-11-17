@@ -63,6 +63,8 @@ export class MediaSessionController {
     onPrevious?: () => void;
     onNext?: () => void;
     onSeekTo?: (details: MediaSessionActionDetails) => void;
+    onSeekForward?: (offset: number) => void;
+    onSeekBackward?: (offset: number) => void;
   }) {
     if (!('mediaSession' in navigator)) return;
 
@@ -88,6 +90,16 @@ export class MediaSessionController {
         if (details.seekTime !== undefined && handlers.onSeekTo) {
           handlers.onSeekTo(details);
         }
+      });
+    }
+    if (handlers.onSeekForward) {
+      safeSet('seekforward', (details) => {
+        handlers.onSeekForward!(details.seekOffset || 10);
+      });
+    }
+    if (handlers.onSeekBackward) {
+      safeSet('seekbackward', (details) => {
+        handlers.onSeekBackward!(details.seekOffset || 10);
       });
     }
   }

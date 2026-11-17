@@ -56,6 +56,7 @@ import { SettingsModal } from './components/SettingsModal';
 import { AudioScrubber } from './components/AudioScrubber';
 import { mediaSessionController } from './lib/mediaSession';
 import { audioAnchor } from './lib/audioAnchor';
+import { browserOptimizer } from './lib/browserOptimizer';
 import { fetchRealTrackCover, cacheImageLocally, downloadImageFile, enrichPlaylistTracks } from './lib/coverEngine';
 import { fetchAudioStream, invalidateStream, getCachedStream } from './lib/audioStreamEngine';
 import { SilentHoldKeeper, GestureGuardian } from 'pwa-audio-player';
@@ -663,8 +664,10 @@ export default function App() {
     };
   }, []);
 
-  // Inicialização do SilentHoldKeeper (Blindagem de Hardware Audio Session no Mobile PWA)
+  // Inicialização do SilentHoldKeeper e Otimizador Universal de Navegadores
   useEffect(() => {
+    browserOptimizer.init();
+
     if (audioRef.current && !silentHoldRef.current) {
       try {
         silentHoldRef.current = new SilentHoldKeeper(
@@ -850,6 +853,18 @@ export default function App() {
       onNext: () => handleNextSongRef.current(),
       onSeekTo: (details) => {
         if (details.seekTime !== undefined) handleSeekRef.current(details.seekTime);
+      },
+      onSeekForward: (offset) => {
+        if (audioRef.current) {
+          const nextT = Math.min(audioRef.current.duration || 300, audioRef.current.currentTime + offset);
+          handleSeekRef.current(nextT);
+        }
+      },
+      onSeekBackward: (offset) => {
+        if (audioRef.current) {
+          const prevT = Math.max(0, audioRef.current.currentTime - offset);
+          handleSeekRef.current(prevT);
+        }
       }
     });
   }, []);
