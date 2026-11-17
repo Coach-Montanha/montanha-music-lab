@@ -1049,10 +1049,6 @@ export default function App() {
         markSongUnavailable(song.id);
         isSwitchingRef.current = false;
         showToast(`"${song.name}" está indisponível na fonte. Toque em "Substituir por semelhante".`);
-        // Em background, tenta avançar para a próxima se houver falha
-        setTimeout(() => {
-          if (isPlayingRef.current) handleNextSongRef.current();
-        }, 600);
         return;
       }
     }
@@ -1248,6 +1244,15 @@ export default function App() {
     showToast('Música removida dos downloads.');
   };
 
+  // SELEÇÃO DE PLAYLIST: ABRE E RELACIONA A FILA AUTOMATICAMENTE
+  const handleSelectPlaylist = (pl: Playlist) => {
+    setSelectedPlaylist(pl);
+    if (pl.songs && pl.songs.length > 0) {
+      setQueue(pl.songs);
+      queueRef.current = pl.songs;
+    }
+  };
+
   // DOWNLOAD DE PLAYLIST COMPLETA
   const handleDownloadPlaylist = async (playlist: Playlist) => {
     if (!playlist.songs || playlist.songs.length === 0) {
@@ -1382,16 +1387,20 @@ export default function App() {
     }
   };
 
-  // ENRIQUECER E ATUALIZAR CAPAS DE TODAS AS PLAYLISTS DO PERFIL SEQUENCIALMENTE
+  // SCAN GERAL: ATUALIZAR CAPAS & VERIFICAR MÚSICAS QUEBRADAS EM TODAS AS PLAYLISTS
   const handleEnrichAllPlaylistsCovers = async () => {
     if (playlists.length === 0) {
-      showToast('Nenhuma playlist para atualizar capas.');
+      showToast('Nenhuma playlist para verificar.');
       return;
     }
     if (isEnrichingAllCovers) return;
 
     setIsEnrichingAllCovers(true);
-    showToast(`Iniciando atualização de capas em sequência para ${playlists.length} playlists...`);
+    showToast(`Iniciando Scan Geral em ${playlists.length} playlists...`);
+
+    const newUnavailableIds = new Set(unavailableSongIds);
+    let evaluatedCount = 0;
+    let brokenCount = 0;
 
     try {
       const updatedPlaylists = [...playlists];
@@ -1402,23 +1411,53 @@ export default function App() {
           total: updatedPlaylists.length,
           playlistName: pl.name
         });
-        showToast(`(${i + 1}/${updatedPlaylists.length}) Atualizando capas: "${pl.name}"...`);
+        showToast(`(${i + 1}/${updatedPlaylists.length}) Escaneando "${pl.name}"...`);
 
         if (pl.songs && pl.songs.length > 0) {
+          // 1. Atualização de capas oficiais
           const enriched = await enrichPlaylistTracks(pl, (done, total) => {
             if (done === total || done % 10 === 0) {
               console.log(`[Cover Engine] Playlist "${pl.name}": ${done}/${total} faixas processadas.`);
             }
           });
+
+          // 2. Avaliação de integridade de áudio de cada faixa (em paralelo)
+          for (let j = 0; j < enriched.songs.length; j += 3) {
+            const chunk = enriched.songs.slice(j, j + 3);
+            await Promise.all(
+              chunk.map(async (song) => {
+                evaluatedCount++;
+                try {
+                  const stream = await fetchAudioStream(song.youtubeId, song.name, song.artist, song.audioUrl, song.id);
+                  if (!stream?.url) {
+                    newUnavailableIds.add(song.id);
+                    brokenCount++;
+                  } else {
+                    newUnavailableIds.delete(song.id);
+                  }
+                } catch {
+                  newUnavailableIds.add(song.id);
+                  brokenCount++;
+                }
+              })
+            );
+          }
+
           updatedPlaylists[i] = enriched;
           setPlaylists([...updatedPlaylists]);
           if (selectedPlaylist && selectedPlaylist.id === enriched.id) {
             setSelectedPlaylist(enriched);
           }
         }
-        // Intervalo de segurança amigável entre playlists
-        await new Promise((resolve) => setTimeout(resolve, 400));
+        await new Promise((resolve) => setTimeout(resolve, 300));
       }
+
+      // Salva lista de músicas com erro
+      const updatedUnavailableList = Array.from(newUnavailableIds);
+      setUnavailableSongIds(updatedUnavailableList);
+      try {
+        localStorage.setItem('able_unavailable_songs', JSON.stringify(updatedUnavailableList));
+      } catch {}
 
       // Persistência local no perfil
       const userKey = getUserPlaylistStorageKey(currentUser?.id);
@@ -1432,10 +1471,10 @@ export default function App() {
         await syncCloudPlaylists(currentUser.id, updatedPlaylists);
       }
 
-      showToast(`🎉 Concluído! Todas as capas das ${updatedPlaylists.length} playlists foram atualizadas.`);
+      showToast(`🎉 Scan concluído! ${evaluatedCount} faixas avaliadas (${brokenCount} marcadas para substituição).`);
     } catch (err) {
-      console.error('[Cover Engine Error]', err);
-      showToast('Erro ao atualizar capas de algumas playlists.');
+      console.error('[Scan Engine Error]', err);
+      showToast('Scan concluído com avisos em algumas faixas.');
     } finally {
       setIsEnrichingAllCovers(false);
       setEnrichAllProgress({ current: 0, total: 0, playlistName: '' });
@@ -2094,11 +2133,11 @@ export default function App() {
                 <button
                   onClick={handleEnrichAllPlaylistsCovers}
                   disabled={isEnrichingAllCovers}
-                  className="text-xs font-bold text-[#1DB954] hover:underline flex items-center gap-1 transition disabled:opacity-50"
-                  title="Atualizar capas de todas as playlists do perfil"
+                  className="text-xs font-bold text-[#1DB954] hover:underline flex items-center gap-1.5 transition disabled:opacity-50 bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-full border border-white/10"
+                  title="Atualizar capas oficiais e verificar se há músicas quebradas em todas as playlists"
                 >
                   <Sparkles size={14} className={isEnrichingAllCovers ? "animate-spin" : ""} />
-                  <span>{isEnrichingAllCovers ? `Atualizando (${enrichAllProgress.current}/${enrichAllProgress.total})...` : 'Atualizar Capas'}</span>
+                  <span>{isEnrichingAllCovers ? `Escaneando (${enrichAllProgress.current}/${enrichAllProgress.total})...` : 'Atualizar Capas & Verificar Músicas'}</span>
                 </button>
                 <button
                   onClick={() => setIsImportModalOpen(true)}
@@ -2115,7 +2154,7 @@ export default function App() {
               {playlists.map((pl) => (
                 <div
                   key={pl.id}
-                  onClick={() => setSelectedPlaylist(pl)}
+                  onClick={() => handleSelectPlaylist(pl)}
                   className="group flex flex-col p-3 rounded-2xl bg-[#181818] hover:bg-[#282828] transition duration-200 cursor-pointer border border-white/5 relative"
                 >
                   <div className="relative aspect-square w-full rounded-xl overflow-hidden mb-3 shadow-md">
@@ -2136,14 +2175,16 @@ export default function App() {
                       onClick={(e) => {
                         e.stopPropagation();
                         if (pl.songs.length > 0) {
-                          if (isPlaying && currentSong.id === pl.songs[0].id) {
+                          if (isPlaying && pl.songs.some(s => s.id === currentSong.id)) {
                             togglePlay();
                           } else {
+                            handleSelectPlaylist(pl);
                             playSong(pl.songs[0], pl.songs);
                           }
                         }
                       }}
-                      className="absolute bottom-2.5 right-2.5 flex h-10 w-10 items-center justify-center rounded-full bg-[#1DB954] text-black shadow-xl opacity-0 group-hover:opacity-100 transition hover:scale-105 active:scale-95"
+                      className="absolute bottom-2.5 right-2.5 flex h-11 w-11 items-center justify-center rounded-full bg-[#1DB954] text-black shadow-2xl opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-all hover:scale-110 active:scale-95 z-10"
+                      title={`Tocar ${pl.name}`}
                     >
                       {isPlaying && pl.songs.some(s => s.id === currentSong.id) ? (
                         <Pause size={18} fill="currentColor" />
@@ -2658,8 +2699,8 @@ export default function App() {
               {playlists.map((pl) => (
                 <div
                   key={pl.id}
-                  onClick={() => setSelectedPlaylist(pl)}
-                  className="group flex flex-col p-3 rounded-2xl bg-[#181818] hover:bg-[#282828] transition cursor-pointer border border-white/5 relative"
+                  onClick={() => handleSelectPlaylist(pl)}
+                  className="group flex flex-col p-3 rounded-2xl bg-[#181818] hover:bg-[#282828] transition duration-200 cursor-pointer border border-white/5 relative"
                 >
                   <div className="relative aspect-square w-full rounded-xl overflow-hidden mb-3 shadow-md">
                     <img
@@ -2679,16 +2720,22 @@ export default function App() {
                       onClick={(e) => {
                         e.stopPropagation();
                         if (pl.songs.length > 0) {
-                          if (isPlaying && currentSong.id === pl.songs[0].id) {
+                          if (isPlaying && pl.songs.some(s => s.id === currentSong.id)) {
                             togglePlay();
                           } else {
+                            handleSelectPlaylist(pl);
                             playSong(pl.songs[0], pl.songs);
                           }
                         }
                       }}
-                      className="absolute bottom-2.5 right-2.5 flex h-10 w-10 items-center justify-center rounded-full bg-[#1DB954] text-black shadow-xl opacity-0 group-hover:opacity-100 transition hover:scale-105"
+                      className="absolute bottom-2.5 right-2.5 flex h-11 w-11 items-center justify-center rounded-full bg-[#1DB954] text-black shadow-2xl opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-all hover:scale-110 active:scale-95 z-10"
+                      title={`Tocar ${pl.name}`}
                     >
-                      <Play size={18} fill="currentColor" className="ml-0.5" />
+                      {isPlaying && pl.songs.some(s => s.id === currentSong.id) ? (
+                        <Pause size={18} fill="currentColor" />
+                      ) : (
+                        <Play size={18} fill="currentColor" className="ml-0.5" />
+                      )}
                     </button>
                   </div>
                   <div className="flex items-start justify-between gap-1">
@@ -2789,44 +2836,23 @@ export default function App() {
         {selectedPlaylist && (
           <div className="space-y-6 max-w-5xl mx-auto animate-fade-in">
             
-            {/* BARRA SUPERIOR DE AÇÕES COM BOTÃO VOLTAR */}
-            <div className="flex items-center justify-between">
+            {/* BARRA SUPERIOR DE AÇÕES: LIMPA, ELEGANTE E EM LINHA ÚNICA (Padrão Apple HIG) */}
+            <div className="flex items-center justify-between gap-2">
               <button
                 onClick={() => setSelectedPlaylist(null)}
-                className="group flex items-center gap-2 rounded-full bg-white/10 hover:bg-white/20 px-4 py-2 text-xs font-bold text-white transition active:scale-95 shadow"
+                className="group flex items-center gap-1.5 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 px-3.5 py-2 text-xs font-bold text-white transition shadow shrink-0"
               >
                 <ArrowLeft size={16} className="group-hover:-translate-x-1 transition" />
                 <span>Voltar</span>
               </button>
 
-              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                {/* Botão Baixar Capa da Playlist */}
-                <button
-                  onClick={() => downloadImageFile(selectedPlaylist.cover, selectedPlaylist.name)}
-                  className="flex items-center gap-1.5 text-xs text-neutral-300 hover:text-white transition px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10"
-                  title="Baixar Capa da Playlist em Alta Resolução"
-                >
-                  <Download size={14} className="text-[#1DB954]" />
-                  <span className="hidden sm:inline">Baixar Capa</span>
-                </button>
-
-                {/* Botão Atualizar Capas das Músicas com Capas Oficiais */}
-                <button
-                  onClick={handleEnrichCurrentPlaylistCovers}
-                  disabled={isEnrichingCovers}
-                  className="flex items-center gap-1.5 text-xs text-neutral-300 hover:text-white transition px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10"
-                  title="Buscar capas oficiais individuais para cada música da playlist"
-                >
-                  <Sparkles size={14} className={isEnrichingCovers ? "animate-spin text-[#1DB954]" : "text-[#1DB954]"} />
-                  <span>{isEnrichingCovers ? "Buscando..." : "Atualizar Capas"}</span>
-                </button>
-
+              <div className="flex items-center gap-2 shrink-0">
                 <button
                   onClick={() => {
                     setIsPlaylistEditingMode(!isPlaylistEditingMode);
                     setSelectedSongsForDeletion([]);
                   }}
-                  className={`flex items-center gap-1.5 text-xs transition px-2.5 py-1.5 rounded-lg border ${
+                  className={`flex items-center gap-1.5 text-xs transition px-3.5 py-2 rounded-full border active:scale-95 ${
                     isPlaylistEditingMode
                       ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 font-bold'
                       : 'text-neutral-300 hover:text-white bg-white/5 hover:bg-white/10 border-white/10'
@@ -2839,18 +2865,20 @@ export default function App() {
 
                 <button
                   onClick={() => handleOpenEditPlaylist(selectedPlaylist)}
-                  className="flex items-center gap-1.5 text-xs text-neutral-400 hover:text-white transition p-2 rounded-lg hover:bg-white/10"
+                  className="flex items-center gap-1.5 text-xs text-neutral-300 hover:text-white transition px-3.5 py-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 active:scale-95"
+                  title="Editar nome e capa da playlist"
                 >
                   <Edit2 size={15} />
-                  <span>Editar</span>
+                  <span className="hidden sm:inline">Editar</span>
                 </button>
 
                 <button
                   onClick={() => handleDeletePlaylist(selectedPlaylist.id)}
-                  className="flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 transition p-2 rounded-lg hover:bg-red-500/10"
+                  className="flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 transition px-3.5 py-2 rounded-full bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 active:scale-95"
+                  title="Excluir esta playlist"
                 >
                   <Trash2 size={15} />
-                  <span>Excluir</span>
+                  <span className="hidden sm:inline">Excluir</span>
                 </button>
               </div>
             </div>

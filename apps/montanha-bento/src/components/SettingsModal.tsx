@@ -186,14 +186,21 @@ export function SettingsModal({
   // Limpar Cache de Imagens
   const handleClearCache = async () => {
     setLoading(true);
+    setErrorMsg('');
     try {
       if ('caches' in window) {
+        const keys = await window.caches.keys();
+        await Promise.all(
+          keys
+            .filter((k) => k.includes('cover') || k.includes('image'))
+            .map((k) => window.caches.delete(k))
+        );
         await window.caches.delete('montanha-music-covers-v1');
       }
-      setSuccessMsg('Cache de capas limpo com sucesso!');
+      setSuccessMsg('Cache de imagens limpo com sucesso!');
       setTimeout(() => setSuccessMsg(''), 3000);
     } catch {
-      setErrorMsg('Erro ao limpar cache.');
+      setErrorMsg('Erro ao limpar cache de imagens.');
     } finally {
       setLoading(false);
     }
@@ -629,25 +636,39 @@ export function SettingsModal({
               <div className="space-y-3">
                 <button
                   type="button"
-                  onClick={onSyncPlaylists}
-                  className="w-full h-11 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition flex items-center justify-center gap-2 border border-white/10"
+                  onClick={async () => {
+                    setLoading(true);
+                    setErrorMsg('');
+                    setSuccessMsg('');
+                    try {
+                      await onSyncPlaylists();
+                      setSuccessMsg('Playlists sincronizadas com a nuvem!');
+                      setTimeout(() => setSuccessMsg(''), 3000);
+                    } catch (err: any) {
+                      setErrorMsg(err.message || 'Erro ao sincronizar com a nuvem.');
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  disabled={loading}
+                  className="w-full h-11 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-white text-xs font-bold transition flex items-center justify-center gap-2 border border-white/10"
                 >
-                  <RefreshCw size={14} className="text-[#1DB954]" />
-                  <span>Sincronizar Todas as Playlists com a Nuvem Agora</span>
+                  <RefreshCw size={14} className={loading ? "animate-spin text-[#1DB954]" : "text-[#1DB954]"} />
+                  <span>Sincronizar com a Nuvem</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={handleExportBackup}
-                  className="w-full h-11 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition flex items-center justify-center gap-2 border border-white/10"
+                  className="w-full h-11 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-white text-xs font-bold transition flex items-center justify-center gap-2 border border-white/10"
                 >
                   <Download size={14} />
-                  <span>Exportar Arquivo de Backup da Minha Biblioteca (.JSON)</span>
+                  <span>Exportar Backup (.JSON)</span>
                 </button>
 
-                <label className="w-full h-11 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition flex items-center justify-center gap-2 border border-white/10 cursor-pointer">
+                <label className="w-full h-11 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-white text-xs font-bold transition flex items-center justify-center gap-2 border border-white/10 cursor-pointer">
                   <Upload size={14} />
-                  <span>Restaurar Playlists de um Backup (.JSON)</span>
+                  <span>Restaurar Backup (.JSON)</span>
                   <input
                     type="file"
                     accept=".json"
@@ -660,10 +681,10 @@ export function SettingsModal({
                   type="button"
                   onClick={handleClearCache}
                   disabled={loading}
-                  className="w-full h-11 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-bold transition flex items-center justify-center gap-2 border border-red-500/20"
+                  className="w-full h-11 rounded-xl bg-red-500/10 hover:bg-red-500/20 active:scale-95 text-red-400 text-xs font-bold transition flex items-center justify-center gap-2 border border-red-500/20"
                 >
                   <Trash2 size={14} />
-                  <span>Limpar Cache de Capas e Imagens Locais</span>
+                  <span>Limpar Cache de Imagens</span>
                 </button>
               </div>
             </div>
