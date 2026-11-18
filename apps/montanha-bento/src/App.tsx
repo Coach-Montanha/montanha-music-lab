@@ -310,6 +310,16 @@ export default function App() {
     }
   });
 
+  // Músicas com Áudio Verificado e Funcional (Evita re-verificar faixas já atestadas)
+  const [verifiedSongIds, setVerifiedSongIds] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem('able_verified_songs');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
   const [replacingSongContext, setReplacingSongContext] = useState<{
     targetSong: Song;
     playlistId?: string;
@@ -322,12 +332,23 @@ export default function App() {
       try { localStorage.setItem('able_unavailable_songs', JSON.stringify(updated)); } catch {}
       return updated;
     });
+    setVerifiedSongIds((prev) => {
+      const updated = prev.filter((id) => id !== songId);
+      try { localStorage.setItem('able_verified_songs', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
   };
 
   const markSongAvailable = (songId: string) => {
     setUnavailableSongIds((prev) => {
       const updated = prev.filter((id) => id !== songId);
       try { localStorage.setItem('able_unavailable_songs', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+    setVerifiedSongIds((prev) => {
+      if (prev.includes(songId)) return prev;
+      const updated = [...prev, songId];
+      try { localStorage.setItem('able_verified_songs', JSON.stringify(updated)); } catch {}
       return updated;
     });
   };
@@ -617,18 +638,60 @@ export default function App() {
     };
   }, [currentUser]);
 
-  // Músicas em Destaque (Lista de Referência Estável do Acervo Montanha)
-  const featuredSongs = useMemo(() => {
-    const allSongsMap = new Map<string, Song>();
-    playlists.forEach((p) => {
-      (p.songs || []).forEach((s) => {
-        if (!allSongsMap.has(s.id)) {
-          allSongsMap.set(s.id, s);
-        }
+  // Sugestões de Músicas Baseadas nas Playlists (Aleatórias e Diversificadas)
+  const [suggestionSeed, setSuggestionSeed] = useState<number>(0);
+
+  const suggestedSongs = useMemo(() => {
+    if (playlists.length === 0) return [];
+
+    // Playlists que contêm faixas
+    const validPlaylists = playlists.filter((p) => p.songs && p.songs.length > 0);
+    if (validPlaylists.length === 0) return [];
+
+    // Embaralha as playlists para sortear de gêneros e coleções distintas
+    const shuffledPlaylists = [...validPlaylists].sort(() => 0.5 - Math.random());
+    const selected: Song[] = [];
+    const usedSongIds = new Set<string>();
+
+    // 1. Sorteia 1 faixa aleatória de cada playlist diferente
+    for (const pl of shuffledPlaylists) {
+      if (selected.length >= 9) break;
+      const availableSongs = (pl.songs || []).filter((s) => !unavailableSongIds.includes(s.id));
+      if (availableSongs.length === 0) continue;
+      const picked = availableSongs[Math.floor(Math.random() * availableSongs.length)];
+      if (!usedSongIds.has(picked.id)) {
+        usedSongIds.add(picked.id);
+        selected.push(picked);
+      }
+    }
+
+    // 2. Se houver menos de 9 playlists, completa com outras músicas aleatórias de qualquer playlist
+    if (selected.length < 9) {
+      const allSongs: Song[] = [];
+      validPlaylists.forEach((p) => {
+        (p.songs || []).forEach((s) => {
+          if (!unavailableSongIds.includes(s.id)) allSongs.push(s);
+        });
       });
-    });
-    return Array.from(allSongsMap.values()).slice(0, 9);
-  }, [playlists]);
+      const shuffledAll = [...allSongs].sort(() => 0.5 - Math.random());
+      for (const s of shuffledAll) {
+        if (selected.length >= 9) break;
+        if (!usedSongIds.has(s.id)) {
+          usedSongIds.add(s.id);
+          selected.push(s);
+        }
+      }
+    }
+
+    return selected;
+  }, [playlists, suggestionSeed, unavailableSongIds]);
+
+  const featuredSongs = suggestedSongs; // Alias para compatibilidade reversa
+
+  const handleShuffleSuggestions = () => {
+    setSuggestionSeed((prev) => prev + 1);
+    showToast('Novas sugestões sorteadas com base nas suas playlists!');
+  };
 
   const syncDebounceRef = useRef<any>(null);
 
@@ -1535,7 +1598,8 @@ export default function App() {
     }
   };
 
-  // SCAN GERAL: ATUALIZAR CAPAS & VERIFICAR MÚSICAS QUEBRADAS EM TODAS AS PLAYLISTS
+  // SCAN GERAL INTELIGENTE: ATUALIZAR CAPAS & VERIFICAR MÚSICAS QUEBRADAS EM TODAS AS PLAYLISTS
+  // Pula instantaneamente playlists e faixas que já foram atualizadas/verificadas anteriormente
   const handleEnrichAllPlaylistsCovers = async () => {
     if (playlists.length === 0) {
       showToast('Nenhuma playlist para verificar.');
@@ -1544,10 +1608,12 @@ export default function App() {
     if (isEnrichingAllCovers) return;
 
     setIsEnrichingAllCovers(true);
-    showToast(`Iniciando Scan Geral em ${playlists.length} playlists...`);
+    showToast(`Iniciando Scan Inteligente em ${playlists.length} playlists...`);
 
     const newUnavailableIds = new Set(unavailableSongIds);
+    const verifiedSet = new Set<string>(verifiedSongIds);
     let evaluatedCount = 0;
+    let skippedCount = 0;
     let brokenCount = 0;
 
     try {
@@ -1559,19 +1625,37 @@ export default function App() {
           total: updatedPlaylists.length,
           playlistName: pl.name
         });
-        showToast(`(${i + 1}/${updatedPlaylists.length}) Escaneando "${pl.name}"...`);
 
-        if (pl.songs && pl.songs.length > 0) {
-          // 1. Atualização de capas oficiais
-          const enriched = await enrichPlaylistTracks(pl, (done, total) => {
-            if (done === total || done % 10 === 0) {
-              console.log(`[Cover Engine] Playlist "${pl.name}": ${done}/${total} faixas processadas.`);
-            }
-          });
+        const songs = pl.songs || [];
+        if (songs.length === 0) continue;
 
-          // 2. Avaliação de integridade de áudio de cada faixa (em paralelo)
-          for (let j = 0; j < enriched.songs.length; j += 3) {
-            const chunk = enriched.songs.slice(j, j + 3);
+        // Se a playlist já foi enriquecida e todas as faixas já estão com áudio verificado:
+        const allSongsVerified = songs.every((s) => verifiedSet.has(s.id) && !newUnavailableIds.has(s.id));
+        const hasUnenrichedCovers = songs.some((s) => !s.thumbnail || s.thumbnail === pl.cover);
+
+        if (pl.coversEnriched && !hasUnenrichedCovers && allSongsVerified) {
+          // Pula na hora sem overhead de requisições de rede
+          skippedCount += songs.length;
+          continue;
+        }
+
+        showToast(`(${i + 1}/${updatedPlaylists.length}) Verificando "${pl.name}"...`);
+
+        // 1. Atualização de capas oficiais (pula as que já possuem capas HD individuais)
+        const enriched = await enrichPlaylistTracks(pl, (done, total) => {
+          if (done === total || done % 15 === 0) {
+            console.log(`[Cover Engine] Playlist "${pl.name}": ${done}/${total} faixas verificadas.`);
+          }
+        });
+
+        // 2. Avaliação de integridade de áudio apenas para músicas NÃO verificadas ainda
+        const unverifiedSongs = enriched.songs.filter(
+          (s) => !verifiedSet.has(s.id) && !newUnavailableIds.has(s.id)
+        );
+
+        if (unverifiedSongs.length > 0) {
+          for (let j = 0; j < unverifiedSongs.length; j += 3) {
+            const chunk = unverifiedSongs.slice(j, j + 3);
             await Promise.all(
               chunk.map(async (song) => {
                 evaluatedCount++;
@@ -1579,25 +1663,37 @@ export default function App() {
                   const stream = await fetchAudioStream(song.youtubeId, song.name, song.artist, song.audioUrl, song.id);
                   if (!stream?.url) {
                     newUnavailableIds.add(song.id);
+                    verifiedSet.delete(song.id);
                     brokenCount++;
                   } else {
                     newUnavailableIds.delete(song.id);
+                    verifiedSet.add(song.id);
                   }
                 } catch {
                   newUnavailableIds.add(song.id);
+                  verifiedSet.delete(song.id);
                   brokenCount++;
                 }
               })
             );
           }
-
-          updatedPlaylists[i] = enriched;
-          setPlaylists([...updatedPlaylists]);
-          if (selectedPlaylist && selectedPlaylist.id === enriched.id) {
-            setSelectedPlaylist(enriched);
-          }
+        } else {
+          skippedCount += songs.length;
         }
-        await new Promise((resolve) => setTimeout(resolve, 300));
+
+        const updatedPl: Playlist = {
+          ...enriched,
+          coversEnriched: true,
+          scannedAt: Date.now()
+        };
+
+        updatedPlaylists[i] = updatedPl;
+        setPlaylists([...updatedPlaylists]);
+        if (selectedPlaylist && selectedPlaylist.id === updatedPl.id) {
+          setSelectedPlaylist(updatedPl);
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 100));
       }
 
       // Salva lista de músicas com erro
@@ -1607,19 +1703,26 @@ export default function App() {
         localStorage.setItem('able_unavailable_songs', JSON.stringify(updatedUnavailableList));
       } catch {}
 
+      // Salva lista de músicas com áudio verificado
+      const updatedVerifiedList = Array.from(verifiedSet);
+      setVerifiedSongIds(updatedVerifiedList);
+      try {
+        localStorage.setItem('able_verified_songs', JSON.stringify(updatedVerifiedList));
+      } catch {}
+
       // Persistência local no perfil
-      const userKey = getUserPlaylistStorageKey(currentUser?.id);
+      const userKey = getUserPlaylistStorageKey(currentUser?.id, currentUser?.email);
       try {
         localStorage.setItem(userKey, JSON.stringify(updatedPlaylists));
       } catch {}
 
       // Sincronização em nuvem Supabase
       if (currentUser?.id) {
-        showToast('Salvando alterações na nuvem...');
+        showToast('Salvando atualizações na nuvem...');
         await syncCloudPlaylists(currentUser.id, updatedPlaylists);
       }
 
-      showToast(`🎉 Scan concluído! ${evaluatedCount} faixas avaliadas (${brokenCount} marcadas para substituição).`);
+      showToast(`🎉 Scan Inteligente concluído! ${evaluatedCount} novas faixas avaliadas (${brokenCount} com falha), ${skippedCount} faixas mantidas sem repetição.`);
     } catch (err) {
       console.error('[Scan Engine Error]', err);
       showToast('Scan concluído com avisos em algumas faixas.');
@@ -2216,16 +2319,16 @@ export default function App() {
             <span>Criar Playlist</span>
           </button>
 
-          {/* Botão Atualizar Capas ao lado de Criar Playlist */}
+          {/* Botão Scan e Verificação Inteligente do Acervo ao lado de Criar Playlist */}
           <button
             onClick={handleEnrichAllPlaylistsCovers}
             disabled={isEnrichingAllCovers}
             className="flex items-center gap-1.5 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 px-3 py-1.5 sm:py-2 text-xs font-bold text-white transition border border-white/10 flex-shrink-0"
-            title="Atualizar capas em alta definição de todas as playlists em sequência"
+            title="Scan Inteligente: atualiza capas HD e verifica integridade pulando o que já foi atualizado"
           >
             <Sparkles size={14} className={isEnrichingAllCovers ? "animate-spin text-[#1DB954]" : "text-[#1DB954]"} />
             <span className="hidden sm:inline">
-              {isEnrichingAllCovers ? `Atualizando (${enrichAllProgress.current}/${enrichAllProgress.total})` : 'Atualizar'}
+              {isEnrichingAllCovers ? `Verificando (${enrichAllProgress.current}/${enrichAllProgress.total})` : 'Scan Acervo'}
             </span>
           </button>
 
@@ -2301,10 +2404,10 @@ export default function App() {
                   onClick={handleEnrichAllPlaylistsCovers}
                   disabled={isEnrichingAllCovers}
                   className="text-xs font-bold text-[#1DB954] hover:underline flex items-center gap-1.5 transition disabled:opacity-50 bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-full border border-white/10"
-                  title="Atualizar capas oficiais e verificar se há músicas quebradas em todas as playlists"
+                  title="Scan Inteligente: atualiza capas HD e verifica integridade pulando o que já foi atualizado"
                 >
                   <Sparkles size={14} className={isEnrichingAllCovers ? "animate-spin" : ""} />
-                  <span>{isEnrichingAllCovers ? `Atualizando (${enrichAllProgress.current}/${enrichAllProgress.total})...` : 'Atualizar'}</span>
+                  <span>{isEnrichingAllCovers ? `Verificando (${enrichAllProgress.current}/${enrichAllProgress.total})...` : 'Verificar Acervo'}</span>
                 </button>
                 <button
                   onClick={() => setIsImportModalOpen(true)}
@@ -2380,24 +2483,32 @@ export default function App() {
               ))}
             </div>
 
-            {/* Seção Músicas em Destaque (Referência Rápida) */}
+            {/* Seção Sugestões de Músicas Baseadas nas Playlists (Aleatórias e Diversificadas) */}
             <div className="space-y-4 pt-4">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                    Músicas em Destaque
-                    <span className="text-xs font-normal text-neutral-400">(Referência)</span>
+                    Sugestões Para Você
+                    <span className="text-xs font-normal text-neutral-400">(Baseadas nas suas playlists)</span>
                   </h3>
                 </div>
+                <button
+                  onClick={handleShuffleSuggestions}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-neutral-300 hover:text-white hover:bg-white/10 px-3 py-1.5 rounded-full border border-white/10 transition active:scale-95 shadow-sm"
+                  title="Sortear novas sugestões aleatórias"
+                >
+                  <RefreshCw size={13} className="text-[#1DB954]" />
+                  <span>Novas Sugestões</span>
+                </button>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                {featuredSongs.map((song, idx) => {
+                {suggestedSongs.map((song, idx) => {
                   const isCurrent = currentSong.id === song.id;
                   const plays = playCounts[song.id] || 0;
                   return (
                     <div
                       key={`${song.id}-${idx}`}
-                      onClick={() => playSong(song, featuredSongs)}
+                      onClick={() => playSong(song, suggestedSongs)}
                       className={`flex items-center justify-between p-3 rounded-xl transition cursor-pointer group ${
                         isCurrent ? 'bg-white/10' : 'hover:bg-[#1e1e1e]'
                       }`}

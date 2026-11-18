@@ -80,11 +80,20 @@ export async function downloadImageFile(imageUrl: string, filename: string): Pro
 }
 
 // Varre e enriquece todas as músicas de uma playlist com capas reais individuais
+// Pula automaticamente playlists e faixas que já foram atualizadas anteriormente
 export async function enrichPlaylistTracks(
   playlist: Playlist,
   onProgress?: (done: number, total: number) => void
 ): Promise<Playlist> {
   const songs = [...(playlist.songs || [])];
+
+  // Se a playlist já foi enriquecida e nenhuma música possui capa genérica/compartilhada, pula na hora
+  const hasUnenrichedSong = songs.some((s) => !s.thumbnail || s.thumbnail === playlist.cover);
+  if (!hasUnenrichedSong && playlist.coversEnriched) {
+    if (onProgress) onProgress(songs.length, songs.length);
+    return playlist;
+  }
+
   const updatedSongs: Song[] = [];
 
   for (let i = 0; i < songs.length; i++) {
@@ -104,6 +113,7 @@ export async function enrichPlaylistTracks(
         updatedSongs.push(s);
       }
     } else {
+      // Já possui capa oficial própria atualizada anteriormente: não faz requisição
       updatedSongs.push(s);
     }
 
@@ -114,6 +124,7 @@ export async function enrichPlaylistTracks(
 
   return {
     ...playlist,
+    coversEnriched: true,
     songs: updatedSongs
   };
 }
