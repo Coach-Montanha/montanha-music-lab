@@ -16,6 +16,7 @@ export interface Playlist {
   cover: string;
   songs: Song[];
   isCustom?: boolean;
+  updatedAt?: number;
 }
 
 export interface SearchAlbum {

@@ -48,7 +48,15 @@ import {
 
 import { Song, Playlist, SearchAlbum, SearchArtist, SearchPlaylist, CategorizedSearchResults } from './types';
 import { storeOfflineBlob, getOfflineBlob, deleteOfflineBlob } from './lib/offlineDb';
-import { supabase, syncCloudPlaylists, fetchCloudPlaylists } from './lib/supabase';
+import {
+  supabase,
+  syncCloudPlaylists,
+  fetchCloudPlaylists,
+  smartMergePlaylists,
+  broadcastLibraryChange,
+  subscribeToLibraryChanges,
+  getCanonicalUserId
+} from './lib/supabase';
 import { extractPlaylistFromUrl } from './lib/playlistExtractor';
 import { universalSearch, searchCategorized, fetchEntityTracks } from './lib/searchEngine';
 import { AuthModal } from './components/AuthModal';
@@ -128,9 +136,10 @@ const INITIAL_PLAYLISTS: Playlist[] = [
   }
 ];
 
-function getUserPlaylistStorageKey(userId?: string | null): string {
-  if (!userId) return 'able_playlists_guest';
-  return `able_playlists_${userId}`;
+function getUserPlaylistStorageKey(userId?: string | null, email?: string | null): string {
+  if (!userId && !email) return 'able_playlists_guest';
+  const canonical = getCanonicalUserId(userId, email);
+  return `able_playlists_${canonical}`;
 }
 
 function loadInitialUserPlaylists(user: any): Playlist[] {
@@ -143,16 +152,22 @@ function loadInitialUserPlaylists(user: any): Playlist[] {
     }
   }
 
-  const userKey = getUserPlaylistStorageKey(user.id);
+  const userKey = getUserPlaylistStorageKey(user.id, user.email);
   try {
     const stored = localStorage.getItem(userKey);
     if (stored) {
       const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     }
-    // Migração de compatibilidade retroativa para a conta pioneira do Alberto
-    if (user.email === 'albertosarly@gmail.com') {
-      const legacy = localStorage.getItem('able_playlists_v2');
+    // Migração de compatibilidade retroativa para as chaves anteriores do Alberto (Edge, Motorola, V2)
+    const possibleKeys = [
+      'able_playlists_4541d773-99e4-4eda-9ff3-69c44a491764',
+      'able_playlists_08fd3ca5-dc9a-4363-be88-9847c648cd6c',
+      'able_playlists_d6e21a10-65dc-426b-a61e-62a03fe871d2',
+      'able_playlists_v2'
+    ];
+    for (const legacyKey of possibleKeys) {
+      const legacy = localStorage.getItem(legacyKey);
       if (legacy) {
         const parsedLegacy = JSON.parse(legacy);
         if (Array.isArray(parsedLegacy) && parsedLegacy.length > 0) {
@@ -161,7 +176,6 @@ function loadInitialUserPlaylists(user: any): Playlist[] {
         }
       }
     }
-    // Qualquer novo perfil (login e senha diferente): biblioteca limpa e estritamente isolada
     return [];
   } catch {
     return [];
@@ -439,16 +453,19 @@ export default function App() {
     } catch {}
     showToast(`Conectado como ${user.email}!`);
 
-    const userKey = getUserPlaylistStorageKey(user.id);
+    const userKey = getUserPlaylistStorageKey(user.id, user.email);
     const cachedUserPls = loadInitialUserPlaylists(user);
 
     try {
       // 1. Tenta carregar playlists exclusivas deste perfil na nuvem
-      const cloudPls = await fetchCloudPlaylists(user.id);
+      const cloudPls = await fetchCloudPlaylists(user.id, user.email);
       if (cloudPls && Array.isArray(cloudPls) && cloudPls.length > 0) {
-        setPlaylists(cloudPls);
+        setPlaylists((prev) => {
+          const merged = smartMergePlaylists(prev, cloudPls);
+          try { localStorage.setItem(userKey, JSON.stringify(merged)); } catch {}
+          return merged;
+        });
         isCloudLoadedRef.current = true;
-        try { localStorage.setItem(userKey, JSON.stringify(cloudPls)); } catch {}
       } else {
         // Usuário novo ou sem acervo na nuvem: define sua própria biblioteca isolada (NUNCA herda de outros)
         setPlaylists(cachedUserPls);
@@ -469,20 +486,24 @@ export default function App() {
     }
 
     setIsSyncingCloud(true);
-    showToast('Buscando suas playlists na nuvem...');
+    showToast('Sincronizando com a nuvem...');
     try {
-      const cloudPls = await fetchCloudPlaylists(currentUser.id);
-      const userKey = getUserPlaylistStorageKey(currentUser.id);
+      const cloudPls = await fetchCloudPlaylists(currentUser.id, currentUser.email);
+      const userKey = getUserPlaylistStorageKey(currentUser.id, currentUser.email);
 
       if (cloudPls && Array.isArray(cloudPls) && cloudPls.length > 0) {
-        setPlaylists(cloudPls);
+        setPlaylists((prev) => {
+          const merged = smartMergePlaylists(prev, cloudPls);
+          try { localStorage.setItem(userKey, JSON.stringify(merged)); } catch {}
+          return merged;
+        });
         isCloudLoadedRef.current = true;
-        try { localStorage.setItem(userKey, JSON.stringify(cloudPls)); } catch {}
-        showToast(`🎉 ${cloudPls.length} playlists sincronizadas do seu perfil!`);
+        showToast(`🎉 ${cloudPls.length} playlists sincronizadas em tempo real!`);
       } else {
         if (playlists.length > 0) {
           // Se o usuário já criou playlists locais neste perfil, sobe para sua nuvem
-          await syncCloudPlaylists(currentUser.id, playlists);
+          await syncCloudPlaylists(currentUser.id, playlists, false, currentUser.email);
+          broadcastLibraryChange(currentUser.id, playlists.length);
           showToast(`Playlists enviadas para a sua nuvem! (${playlists.length} playlists)`);
         } else {
           showToast('Nenhuma playlist encontrada na sua conta.');
@@ -506,12 +527,15 @@ export default function App() {
           setPlayCounts((prev) => ({ ...prev, ...u.user_metadata.able_play_counts }));
         }
 
-        const userKey = getUserPlaylistStorageKey(u.id);
-        fetchCloudPlaylists(u.id).then((cloudPls) => {
+        const userKey = getUserPlaylistStorageKey(u.id, u.email);
+        fetchCloudPlaylists(u.id, u.email).then((cloudPls) => {
           if (cloudPls && Array.isArray(cloudPls) && cloudPls.length > 0) {
-            setPlaylists(cloudPls);
+            setPlaylists((prev) => {
+              const merged = smartMergePlaylists(prev, cloudPls);
+              try { localStorage.setItem(userKey, JSON.stringify(merged)); } catch {}
+              return merged;
+            });
             isCloudLoadedRef.current = true;
-            try { localStorage.setItem(userKey, JSON.stringify(cloudPls)); } catch {}
           }
         }).catch(() => {});
       }
@@ -533,12 +557,15 @@ export default function App() {
           setPlayCounts((prev) => ({ ...prev, ...u.user_metadata.able_play_counts }));
         }
 
-        const userKey = getUserPlaylistStorageKey(u.id);
-        fetchCloudPlaylists(u.id).then((cloudPls) => {
+        const userKey = getUserPlaylistStorageKey(u.id, u.email);
+        fetchCloudPlaylists(u.id, u.email).then((cloudPls) => {
           if (cloudPls && Array.isArray(cloudPls) && cloudPls.length > 0) {
-            setPlaylists(cloudPls);
+            setPlaylists((prev) => {
+              const merged = smartMergePlaylists(prev, cloudPls);
+              try { localStorage.setItem(userKey, JSON.stringify(merged)); } catch {}
+              return merged;
+            });
             isCloudLoadedRef.current = true;
-            try { localStorage.setItem(userKey, JSON.stringify(cloudPls)); } catch {}
           }
         }).catch(() => {});
       }
@@ -546,6 +573,49 @@ export default function App() {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // SINCRONIZAÇÃO EM TEMPO REAL AUTOMÁTICA ENTRE DISPOSITIVOS (NOTEBOOK <-> CELULAR)
+  useEffect(() => {
+    if (!currentUser?.id) return;
+
+    // 1. Canal Realtime Broadcast do Supabase (WebSocket Instantâneo)
+    const unsubscribe = subscribeToLibraryChanges(currentUser.id, async () => {
+      console.log('[Realtime Auto-Sync] Notificação de biblioteca modificada recebida de outro dispositivo.');
+      const cloudPls = await fetchCloudPlaylists(currentUser.id, currentUser.email);
+      if (cloudPls && Array.isArray(cloudPls) && cloudPls.length > 0) {
+        setPlaylists((prev) => {
+          const merged = smartMergePlaylists(prev, cloudPls);
+          const userKey = getUserPlaylistStorageKey(currentUser.id, currentUser.email);
+          try { localStorage.setItem(userKey, JSON.stringify(merged)); } catch {}
+          return merged;
+        });
+      }
+    });
+
+    // 2. Ao desbloquear a tela do celular ou retornar o foco na aba
+    const handleVisibilityOrFocus = async () => {
+      if (document.visibilityState === 'visible') {
+        const cloudPls = await fetchCloudPlaylists(currentUser.id, currentUser.email);
+        if (cloudPls && Array.isArray(cloudPls) && cloudPls.length > 0) {
+          setPlaylists((prev) => {
+            const merged = smartMergePlaylists(prev, cloudPls);
+            const userKey = getUserPlaylistStorageKey(currentUser.id, currentUser.email);
+            try { localStorage.setItem(userKey, JSON.stringify(merged)); } catch {}
+            return merged;
+          });
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+
+    return () => {
+      unsubscribe();
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+    };
+  }, [currentUser]);
 
   // Músicas em Destaque (Lista de Referência Estável do Acervo Montanha)
   const featuredSongs = useMemo(() => {
@@ -560,17 +630,28 @@ export default function App() {
     return Array.from(allSongsMap.values()).slice(0, 9);
   }, [playlists]);
 
-  // Persistência Imediata de Playlists no LocalStorage e Nuvem Isolada por Perfil
+  const syncDebounceRef = useRef<any>(null);
+
+  // Persistência Imediata de Playlists no LocalStorage e Auto-Sync para Nuvem & Outros Aparelhos
   useEffect(() => {
-    const userKey = getUserPlaylistStorageKey(currentUser?.id);
+    const userKey = getUserPlaylistStorageKey(currentUser?.id, currentUser?.email);
     try {
       localStorage.setItem(userKey, JSON.stringify(playlists));
     } catch {}
 
-    // TRAVA ANTI-ZERAMENTO & ISOLAMENTO: Sincroniza na nuvem estritamente se houver usuário autenticado
+    // AUTO-SYNC EM SEGUNDO PLANO (DEBOUNCE 700ms):
+    // Sobe para o armazenamento qualquer alteração (nova música, exclusão, capas ou reordenação)
     if (currentUser?.id && playlists.length > 0 && isCloudLoadedRef.current) {
-      syncCloudPlaylists(currentUser.id, playlists);
+      if (syncDebounceRef.current) clearTimeout(syncDebounceRef.current);
+      syncDebounceRef.current = setTimeout(async () => {
+        await syncCloudPlaylists(currentUser.id, playlists, false, currentUser.email);
+        broadcastLibraryChange(currentUser.id, playlists.length);
+      }, 700);
     }
+
+    return () => {
+      if (syncDebounceRef.current) clearTimeout(syncDebounceRef.current);
+    };
   }, [playlists, currentUser]);
 
   useEffect(() => {
@@ -1410,7 +1491,14 @@ export default function App() {
 
   // EXCLUIR PLAYLIST (Qualquer Playlist)
   const handleDeletePlaylist = (playlistId: string) => {
-    setPlaylists((prev) => prev.filter((p) => p.id !== playlistId));
+    setPlaylists((prev) => {
+      const next = prev.filter((p) => p.id !== playlistId);
+      if (currentUser?.id) {
+        syncCloudPlaylists(currentUser.id, next, true, currentUser.email);
+        broadcastLibraryChange(currentUser.id, next.length);
+      }
+      return next;
+    });
     setSelectedPlaylist(null);
     showToast('Playlist excluída com sucesso.');
   };
@@ -1554,7 +1642,7 @@ export default function App() {
           }
           const nextSongs = [...pl.songs, songToAddToPlaylist];
           showToast(`"${songToAddToPlaylist.name}" adicionada a "${pl.name}"!`);
-          return { ...pl, songs: nextSongs };
+          return { ...pl, updatedAt: Date.now(), songs: nextSongs };
         }
         return pl;
       })
@@ -1569,7 +1657,7 @@ export default function App() {
     setPlaylists((prev) =>
       prev.map((pl) => {
         if (pl.id === playlistId) {
-          return { ...pl, songs: pl.songs.filter((s) => s.id !== songId) };
+          return { ...pl, updatedAt: Date.now(), songs: pl.songs.filter((s) => s.id !== songId) };
         }
         return pl;
       })
@@ -1578,6 +1666,7 @@ export default function App() {
     if (selectedPlaylist?.id === playlistId) {
       setSelectedPlaylist({
         ...selectedPlaylist,
+        updatedAt: Date.now(),
         songs: selectedPlaylist.songs.filter((s) => s.id !== songId)
       });
     }
@@ -1593,7 +1682,7 @@ export default function App() {
     setPlaylists((prev) =>
       prev.map((pl) => {
         if (pl.id === playlistId) {
-          return { ...pl, songs: pl.songs.filter((s) => !toRemove.has(s.id)) };
+          return { ...pl, updatedAt: Date.now(), songs: pl.songs.filter((s) => !toRemove.has(s.id)) };
         }
         return pl;
       })
@@ -1602,6 +1691,7 @@ export default function App() {
     if (selectedPlaylist?.id === playlistId) {
       setSelectedPlaylist({
         ...selectedPlaylist,
+        updatedAt: Date.now(),
         songs: selectedPlaylist.songs.filter((s) => !toRemove.has(s.id))
       });
     }
@@ -1636,7 +1726,7 @@ export default function App() {
           const reordered = [...pl.songs];
           const [moved] = reordered.splice(fromIndex, 1);
           reordered.splice(toIndex, 0, moved);
-          return { ...pl, songs: reordered };
+          return { ...pl, updatedAt: Date.now(), songs: reordered };
         }
         return pl;
       })
@@ -1648,6 +1738,7 @@ export default function App() {
       reordered.splice(toIndex, 0, moved);
       setSelectedPlaylist({
         ...selectedPlaylist,
+        updatedAt: Date.now(),
         songs: reordered
       });
     }
