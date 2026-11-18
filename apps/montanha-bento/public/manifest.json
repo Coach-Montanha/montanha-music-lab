@@ -1,6 +1,6 @@
 {
   "name": "Montanha Music Lab",
-  "short_name": "Montanha Music",
+  "short_name": "Montanha Music Lab",
   "description": "Montanha Music Lab • Streaming & Playlists sem limites, integrado ao Ecossistema Montanha",
   "start_url": "/",
   "display": "standalone",
@@ -8,20 +8,22 @@
   "theme_color": "#121212",
   "icons": [
     {
-      "src": "/music.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
-    },
-    {
       "src": "/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
       "src": "/icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/montanha-music-lab.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
     }
   ]
 }

@@ -22,7 +22,7 @@ export function AuthGateway({ onSuccess }: AuthGatewayProps) {
 
     const cleanEmail = email.trim().includes('@')
       ? email.trim()
-      : `${email.trim().toLowerCase()}@ablemusic.app`;
+      : `${email.trim().toLowerCase()}@montanhamusic.app`;
 
     try {
       if (isRegister) {
@@ -79,8 +79,8 @@ export function AuthGateway({ onSuccess }: AuthGatewayProps) {
         
         {/* CABEÇALHO DO GATEWAY */}
         <div className="text-center space-y-3">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-[#1DB954] text-black shadow-[0_10px_30px_rgba(29,185,84,0.4)] p-3">
-            <img src="/music.svg" alt="Montanha Music Lab" className="w-full h-full object-contain" />
+          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-white/5 border border-white/10 shadow-[0_10px_30px_rgba(29,185,84,0.2)] p-2">
+            <img src="/icon-192.png" alt="Montanha Music Lab" className="w-full h-full object-contain drop-shadow" />
           </div>
           <div>
             <h2 className="text-2xl font-black text-white tracking-tight flex items-center justify-center gap-2">

@@ -1,8 +1,8 @@
 {
-  "name": "able-music-player",
+  "name": "montanha-music-lab",
   "private": true,
   "version": "1.0.0",
-  "description": "Able Music Player - A YouTube Music like app with a Spotify like design, ad free, open source",
+  "description": "Montanha Music Lab • Streaming & Playlists sem limites, integrado ao Ecossistema Montanha",
   "author": "Coach Montanha",
   "type": "module",
   "scripts": {

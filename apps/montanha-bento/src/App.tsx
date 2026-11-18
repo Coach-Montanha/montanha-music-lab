@@ -82,7 +82,7 @@ const INITIAL_PLAYLISTS: Playlist[] = [
   {
     id: "sp-pl-running",
     name: "Running",
-    creator: "Able Player",
+    creator: "Montanha Music Lab",
     cover: "https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?w=600&q=80",
     songs: [
       { id: "run-1", name: "Till I Collapse", artist: "Eminem, Nate Dogg", youtubeId: "ytQ5CYE1VZw", thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80", duration: 297 },
@@ -94,7 +94,7 @@ const INITIAL_PLAYLISTS: Playlist[] = [
   {
     id: "sp-pl-cth-dance",
     name: "CTH 2.0 Dance",
-    creator: "Able Player",
+    creator: "Montanha Music Lab",
     cover: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600&q=80",
     songs: [
       { id: "dance-1", name: "Put Your Hands Up For Detroit", artist: "Fedde Le Grand", youtubeId: "SYs2HGYbr28", thumbnail: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=400&q=80", duration: 150 },
@@ -105,7 +105,7 @@ const INITIAL_PLAYLISTS: Playlist[] = [
   {
     id: "sp-pl-cth-2",
     name: "CTH 2.0",
-    creator: "Able Player",
+    creator: "Montanha Music Lab",
     cover: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=600&q=80",
     songs: [
       { id: "cth-1", name: "The Way I Am", artist: "Eminem", youtubeId: "mQvteoFiMlg", thumbnail: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=400&q=80", duration: 290 },
@@ -115,7 +115,7 @@ const INITIAL_PLAYLISTS: Playlist[] = [
   {
     id: "sp-pl-my-workout",
     name: "My Workout",
-    creator: "Able Player",
+    creator: "Montanha Music Lab",
     cover: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600&q=80",
     songs: [
       { id: "wod-1", name: "Remember the Name", artist: "Fort Minor", youtubeId: "VDvr08sCPOc", thumbnail: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=400&q=80", duration: 230 },
@@ -126,7 +126,7 @@ const INITIAL_PLAYLISTS: Playlist[] = [
   {
     id: "sp-pl-barbecue-rock",
     name: "Barbecue Rock",
-    creator: "Able Player",
+    creator: "Montanha Music Lab",
     cover: "https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=600&q=80",
     songs: [
       { id: "rock-1", name: "Back in Black", artist: "AC/DC", youtubeId: "pAgnJDJN4VA", thumbnail: "https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=400&q=80", duration: 255 },
@@ -137,15 +137,15 @@ const INITIAL_PLAYLISTS: Playlist[] = [
 ];
 
 function getUserPlaylistStorageKey(userId?: string | null, email?: string | null): string {
-  if (!userId && !email) return 'able_playlists_guest';
+  if (!userId && !email) return 'montanha_playlists_guest';
   const canonical = getCanonicalUserId(userId, email);
-  return `able_playlists_${canonical}`;
+  return `montanha_playlists_${canonical}`;
 }
 
 function loadInitialUserPlaylists(user: any): Playlist[] {
   if (!user?.id) {
     try {
-      const stored = localStorage.getItem('able_playlists_guest');
+      const stored = localStorage.getItem('montanha_playlists_guest') || localStorage.getItem('able_playlists_guest');
       return stored ? JSON.parse(stored) : INITIAL_PLAYLISTS;
     } catch {
       return INITIAL_PLAYLISTS;
@@ -159,8 +159,10 @@ function loadInitialUserPlaylists(user: any): Playlist[] {
       const parsed = JSON.parse(stored);
       if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     }
-    // Migração de compatibilidade retroativa para as chaves anteriores do Alberto (Edge, Motorola, V2)
+    // Migração de compatibilidade retroativa para as chaves anteriores
+    const canonical = getCanonicalUserId(user.id, user.email);
     const possibleKeys = [
+      `able_playlists_${canonical}`,
       'able_playlists_4541d773-99e4-4eda-9ff3-69c44a491764',
       'able_playlists_08fd3ca5-dc9a-4363-be88-9847c648cd6c',
       'able_playlists_d6e21a10-65dc-426b-a61e-62a03fe871d2',
@@ -303,7 +305,7 @@ export default function App() {
   // Músicas Indisponíveis (Com Falha de Áudio na Fonte) & Fluxo de Substituição
   const [unavailableSongIds, setUnavailableSongIds] = useState<string[]>(() => {
     try {
-      const stored = localStorage.getItem('able_unavailable_songs');
+      const stored = localStorage.getItem('montanha_unavailable_songs') || localStorage.getItem('able_unavailable_songs');
       return stored ? JSON.parse(stored) : [];
     } catch {
       return [];
@@ -313,7 +315,7 @@ export default function App() {
   // Músicas com Áudio Verificado e Funcional (Evita re-verificar faixas já atestadas)
   const [verifiedSongIds, setVerifiedSongIds] = useState<string[]>(() => {
     try {
-      const stored = localStorage.getItem('able_verified_songs');
+      const stored = localStorage.getItem('montanha_verified_songs') || localStorage.getItem('able_verified_songs');
       return stored ? JSON.parse(stored) : [];
     } catch {
       return [];
@@ -329,12 +331,18 @@ export default function App() {
     setUnavailableSongIds((prev) => {
       if (prev.includes(songId)) return prev;
       const updated = [...prev, songId];
-      try { localStorage.setItem('able_unavailable_songs', JSON.stringify(updated)); } catch {}
+      try {
+        localStorage.setItem('montanha_unavailable_songs', JSON.stringify(updated));
+        localStorage.setItem('able_unavailable_songs', JSON.stringify(updated));
+      } catch {}
       return updated;
     });
     setVerifiedSongIds((prev) => {
       const updated = prev.filter((id) => id !== songId);
-      try { localStorage.setItem('able_verified_songs', JSON.stringify(updated)); } catch {}
+      try {
+        localStorage.setItem('montanha_verified_songs', JSON.stringify(updated));
+        localStorage.setItem('able_verified_songs', JSON.stringify(updated));
+      } catch {}
       return updated;
     });
   };
@@ -342,13 +350,19 @@ export default function App() {
   const markSongAvailable = (songId: string) => {
     setUnavailableSongIds((prev) => {
       const updated = prev.filter((id) => id !== songId);
-      try { localStorage.setItem('able_unavailable_songs', JSON.stringify(updated)); } catch {}
+      try {
+        localStorage.setItem('montanha_unavailable_songs', JSON.stringify(updated));
+        localStorage.setItem('able_unavailable_songs', JSON.stringify(updated));
+      } catch {}
       return updated;
     });
     setVerifiedSongIds((prev) => {
       if (prev.includes(songId)) return prev;
       const updated = [...prev, songId];
-      try { localStorage.setItem('able_verified_songs', JSON.stringify(updated)); } catch {}
+      try {
+        localStorage.setItem('montanha_verified_songs', JSON.stringify(updated));
+        localStorage.setItem('able_verified_songs', JSON.stringify(updated));
+      } catch {}
       return updated;
     });
   };
@@ -445,7 +459,8 @@ export default function App() {
   // Favorites & Downloads
   const [favoriteSongIds, setFavoriteSongIds] = useState<string[]>(() => {
     try {
-      return JSON.parse(localStorage.getItem('able_favorites') || '["run-1"]');
+      const stored = localStorage.getItem('montanha_favorites') || localStorage.getItem('able_favorites');
+      return JSON.parse(stored || '["run-1"]');
     } catch {
       return ["run-1"];
     }
@@ -453,7 +468,8 @@ export default function App() {
 
   const [downloadedSongs, setDownloadedSongs] = useState<Song[]>(() => {
     try {
-      return JSON.parse(localStorage.getItem('able_downloads') || '[]');
+      const stored = localStorage.getItem('montanha_downloads') || localStorage.getItem('able_downloads');
+      return JSON.parse(stored || '[]');
     } catch {
       return [];
     }
@@ -719,12 +735,14 @@ export default function App() {
 
   useEffect(() => {
     try {
+      localStorage.setItem('montanha_favorites', JSON.stringify(favoriteSongIds));
       localStorage.setItem('able_favorites', JSON.stringify(favoriteSongIds));
     } catch {}
   }, [favoriteSongIds]);
 
   useEffect(() => {
     try {
+      localStorage.setItem('montanha_downloads', JSON.stringify(downloadedSongs));
       localStorage.setItem('able_downloads', JSON.stringify(downloadedSongs));
     } catch {}
   }, [downloadedSongs]);
@@ -2185,7 +2203,7 @@ export default function App() {
             mediaSessionController.updateMetadata({
               title: currentSongRef.current.name,
               artist: currentSongRef.current.artist,
-              album: currentSongRef.current.album || 'Able Music',
+              album: currentSongRef.current.album || 'Montanha Music Lab',
               artworkUrl: currentSongRef.current.thumbnail,
             });
           }
@@ -2268,8 +2286,8 @@ export default function App() {
           )}
 
           <div className="flex items-center gap-2.5 flex-shrink-0 select-none">
-            <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl bg-[#1DB954] text-black shadow-md p-1.5 flex-shrink-0">
-              <img src="/music.svg" alt="Montanha Music Lab" className="w-full h-full object-contain" />
+            <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-white/5 border border-white/10 shadow-lg p-1 flex-shrink-0">
+              <img src="/icon-192.png" alt="Montanha Music Lab" className="w-full h-full object-contain drop-shadow" />
             </div>
             <div className="flex flex-col justify-center leading-none">
               <span className="text-sm sm:text-base font-black tracking-tight text-white leading-none">Montanha</span>

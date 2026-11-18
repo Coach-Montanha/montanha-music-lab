@@ -31,7 +31,7 @@ export function AuthModal({ isOpen, onClose, currentUser, onUserChange, onSyncPl
     setSuccessMsg('');
     setLoading(true);
 
-    const cleanEmail = email.trim().includes('@') ? email.trim() : `${email.trim().toLowerCase()}@ablemusic.app`;
+    const cleanEmail = email.trim().includes('@') ? email.trim() : `${email.trim().toLowerCase()}@montanhamusic.app`;
 
     try {
       if (isRegister) {

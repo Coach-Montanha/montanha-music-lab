@@ -1,5 +1,5 @@
 // Service Worker para Montanha Music Lab PWA - Network First com Cache Estático Same-Origin
-const CACHE_NAME = 'montanha-music-v7';
+const CACHE_NAME = 'montanha-music-v8';
 
 self.addEventListener('install', () => {
   self.skipWaiting();
