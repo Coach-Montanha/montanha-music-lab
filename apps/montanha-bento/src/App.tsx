@@ -62,6 +62,7 @@ import { universalSearch, searchCategorized, fetchEntityTracks } from './lib/sea
 import { AuthModal } from './components/AuthModal';
 import { AuthGateway } from './components/AuthGateway';
 import { SettingsModal } from './components/SettingsModal';
+import { ReplaceSongModal } from './components/ReplaceSongModal';
 import { AudioScrubber } from './components/AudioScrubber';
 import { mediaSessionController } from './lib/mediaSession';
 import { audioAnchor } from './lib/audioAnchor';
@@ -371,15 +372,12 @@ export default function App() {
 
   const handleStartReplaceSong = (song: Song, playlistId?: string) => {
     setReplacingSongContext({ targetSong: song, playlistId });
-    setActiveTab('search');
-    setSearchQuery(`${song.name} ${song.artist}`);
-    handleSearch(`${song.name} ${song.artist}`);
-    showToast(`Buscando alternativas para "${song.name}". Escolha uma versão para substituir.`);
   };
 
-  const handleApplySongReplacement = (newSong: Song) => {
-    if (!replacingSongContext) return;
-    const { targetSong, playlistId } = replacingSongContext;
+  const handleApplySongReplacement = (newSong: Song, explicitTarget?: Song, explicitPlaylistId?: string) => {
+    const targetSong = explicitTarget || replacingSongContext?.targetSong;
+    const playlistId = explicitPlaylistId !== undefined ? explicitPlaylistId : replacingSongContext?.playlistId;
+    if (!targetSong) return;
 
     if (playlistId) {
       setPlaylists((prev) => {
@@ -402,6 +400,7 @@ export default function App() {
     }
 
     markSongAvailable(targetSong.id);
+    markSongAvailable(newSong.id);
     setReplacingSongContext(null);
     showToast(`"${newSong.name}" substituiu "${targetSong.name}" com sucesso!`);
   };
@@ -752,7 +751,9 @@ export default function App() {
   // Histórico e Botão Físico/Virtual Voltar (Navegação Segura no Mobile)
   useEffect(() => {
     const handlePopState = () => {
-      if (isQueueOpen) {
+      if (replacingSongContext) {
+        setReplacingSongContext(null);
+      } else if (isQueueOpen) {
         setIsQueueOpen(false);
       } else if (isFullScreenPlayer) {
         setIsFullScreenPlayer(false);
@@ -766,12 +767,13 @@ export default function App() {
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [selectedPlaylist, isFullScreenPlayer, isQueueOpen, isAuthModalOpen, isSettingsModalOpen]);
+  }, [selectedPlaylist, isFullScreenPlayer, isQueueOpen, isAuthModalOpen, isSettingsModalOpen, replacingSongContext]);
 
   // Tecla Escape para Fechamento Rápido no Desktop
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        if (replacingSongContext) setReplacingSongContext(null);
         if (isQueueOpen) setIsQueueOpen(false);
         if (isFullScreenPlayer) setIsFullScreenPlayer(false);
         if (isSettingsModalOpen) setIsSettingsModalOpen(false);
@@ -780,7 +782,7 @@ export default function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isQueueOpen, isFullScreenPlayer, isAuthModalOpen, isSettingsModalOpen]);
+  }, [isQueueOpen, isFullScreenPlayer, isAuthModalOpen, isSettingsModalOpen, replacingSongContext]);
 
   // Screen Wake Lock API (Evita que a tela do celular apague sozinha durante o treino / reprodução)
   useEffect(() => {
@@ -846,7 +848,7 @@ export default function App() {
         silentHoldRef.current = new SilentHoldKeeper(
           audioRef.current,
           {
-            strategy: 'silent-hold',
+            strategy: 'auto',
             hardPauseTimeoutMs: 15 * 60 * 1000
           },
           {
@@ -870,12 +872,15 @@ export default function App() {
     let interval: any = null;
     if (isPlaying) {
       interval = setInterval(() => {
+        if (!isPlayingRef.current || userInitiatedPauseRef.current || silentHoldRef.current?.isHolding()) {
+          return;
+        }
         if (audioRef.current && !audioRef.current.paused) {
           const cur = Math.floor(audioRef.current.currentTime);
           setCurrentTime(cur);
           if (audioRef.current.duration) {
             const dur = Math.floor(audioRef.current.duration);
-            if (dur > 0 && dur !== duration) {
+            if (dur > 1 && dur !== duration) {
               setDuration(dur);
             }
           }
@@ -2203,6 +2208,9 @@ export default function App() {
           zIndex: -1
         }}
         onPlaying={() => {
+          if (userInitiatedPauseRef.current || silentHoldRef.current?.isHolding()) {
+            return;
+          }
           isSwitchingRef.current = false;
           setIsPlaying(true);
           isPlayingRef.current = true;
@@ -2218,6 +2226,9 @@ export default function App() {
           }
         }}
         onTimeUpdate={() => {
+          if (!isPlayingRef.current || userInitiatedPauseRef.current || silentHoldRef.current?.isHolding()) {
+            return;
+          }
           if (audioRef.current) {
             const cur = Math.floor(audioRef.current.currentTime);
             setCurrentTime(cur);
@@ -2234,12 +2245,13 @@ export default function App() {
           }
         }}
         onLoadedMetadata={() => {
-          if (audioRef.current && audioRef.current.duration && Number.isFinite(audioRef.current.duration)) {
+          if (silentHoldRef.current?.isHolding()) return;
+          if (audioRef.current && audioRef.current.duration && Number.isFinite(audioRef.current.duration) && audioRef.current.duration > 1) {
             setDuration(Math.floor(audioRef.current.duration));
           }
         }}
         onEnded={() => {
-          if (isSwitchingRef.current) return;
+          if (silentHoldRef.current?.isHolding() || isSwitchingRef.current) return;
           const a = audioRef.current;
           // Prevenção contra falsos disparos imediatos (apenas se tiver menos de 1 segundo de reprodução)
           if (a && a.currentTime < 1 && a.duration > 5) {
@@ -2250,6 +2262,7 @@ export default function App() {
           handleNextSongRef.current();
         }}
         onPause={() => {
+          if (silentHoldRef.current?.isHolding()) return;
           const a = audioRef.current;
           if (!a || a.ended || isSwitchingRef.current) return;
           setIsPlaying(false);
@@ -3893,6 +3906,17 @@ export default function App() {
         }}
         onSyncPlaylists={handleForceCloudSync}
         downloadedCount={downloadedSongs.length}
+      />
+
+      {/* POP-UP MODAL DE SUBSTITUIÇÃO DE FAIXA INDISPONÍVEL */}
+      <ReplaceSongModal
+        isOpen={!!replacingSongContext}
+        onClose={() => setReplacingSongContext(null)}
+        targetSong={replacingSongContext?.targetSong || null}
+        playlistId={replacingSongContext?.playlistId}
+        onSelectReplacement={(targetSong, newSong, plId) => {
+          handleApplySongReplacement(newSong, targetSong, plId);
+        }}
       />
 
       {/* PAINEL LATERAL: FILA DE REPRODUÇÃO (QUEUE DRAWER) COM BACKDROP E DISMISSAL TOUCH-FRIENDLY */}
