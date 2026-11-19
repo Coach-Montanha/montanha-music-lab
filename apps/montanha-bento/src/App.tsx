@@ -15,7 +15,6 @@ import {
   Download,
   Plus,
   Home as HomeIcon,
-  Library as LibraryIcon,
   X,
   Music,
   Check,
@@ -188,7 +187,7 @@ function loadInitialUserPlaylists(user: any): Playlist[] {
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'home' | 'search' | 'playlists' | 'downloads'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'search' | 'downloads'>('home');
 
   // Usuário Conectado via Supabase (Persistência Imediata no Dispositivo para Zero Deslogamentos)
   const [currentUser, setCurrentUser] = useState<any>(() => {
@@ -2311,7 +2310,6 @@ export default function App() {
           {[
             { id: 'home', label: 'Início', icon: HomeIcon },
             { id: 'search', label: 'Buscar', icon: Search },
-            { id: 'playlists', label: 'Playlists', icon: LibraryIcon },
             { id: 'downloads', label: 'Downloads', icon: Download }
           ].map((item) => {
             const Icon = item.icon;
@@ -2337,17 +2335,7 @@ export default function App() {
         </nav>
 
         <div className="flex items-center gap-1.5 sm:gap-2.5">
-          {/* Botão Criar Playlist - Apenas telas médias/grandes (já presente na Home no mobile) */}
-          <button
-            onClick={() => setIsCreatePlaylistModalOpen(true)}
-            className="hidden md:flex items-center gap-1.5 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 px-3.5 py-2 text-xs font-bold text-white transition border border-white/10"
-            title="Criar Playlist"
-          >
-            <FolderPlus size={15} />
-            <span>Criar Playlist</span>
-          </button>
-
-          {/* Botão Scan e Verificação Inteligente do Acervo ao lado de Criar Playlist */}
+          {/* Botão Scan e Verificação Inteligente do Acervo */}
           <button
             onClick={handleEnrichAllPlaylistsCovers}
             disabled={isEnrichingAllCovers}
@@ -2422,13 +2410,6 @@ export default function App() {
               </div>
               <div className="flex items-center gap-3">
                 <button
-                  onClick={() => setIsCreatePlaylistModalOpen(true)}
-                  className="text-xs font-bold text-white hover:text-[#1DB954] flex items-center gap-1 transition"
-                >
-                  <Plus size={14} />
-                  <span>Criar Playlist</span>
-                </button>
-                <button
                   onClick={handleEnrichAllPlaylistsCovers}
                   disabled={isEnrichingAllCovers}
                   className="text-xs font-bold text-[#1DB954] hover:underline flex items-center gap-1.5 transition disabled:opacity-50 bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-full border border-white/10"
@@ -2449,6 +2430,17 @@ export default function App() {
 
             {/* Grid de Playlists */}
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              {/* Card Grande: Criar Nova Playlist */}
+              <div
+                onClick={() => setIsCreatePlaylistModalOpen(true)}
+                className="group flex flex-col items-center justify-center p-6 rounded-2xl border-2 border-dashed border-white/20 hover:border-[#1DB954] hover:bg-white/[0.04] transition duration-200 cursor-pointer aspect-square text-center bg-[#181818]/60 shadow-lg active:scale-98 select-none"
+              >
+                <div className="flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-full bg-white/10 group-hover:bg-[#1DB954] group-hover:text-black group-hover:scale-110 text-white transition duration-300 mb-3 shadow">
+                  <Plus size={26} strokeWidth={2.5} />
+                </div>
+                <h3 className="text-sm sm:text-base font-black text-white group-hover:text-[#1DB954] transition">Criar Playlist</h3>
+                <p className="text-[11px] text-neutral-400 mt-1 font-medium">Monte sua própria lista</p>
+              </div>
               {playlists.map((pl) => (
                 <div
                   key={pl.id}
@@ -2969,104 +2961,7 @@ export default function App() {
           </div>
         )}
 
-        {/* VIEW 3: PLAYLISTS */}
-        {activeTab === 'playlists' && !selectedPlaylist && (
-          <div className="space-y-6 max-w-6xl mx-auto">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-black text-white">Suas Playlists</h2>
-                <p className="text-xs text-neutral-400 mt-0.5">Gerencie, edite e crie suas listas de reprodução</p>
-              </div>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setIsCreatePlaylistModalOpen(true)}
-                  className="flex items-center gap-2 rounded-full bg-[#1DB954] px-4 py-2 text-xs font-bold text-black hover:bg-[#1ed760] transition shadow-lg"
-                >
-                  <Plus size={16} strokeWidth={2.5} />
-                  <span>Nova Playlist</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-              
-              {/* Card Criar Nova Playlist */}
-              <div
-                onClick={() => setIsCreatePlaylistModalOpen(true)}
-                className="group flex flex-col items-center justify-center p-6 rounded-2xl border-2 border-dashed border-white/20 hover:border-[#1DB954] transition cursor-pointer aspect-square text-center bg-[#181818]/50 hover:bg-[#181818]"
-              >
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/10 group-hover:bg-[#1DB954] group-hover:text-black transition mb-3">
-                  <Plus size={24} />
-                </div>
-                <h3 className="text-sm font-bold text-white group-hover:text-[#1DB954]">Criar Playlist</h3>
-                <p className="text-[11px] text-neutral-400 mt-1">Monte sua própria lista</p>
-              </div>
-
-              {playlists.map((pl) => (
-                <div
-                  key={pl.id}
-                  onClick={() => handleSelectPlaylist(pl)}
-                  className="group flex flex-col p-3 rounded-2xl bg-[#181818] hover:bg-[#282828] transition duration-200 cursor-pointer border border-white/5 relative"
-                >
-                  <div className="relative aspect-square w-full rounded-xl overflow-hidden mb-3 shadow-md">
-                    <img
-                      src={pl.cover || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&auto=format&fit=crop&q=60'}
-                      alt={pl.name}
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&auto=format&fit=crop&q=60';
-                      }}
-                      className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
-                    />
-                    {pl.isCustom && (
-                      <span className="absolute top-2 left-2 bg-[#1DB954] text-black text-[10px] font-black px-2 py-0.5 rounded-full shadow">
-                        Sua
-                      </span>
-                    )}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (pl.songs.length > 0) {
-                          if (isPlaying && pl.songs.some(s => s.id === currentSong.id)) {
-                            togglePlay();
-                          } else {
-                            handleSelectPlaylist(pl);
-                            playSong(pl.songs[0], pl.songs);
-                          }
-                        }
-                      }}
-                      className="absolute bottom-2.5 right-2.5 flex h-11 w-11 items-center justify-center rounded-full bg-[#1DB954] text-black shadow-2xl opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-all hover:scale-110 active:scale-95 z-10"
-                      title={`Tocar ${pl.name}`}
-                    >
-                      {isPlaying && pl.songs.some(s => s.id === currentSong.id) ? (
-                        <Pause size={18} fill="currentColor" />
-                      ) : (
-                        <Play size={18} fill="currentColor" className="ml-0.5" />
-                      )}
-                    </button>
-                  </div>
-                  <div className="flex items-start justify-between gap-1">
-                    <div className="min-w-0 flex-1">
-                      <h3 className="text-sm font-bold text-white truncate">{pl.name}</h3>
-                      <p className="text-xs text-neutral-400 truncate mt-0.5">{pl.songs.length} faixas • {pl.creator}</p>
-                    </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOpenEditPlaylist(pl);
-                      }}
-                      className="opacity-0 group-hover:opacity-100 p-1 text-neutral-400 hover:text-white transition"
-                      title="Editar Playlist"
-                    >
-                      <Edit2 size={14} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* VIEW 4: DOWNLOADS */}
+        {/* VIEW 3: DOWNLOADS */}
         {activeTab === 'downloads' && !selectedPlaylist && (
           <div className="space-y-6 max-w-4xl mx-auto">
             <div className="flex items-center justify-between">
@@ -4573,7 +4468,6 @@ export default function App() {
           {[
             { id: 'home', label: 'Início', icon: HomeIcon },
             { id: 'search', label: 'Buscar', icon: Search },
-            { id: 'playlists', label: 'Playlists', icon: LibraryIcon },
             { id: 'downloads', label: 'Downloads', icon: Download }
           ].map((item) => {
             const Icon = item.icon;
