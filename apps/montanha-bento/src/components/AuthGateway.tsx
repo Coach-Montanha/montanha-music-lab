@@ -74,7 +74,7 @@ export function AuthGateway({ onSuccess }: AuthGatewayProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-2xl transition-all duration-700 ease-out select-none">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pt-[env(safe-area-inset-top,16px)] pb-[env(safe-area-inset-bottom,16px)] bg-black/60 backdrop-blur-2xl transition-all duration-700 ease-out select-none">
       <div className="w-full max-w-md rounded-[32px] bg-[#181818]/95 border border-white/10 p-6 sm:p-8 space-y-6 shadow-[0_25px_70px_rgba(0,0,0,0.85)] relative animate-fade-in backdrop-blur-3xl">
         
         {/* CABEÇALHO DO GATEWAY */}

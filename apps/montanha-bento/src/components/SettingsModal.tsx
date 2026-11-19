@@ -227,7 +227,7 @@ export function SettingsModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 select-none animate-fade-in">
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 pt-[env(safe-area-inset-top,16px)] pb-[env(safe-area-inset-bottom,16px)] select-none animate-fade-in">
       <div className="w-full max-w-2xl rounded-3xl bg-[#181818] border border-white/10 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
         
         {/* HEADER DO MODAL */}

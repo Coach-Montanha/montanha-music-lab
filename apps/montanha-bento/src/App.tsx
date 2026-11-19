@@ -1937,23 +1937,30 @@ export default function App() {
 
   // IMPORTAÇÃO UNIVERSAL POR LINK (SPOTIFY OU YOUTUBE)
   const handleImportByUrl = async () => {
-    if (!importLinkInput.trim() || isImporting) return;
+    const raw = importLinkInput.trim();
+    if (!raw || isImporting) return;
+
+    if (raw.includes('spotify.com/artist') || raw.includes('/artist/')) {
+      showToast('Links de Artista não contêm lista direta de faixas. Por favor, cole o link de uma Playlist ou Álbum do artista!');
+      return;
+    }
+
     setIsImporting(true);
     setImportProgressText('Conectando ao Spotify / YouTube...');
 
     try {
-      setImportProgressText('Lendo metadados e faixas da playlist...');
-      const extracted = await extractPlaylistFromUrl(importLinkInput.trim());
+      setImportProgressText('Lendo metadados e faixas reais da playlist...');
+      const extracted = await extractPlaylistFromUrl(raw);
       if (extracted && extracted.songs && extracted.songs.length > 0) {
         const nextPlaylists = [extracted, ...playlists];
         setPlaylists(nextPlaylists);
         try {
-          const userKey = getUserPlaylistStorageKey(currentUser?.id);
+          const userKey = getUserPlaylistStorageKey(currentUser?.id, currentUser?.email);
           localStorage.setItem(userKey, JSON.stringify(nextPlaylists));
         } catch {}
         if (currentUser?.id) {
           isCloudLoadedRef.current = true;
-          syncCloudPlaylists(currentUser.id, nextPlaylists);
+          syncCloudPlaylists(currentUser.id, nextPlaylists, false, currentUser.email);
         }
         setIsImportModalOpen(false);
         setImportLinkInput('');
@@ -1961,7 +1968,7 @@ export default function App() {
         showToast(`Playlist "${extracted.name}" importada com sucesso (${extracted.songs.length} faixas)!`);
         return;
       } else {
-        showToast('Não foi possível importar faixas. Verifique se a playlist é pública.');
+        showToast('Não foi possível carregar as faixas. Verifique se a playlist ou perfil é público.');
       }
     } catch (e: any) {
       console.warn('Erro ao extrair playlist:', e);
@@ -2266,16 +2273,16 @@ export default function App() {
         }}
       />
 
-      {/* TOAST NOTIFICATION (Posicionado abaixo do Header para não cobrir botões) */}
+      {/* TOAST NOTIFICATION (Posicionado abaixo do Header seguro para não cobrir botões nem o notch) */}
       {toastMessage && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 rounded-full bg-[#282828] border border-white/10 px-5 py-2.5 text-xs font-semibold text-white shadow-2xl animate-fade-in flex items-center gap-2 pointer-events-none">
+        <div className="fixed top-[calc(4.5rem+env(safe-area-inset-top,0px))] left-1/2 -translate-x-1/2 z-50 rounded-full bg-[#282828] border border-white/10 px-5 py-2.5 text-xs font-semibold text-white shadow-2xl animate-fade-in flex items-center gap-2 pointer-events-none">
           <Check size={14} className="text-[#1DB954]" />
           <span>{toastMessage}</span>
         </div>
       )}
 
-      {/* TOP HEADER */}
-      <header className="flex h-16 shrink-0 items-center justify-between px-4 sm:px-6 border-b border-white/[0.06] bg-[#121212]/90 backdrop-blur-md z-10">
+      {/* TOP HEADER (Com proteção ativa contra notch/Dynamic Island do iPhone) */}
+      <header className="flex shrink-0 items-center justify-between px-4 sm:px-6 border-b border-white/[0.06] bg-[#121212]/90 backdrop-blur-md z-10 pt-[env(safe-area-inset-top,0px)] h-[calc(4rem+env(safe-area-inset-top,0px))]">
         <div className="flex items-center gap-3">
           {/* BOTÃO DE VOLTAR DE NAVEGAÇÃO NO HEADER */}
           {selectedPlaylist && (
@@ -2399,8 +2406,8 @@ export default function App() {
         </div>
       </header>
 
-      {/* MAIN VIEW CONTENT */}
-      <main className="flex-1 overflow-y-auto px-4 sm:px-8 py-6 pb-40">
+      {/* MAIN VIEW CONTENT (Com espaçamento inferior seguro para mini-player + barra de abas + home indicator) */}
+      <main className="flex-1 overflow-y-auto px-4 sm:px-8 py-6 pb-[calc(11rem+env(safe-area-inset-bottom,0px))]">
         
         {/* VIEW 1: HOME */}
         {activeTab === 'home' && !selectedPlaylist && (
@@ -3541,11 +3548,12 @@ export default function App() {
 
       {/* MODAL: CRIAR NOVA PLAYLIST */}
       {isCreatePlaylistModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 pt-[env(safe-area-inset-top,16px)] pb-[env(safe-area-inset-bottom,16px)]">
           <div className="w-full max-w-md rounded-3xl bg-[#1e1e1e] border border-white/10 p-6 sm:p-8 space-y-5 shadow-2xl relative">
             <button
               onClick={() => setIsCreatePlaylistModalOpen(false)}
-              className="absolute top-5 right-5 text-neutral-400 hover:text-white p-1"
+              className="absolute top-5 right-5 text-neutral-400 hover:text-white p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full hover:bg-white/10 transition"
+              aria-label="Fechar"
             >
               <X size={20} />
             </button>
@@ -3565,9 +3573,9 @@ export default function App() {
                 type="text"
                 value={newPlaylistTitle}
                 onChange={(e) => setNewPlaylistTitle(e.target.value)}
-                placeholder="Ex: Minhas Favoritas, Rock, etc..."
+                placeholder="Ex: Minhas Favoritas, Treino Pesado..."
                 autoFocus
-                className="h-12 w-full rounded-2xl bg-[#121212] border border-white/10 px-4 text-sm text-white placeholder-neutral-500 outline-none focus:border-[#1DB954] transition"
+                className="h-12 w-full rounded-2xl bg-[#121212] border border-white/10 px-4 text-base sm:text-sm text-white placeholder-neutral-500 outline-none focus:border-[#1DB954] transition"
               />
 
               <div className="flex gap-2">
@@ -3892,25 +3900,26 @@ export default function App() {
 
       {/* MODAL: IMPORTADOR UNIVERSAL DE PLAYLISTS (SPOTIFY & YOUTUBE) */}
       {isImportModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 pt-[env(safe-area-inset-top,16px)] pb-[env(safe-area-inset-bottom,16px)]">
           <div className="w-full max-w-lg rounded-3xl bg-[#1e1e1e] border border-white/10 p-6 sm:p-8 space-y-6 shadow-2xl relative">
             <button
               onClick={() => {
                 setIsImporting(false);
                 setIsImportModalOpen(false);
               }}
-              className="absolute top-5 right-5 text-neutral-400 hover:text-white p-1"
+              className="absolute top-5 right-5 text-neutral-400 hover:text-white p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full hover:bg-white/10 transition"
+              aria-label="Fechar"
             >
               <X size={20} />
             </button>
 
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#1DB954] text-black shadow-lg">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#1DB954] text-black shadow-lg flex-shrink-0">
                 <Link2 size={22} />
               </div>
               <div>
-                <h3 className="text-xl font-black text-white">Importar Playlist por Link</h3>
-                <p className="text-xs text-neutral-400">Cole o link público de qualquer playlist do Spotify ou YouTube</p>
+                <h3 className="text-xl font-black text-white">Importar por Link</h3>
+                <p className="text-xs text-neutral-400">Cole o link público de qualquer playlist, álbum ou artista do Spotify ou YouTube</p>
               </div>
             </div>
 
@@ -3918,14 +3927,14 @@ export default function App() {
               <div className="py-8 text-center space-y-4">
                 <Loader2 size={36} className="mx-auto text-[#1DB954] animate-spin" />
                 <p className="text-sm font-bold text-white">{importProgressText}</p>
-                <p className="text-xs text-neutral-400">Extraindo faixas reais e sincronizando com o player...</p>
+                <p className="text-xs text-neutral-400">Extraindo faixas reais e sincronizando com sua conta...</p>
                 <button
                   type="button"
                   onClick={() => {
                     setIsImporting(false);
                     setIsImportModalOpen(false);
                   }}
-                  className="mt-4 px-5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-semibold text-neutral-300 hover:text-white transition"
+                  className="mt-4 px-6 py-2.5 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 text-xs font-semibold text-neutral-300 hover:text-white transition"
                 >
                   Cancelar
                 </button>
@@ -3933,29 +3942,30 @@ export default function App() {
             ) : (
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-neutral-300">Link da Playlist:</label>
+                  <label className="text-xs font-bold text-neutral-300">Link do Spotify ou YouTube:</label>
                   <input
                     type="text"
                     value={importLinkInput}
                     onChange={(e) => setImportLinkInput(e.target.value)}
-                    placeholder="https://open.spotify.com/playlist/... ou https://www.youtube.com/playlist?list=..."
-                    className="h-12 w-full rounded-2xl bg-[#121212] border border-white/10 px-4 text-xs text-white placeholder-neutral-500 outline-none focus:border-[#1DB954] transition"
+                    placeholder="Cole o link da Playlist ou Álbum (Spotify ou YouTube)"
+                    className="h-12 w-full rounded-2xl bg-[#121212] border border-white/10 px-4 text-base sm:text-sm text-white placeholder-neutral-500 outline-none focus:border-[#1DB954] transition"
                   />
                 </div>
 
-                <div className="rounded-xl bg-white/5 p-3 text-xs text-neutral-400 space-y-1">
-                  <p className="font-semibold text-neutral-300">Formatos aceitos:</p>
-                  <p>• Spotify: https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M</p>
-                  <p>• YouTube: https://www.youtube.com/playlist?list=PLrAlX1vF51V... ou link do YouTube Music</p>
+                <div className="rounded-xl bg-white/5 p-3.5 text-xs text-neutral-400 space-y-1.5">
+                  <p className="font-bold text-neutral-200">Formatos aceitos:</p>
+                  <p>• <strong>Spotify</strong>: Playlists ou Álbuns (ex: <code>open.spotify.com/playlist/...</code> ou <code>/album/...</code>)</p>
+                  <p>• <strong>YouTube</strong>: Playlists do YouTube ou YouTube Music (<code>list=...</code>)</p>
+                  <p className="text-[11px] text-[#1DB954] pt-1">💡 <strong>Dica</strong>: No Spotify, toque nos 3 pontinhos (...) da playlist ou álbum &gt; Compartilhar &gt; Copiar link.</p>
                 </div>
 
                 <button
                   onClick={handleImportByUrl}
                   disabled={!importLinkInput.trim()}
-                  className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#1DB954] hover:bg-[#1ed760] py-3.5 text-xs font-bold text-black shadow-lg disabled:opacity-40 transition"
+                  className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#1DB954] hover:bg-[#1ed760] active:scale-98 min-h-[48px] py-3 text-sm font-bold text-black shadow-lg disabled:opacity-40 transition"
                 >
                   <Check size={16} />
-                  <span>Importar Playlist Agora</span>
+                  <span>Importar Agora</span>
                 </button>
               </div>
             )}
@@ -4000,7 +4010,7 @@ export default function App() {
             aria-label="Fechar Fila de Reprodução"
           />
 
-          <aside className="fixed top-0 bottom-16 sm:bottom-0 right-0 w-full sm:max-w-md bg-[#161616] border-l border-white/10 z-40 p-4 sm:p-6 flex flex-col shadow-2xl animate-fade-in select-none">
+          <aside className="fixed top-0 bottom-[calc(4rem+env(safe-area-inset-bottom,0px))] sm:bottom-0 right-0 w-full sm:max-w-md bg-[#161616] border-l border-white/10 z-40 p-4 sm:p-6 pt-[calc(1rem+env(safe-area-inset-top,0px))] pb-[calc(1rem+env(safe-area-inset-bottom,0px))] sm:pt-6 sm:pb-6 flex flex-col shadow-2xl animate-fade-in select-none">
             {/* CABEÇALHO DA FILA COM TOUCH TARGET SEGURO */}
             <div className="flex items-center justify-between pb-4 border-b border-white/10 flex-shrink-0">
               <div className="flex items-center gap-2.5">
@@ -4161,10 +4171,10 @@ export default function App() {
         </>
       )}
 
-      {/* MINI-PLAYER INFERIOR RESPONSIVO */}
+      {/* MINI-PLAYER INFERIOR RESPONSIVO (Posicionado logo acima da barra de navegação com respeito à safe area) */}
       <div
         onClick={() => setIsFullScreenPlayer(true)}
-        className="fixed bottom-16 sm:bottom-0 left-0 right-0 h-20 bg-[#181818] border-t border-white/[0.08] px-3.5 sm:px-6 flex items-center cursor-pointer z-30 hover:bg-[#202020] transition select-none"
+        className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom,0px))] sm:bottom-0 left-0 right-0 h-20 bg-[#181818] border-t border-white/[0.08] px-3.5 sm:px-6 flex items-center cursor-pointer z-30 hover:bg-[#202020] transition select-none"
       >
         {/* LAYOUT MOBILE (sm:hidden) - Limpo, Descomplicado e Sem Aperto */}
         <div className="flex sm:hidden items-center justify-between w-full gap-2">
@@ -4557,9 +4567,9 @@ export default function App() {
         </div>
       )}
 
-      {/* BOTTOM NAVIGATION TABS (Mobile - Oculto quando o player fullscreen está ativo) */}
+      {/* BOTTOM NAVIGATION TABS (Mobile - Oculto quando o player fullscreen está ativo, com suporte nativo ao Home Bar do iPhone) */}
       {!isFullScreenPlayer && (
-        <nav className="fixed bottom-0 left-0 right-0 h-16 bg-[#121212]/95 border-t border-white/[0.08] backdrop-blur-lg flex items-center justify-around z-40 sm:hidden">
+        <nav className="fixed bottom-0 left-0 right-0 h-[calc(4rem+env(safe-area-inset-bottom,0px))] pb-[env(safe-area-inset-bottom,0px)] bg-[#121212]/95 border-t border-white/[0.08] backdrop-blur-lg flex items-center justify-around z-40 sm:hidden">
           {[
             { id: 'home', label: 'Início', icon: HomeIcon },
             { id: 'search', label: 'Buscar', icon: Search },

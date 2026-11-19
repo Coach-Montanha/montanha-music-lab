@@ -272,9 +272,18 @@ export default defineConfig({
           const urlObj = new URL(req.url, 'http://localhost');
           const input = (urlObj.searchParams.get('url') || urlObj.searchParams.get('id') || '').trim();
 
-          const match = input.match(/(playlist|album|track)[/:]([a-zA-Z0-9]+)/i);
+          const match = input.match(/(playlist|album|track|artist)[/:]([a-zA-Z0-9]+)/i);
           const type = match ? match[1].toLowerCase() : 'playlist';
-          const playId = match ? match[2] : input.replace(/.*playlist\//, '').split('?')[0].replace(/[^a-zA-Z0-9]/g, '');
+          let playId = match ? match[2] : '';
+
+          if (!playId) {
+            const idMatch = input.match(/([a-zA-Z0-9]{22})/);
+            if (idMatch) {
+              playId = idMatch[1];
+            } else {
+              playId = input.replace(/.*playlist\//, '').split('?')[0].replace(/[^a-zA-Z0-9]/g, '');
+            }
+          }
 
           if (!playId) {
             res.statusCode = 400;
@@ -296,81 +305,129 @@ export default defineConfig({
             });
             clearTimeout(timeout);
 
-            if (!resp.ok) {
-              res.statusCode = resp.status;
-              res.end(JSON.stringify({ error: `Spotify embed retornou ${resp.status}` }));
-              return;
-            }
+            if (resp.ok) {
+              const html = await resp.text();
+              const matchScript = html.match(/<script id="__NEXT_DATA__" type="application\/json">(.*?)<\/script>/s);
 
-            const html = await resp.text();
-            const matchScript = html.match(/<script id="__NEXT_DATA__" type="application\/json">(.*?)<\/script>/s);
+              if (matchScript && matchScript[1]) {
+                const parsed = JSON.parse(matchScript[1]);
+                const entity = parsed?.props?.pageProps?.state?.data?.entity;
 
-            if (matchScript && matchScript[1]) {
-              const parsed = JSON.parse(matchScript[1]);
-              const entity = parsed?.props?.pageProps?.state?.data?.entity;
+                if (entity) {
+                  let name = entity.title || entity.name || (type === 'album' ? 'Álbum Spotify' : type === 'artist' ? 'Artista Spotify' : 'Playlist Spotify');
+                  if (type === 'artist' && !name.includes('Top') && !name.includes('Melhores')) {
+                    name = `${name} • Top Músicas`;
+                  }
+                  const creator = entity.owner?.name || entity.subtitle || (Array.isArray(entity.artists) ? entity.artists.map((a: any) => a.name).join(', ') : 'Spotify');
+                  const cover = entity.coverArt?.sources?.[0]?.url || entity.visualIdentity?.image?.[0]?.url || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80';
 
-              if (entity) {
-                const name = entity.title || entity.name || (type === 'album' ? 'Álbum Spotify' : 'Playlist Spotify');
-                const creator = entity.owner?.name || entity.subtitle || (Array.isArray(entity.artists) ? entity.artists.map((a: any) => a.name).join(', ') : 'Spotify');
-                const cover = entity.coverArt?.sources?.[0]?.url || entity.visualIdentity?.image?.[0]?.url || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80';
-                const rawTracks = entity.trackList || entity.tracks || [];
+                  let songs: any[] = [];
 
-                const songs = rawTracks.map((t: any, idx: number) => {
-                  const trackThumb =
-                    t.album?.coverArt?.sources?.[0]?.url ||
-                    t.album?.images?.[0]?.url ||
-                    t.coverArt?.sources?.[0]?.url ||
-                    t.visualIdentity?.image?.[0]?.url ||
-                    t.images?.[0]?.url ||
-                    (t.album?.id ? `https://i.scdn.co/image/${t.album.id}` : null) ||
-                    cover;
+                  if (entity.type === 'track') {
+                    songs = [{
+                      id: `sp-${entity.id || playId}-${Date.now()}`,
+                      name: entity.name || entity.title || 'Música',
+                      artist: Array.isArray(entity.artists) ? entity.artists.map((a: any) => a.name).join(', ') : creator,
+                      album: entity.album?.name || 'Single',
+                      thumbnail: entity.visualIdentity?.image?.[0]?.url || cover,
+                      duration: Math.round((entity.duration || 180000) / 1000)
+                    }];
+                  } else {
+                    const rawTracks = entity.trackList || entity.tracks || [];
+                    songs = rawTracks.map((t: any, idx: number) => {
+                      const trackThumb =
+                        t.album?.coverArt?.sources?.[0]?.url ||
+                        t.album?.images?.[0]?.url ||
+                        t.coverArt?.sources?.[0]?.url ||
+                        t.visualIdentity?.image?.[0]?.url ||
+                        t.images?.[0]?.url ||
+                        (t.album?.id ? `https://i.scdn.co/image/${t.album.id}` : null) ||
+                        cover;
 
-                  return {
-                    id: `sp-${t.id || idx}-${Date.now()}`,
-                    name: t.title || t.name || 'Música',
-                    artist: t.subtitle || (Array.isArray(t.artists) ? t.artists.map((a: any) => a.name).join(', ') : 'Artista'),
-                    album: t.album?.name || name,
-                    thumbnail: trackThumb,
-                    duration: Math.round((t.duration || 180000) / 1000)
-                  };
-                });
+                      return {
+                        id: `sp-${t.id || idx}-${Date.now()}`,
+                        name: t.title || t.name || 'Música',
+                        artist: t.subtitle || (Array.isArray(t.artists) ? t.artists.map((a: any) => a.name).join(', ') : creator),
+                        album: t.album?.name || name,
+                        thumbnail: trackThumb,
+                        duration: Math.round((t.duration || 180000) / 1000)
+                      };
+                    });
+                  }
 
-                if (songs.length > 0) {
-                  res.statusCode = 200;
-                  res.end(JSON.stringify({ name, creator, cover, songs }));
-                  return;
+                  if (songs.length > 0) {
+                    res.statusCode = 200;
+                    res.end(JSON.stringify({ name, creator, cover, songs }));
+                    return;
+                  }
                 }
               }
             }
 
-            // Fallback oEmbed
+            // Fallback inteligente: consulta oEmbed e busca faixas no Deezer
+            let fallbackTitle = '';
+            let fallbackCover = '';
             try {
               const oembedRes = await fetch(`https://open.spotify.com/oembed?url=https://open.spotify.com/${type}/${playId}`, {
                 headers: { 'User-Agent': 'Mozilla/5.0' }
               });
               if (oembedRes.ok) {
                 const oembed = await oembedRes.json();
-                res.statusCode = 200;
-                res.end(JSON.stringify({
-                  name: oembed.title || 'Playlist Spotify',
-                  creator: 'Spotify',
-                  cover: oembed.thumbnail_url || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80',
-                  songs: [
-                    {
-                      id: `sp-track-${playId}-${Date.now()}`,
-                      name: oembed.title || 'Faixa Principal',
-                      artist: 'Spotify',
-                      thumbnail: oembed.thumbnail_url || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80',
-                      duration: 210
-                    }
-                  ]
-                }));
-                return;
+                fallbackTitle = oembed.title || '';
+                fallbackCover = oembed.thumbnail_url || '';
               }
             } catch {}
 
+            if (type === 'track' && fallbackTitle) {
+              res.statusCode = 200;
+              res.end(JSON.stringify({
+                name: fallbackTitle,
+                creator: 'Spotify',
+                cover: fallbackCover || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80',
+                songs: [{
+                  id: `sp-track-${playId}-${Date.now()}`,
+                  name: fallbackTitle,
+                  artist: 'Spotify',
+                  thumbnail: fallbackCover,
+                  duration: 210
+                }]
+              }));
+              return;
+            }
+
+            if (fallbackTitle) {
+              try {
+                const queryTerm = type === 'artist' ? `artist:"${fallbackTitle}"` : fallbackTitle;
+                const dzRes = await fetch(`https://api.deezer.com/search?q=${encodeURIComponent(queryTerm)}&limit=30`, {
+                  signal: AbortSignal.timeout(5000)
+                });
+                if (dzRes.ok) {
+                  const dzData = await dzRes.json();
+                  if (Array.isArray(dzData.data) && dzData.data.length > 0) {
+                    const songs = dzData.data.map((item: any, idx: number) => ({
+                      id: `sp-dz-${item.id || idx}-${Date.now()}`,
+                      name: item.title,
+                      artist: item.artist?.name || fallbackTitle,
+                      album: item.album?.title || fallbackTitle,
+                      thumbnail: item.album?.cover_medium || fallbackCover || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80',
+                      duration: item.duration || 210
+                    }));
+
+                    res.statusCode = 200;
+                    res.end(JSON.stringify({
+                      name: type === 'artist' ? `${fallbackTitle} • Top Músicas` : fallbackTitle,
+                      creator: type === 'artist' ? fallbackTitle : 'Spotify',
+                      cover: fallbackCover || songs[0]?.thumbnail || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80',
+                      songs
+                    }));
+                    return;
+                  }
+                }
+              } catch {}
+            }
+
             res.statusCode = 404;
-            res.end(JSON.stringify({ error: 'Nenhuma faixa encontrada na playlist' }));
+            res.end(JSON.stringify({ error: 'Nenhuma faixa encontrada na playlist fornecida' }));
           } catch (e: any) {
             res.statusCode = 500;
             res.end(JSON.stringify({ error: e.message }));
