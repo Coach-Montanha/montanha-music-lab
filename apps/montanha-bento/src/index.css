@@ -24,6 +24,48 @@
   }
 }
 
+/* Ergonomia Mobile & Safe Area Determinística (Sem falhas de parse do Tailwind) */
+.safe-header-top {
+  padding-top: env(safe-area-inset-top, 0px);
+  height: calc(4rem + env(safe-area-inset-top, 0px));
+}
+
+.safe-main-bottom {
+  padding-bottom: calc(11rem + env(safe-area-inset-bottom, 0px));
+}
+
+.mobile-bottom-nav {
+  height: calc(4rem + env(safe-area-inset-bottom, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.mobile-mini-player {
+  bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
+}
+
+@media (min-width: 640px) {
+  .mobile-mini-player {
+    bottom: 0px !important;
+  }
+  .safe-main-bottom {
+    padding-bottom: 7rem !important;
+  }
+}
+
+.safe-queue-sidebar {
+  bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
+}
+
+@media (min-width: 640px) {
+  .safe-queue-sidebar {
+    bottom: 0px !important;
+  }
+}
+
+.safe-toast-top {
+  top: calc(4.5rem + env(safe-area-inset-top, 0px));
+}
+
 /* Apple Style Synced Lyrics Container */
 .lyrics-scroll {
   scroll-behavior: smooth;

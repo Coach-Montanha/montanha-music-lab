@@ -2274,14 +2274,14 @@ export default function App() {
 
       {/* TOAST NOTIFICATION (Posicionado abaixo do Header seguro para não cobrir botões nem o notch) */}
       {toastMessage && (
-        <div className="fixed top-[calc(4.5rem+env(safe-area-inset-top,0px))] left-1/2 -translate-x-1/2 z-50 rounded-full bg-[#282828] border border-white/10 px-5 py-2.5 text-xs font-semibold text-white shadow-2xl animate-fade-in flex items-center gap-2 pointer-events-none">
+        <div className="fixed safe-toast-top left-1/2 -translate-x-1/2 z-50 rounded-full bg-[#282828] border border-white/10 px-5 py-2.5 text-xs font-semibold text-white shadow-2xl animate-fade-in flex items-center gap-2 pointer-events-none">
           <Check size={14} className="text-[#1DB954]" />
           <span>{toastMessage}</span>
         </div>
       )}
 
       {/* TOP HEADER (Com proteção ativa contra notch/Dynamic Island do iPhone) */}
-      <header className="flex shrink-0 items-center justify-between px-4 sm:px-6 border-b border-white/[0.06] bg-[#121212]/90 backdrop-blur-md z-10 pt-[env(safe-area-inset-top,0px)] h-[calc(4rem+env(safe-area-inset-top,0px))]">
+      <header className="flex shrink-0 items-center justify-between px-4 sm:px-6 border-b border-white/[0.06] bg-[#121212]/90 backdrop-blur-md z-10 safe-header-top">
         <div className="flex items-center gap-3">
           {/* BOTÃO DE VOLTAR DE NAVEGAÇÃO NO HEADER */}
           {selectedPlaylist && (
@@ -2395,7 +2395,7 @@ export default function App() {
       </header>
 
       {/* MAIN VIEW CONTENT (Com espaçamento inferior seguro para mini-player + barra de abas + home indicator) */}
-      <main className="flex-1 overflow-y-auto px-4 sm:px-8 py-6 pb-[calc(11rem+env(safe-area-inset-bottom,0px))]">
+      <main className="flex-1 overflow-y-auto px-4 sm:px-8 py-6 safe-main-bottom">
         
         {/* VIEW 1: HOME */}
         {activeTab === 'home' && !selectedPlaylist && (
@@ -3905,7 +3905,7 @@ export default function App() {
             aria-label="Fechar Fila de Reprodução"
           />
 
-          <aside className="fixed top-0 bottom-[calc(4rem+env(safe-area-inset-bottom,0px))] sm:bottom-0 right-0 w-full sm:max-w-md bg-[#161616] border-l border-white/10 z-40 p-4 sm:p-6 pt-[calc(1rem+env(safe-area-inset-top,0px))] pb-[calc(1rem+env(safe-area-inset-bottom,0px))] sm:pt-6 sm:pb-6 flex flex-col shadow-2xl animate-fade-in select-none">
+          <aside className="fixed top-0 safe-queue-sidebar sm:bottom-0 right-0 w-full sm:max-w-md bg-[#161616] border-l border-white/10 z-40 p-4 sm:p-6 pt-[calc(1rem+env(safe-area-inset-top,0px))] pb-[calc(1rem+env(safe-area-inset-bottom,0px))] sm:pt-6 sm:pb-6 flex flex-col shadow-2xl animate-fade-in select-none">
             {/* CABEÇALHO DA FILA COM TOUCH TARGET SEGURO */}
             <div className="flex items-center justify-between pb-4 border-b border-white/10 flex-shrink-0">
               <div className="flex items-center gap-2.5">
@@ -4069,7 +4069,7 @@ export default function App() {
       {/* MINI-PLAYER INFERIOR RESPONSIVO (Posicionado logo acima da barra de navegação com respeito à safe area) */}
       <div
         onClick={() => setIsFullScreenPlayer(true)}
-        className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom,0px))] sm:bottom-0 left-0 right-0 h-20 bg-[#181818] border-t border-white/[0.08] px-3.5 sm:px-6 flex items-center cursor-pointer z-30 hover:bg-[#202020] transition select-none"
+        className="fixed mobile-mini-player sm:bottom-0 left-0 right-0 h-20 bg-[#181818] border-t border-white/[0.08] px-3.5 sm:px-6 flex items-center cursor-pointer z-40 hover:bg-[#202020] transition select-none"
       >
         {/* LAYOUT MOBILE (sm:hidden) - Limpo, Descomplicado e Sem Aperto */}
         <div className="flex sm:hidden items-center justify-between w-full gap-2">
@@ -4462,9 +4462,9 @@ export default function App() {
         </div>
       )}
 
-      {/* BOTTOM NAVIGATION TABS (Mobile - Oculto quando o player fullscreen está ativo, com suporte nativo ao Home Bar do iPhone) */}
+      {/* BOTTOM NAVIGATION TABS (Mobile - Oculto quando o player fullscreen está ativo, com suporte nativo ao Home Bar do iPhone e Android) */}
       {!isFullScreenPlayer && (
-        <nav className="fixed bottom-0 left-0 right-0 h-[calc(4rem+env(safe-area-inset-bottom,0px))] pb-[env(safe-area-inset-bottom,0px)] bg-[#121212]/95 border-t border-white/[0.08] backdrop-blur-lg flex items-center justify-around z-40 sm:hidden">
+        <nav className="fixed bottom-0 left-0 right-0 mobile-bottom-nav bg-[#121212]/95 border-t border-white/[0.08] backdrop-blur-lg flex items-center justify-around z-50 sm:hidden">
           {[
             { id: 'home', label: 'Início', icon: HomeIcon },
             { id: 'search', label: 'Buscar', icon: Search },
