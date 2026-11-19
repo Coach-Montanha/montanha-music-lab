@@ -21,7 +21,7 @@ function resolveCanonicalUserId(userId, email) {
       return DEFAULT_ALBERTO_ID;
     }
   }
-  return userId;
+  return userId || null;
 }
 
 export default async function handler(req, res) {

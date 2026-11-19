@@ -55,7 +55,8 @@ import {
   smartMergePlaylists,
   broadcastLibraryChange,
   subscribeToLibraryChanges,
-  getCanonicalUserId
+  getCanonicalUserId,
+  isAlbertoUser
 } from './lib/supabase';
 import { extractPlaylistFromUrl } from './lib/playlistExtractor';
 import { universalSearch, searchCategorized, fetchEntityTracks } from './lib/searchEngine';
@@ -139,17 +140,14 @@ const INITIAL_PLAYLISTS: Playlist[] = [
 function getUserPlaylistStorageKey(userId?: string | null, email?: string | null): string {
   if (!userId && !email) return 'montanha_playlists_guest';
   const canonical = getCanonicalUserId(userId, email);
+  if (!canonical) return 'montanha_playlists_guest';
   return `montanha_playlists_${canonical}`;
 }
 
 function loadInitialUserPlaylists(user: any): Playlist[] {
   if (!user?.id) {
-    try {
-      const stored = localStorage.getItem('montanha_playlists_guest') || localStorage.getItem('able_playlists_guest');
-      return stored ? JSON.parse(stored) : INITIAL_PLAYLISTS;
-    } catch {
-      return INITIAL_PLAYLISTS;
-    }
+    // Visitante não autenticado: nunca herda acervo de nenhum usuário
+    return [];
   }
 
   const userKey = getUserPlaylistStorageKey(user.id, user.email);
@@ -159,25 +157,30 @@ function loadInitialUserPlaylists(user: any): Playlist[] {
       const parsed = JSON.parse(stored);
       if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     }
-    // Migração de compatibilidade retroativa para as chaves anteriores
-    const canonical = getCanonicalUserId(user.id, user.email);
-    const possibleKeys = [
-      `able_playlists_${canonical}`,
-      'able_playlists_4541d773-99e4-4eda-9ff3-69c44a491764',
-      'able_playlists_08fd3ca5-dc9a-4363-be88-9847c648cd6c',
-      'able_playlists_d6e21a10-65dc-426b-a61e-62a03fe871d2',
-      'able_playlists_v2'
-    ];
-    for (const legacyKey of possibleKeys) {
-      const legacy = localStorage.getItem(legacyKey);
-      if (legacy) {
-        const parsedLegacy = JSON.parse(legacy);
-        if (Array.isArray(parsedLegacy) && parsedLegacy.length > 0) {
-          try { localStorage.setItem(userKey, legacy); } catch {}
-          return parsedLegacy;
+
+    // Compatibilidade retroativa EXCLUSIVA para o acervo do Coach Montanha (Alberto)
+    if (isAlbertoUser(user.id, user.email)) {
+      const canonical = getCanonicalUserId(user.id, user.email);
+      const possibleKeys = [
+        `able_playlists_${canonical}`,
+        'able_playlists_4541d773-99e4-4eda-9ff3-69c44a491764',
+        'able_playlists_08fd3ca5-dc9a-4363-be88-9847c648cd6c',
+        'able_playlists_d6e21a10-65dc-426b-a61e-62a03fe871d2',
+        'able_playlists_v2'
+      ];
+      for (const legacyKey of possibleKeys) {
+        const legacy = localStorage.getItem(legacyKey);
+        if (legacy) {
+          const parsedLegacy = JSON.parse(legacy);
+          if (Array.isArray(parsedLegacy) && parsedLegacy.length > 0) {
+            try { localStorage.setItem(userKey, legacy); } catch {}
+            return parsedLegacy;
+          }
         }
       }
     }
+
+    // Qualquer outro aluno/usuário (ex: Angélica Pontes) começa 100% isolado com sua própria biblioteca limpa
     return [];
   } catch {
     return [];
@@ -482,8 +485,12 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-    // SUCESSO DE LOGIN / CADASTRO: CARREGAMENTO EXCLUSIVO DO PERFIL AUTENTICADO
+  // SUCESSO DE LOGIN / CADASTRO: CARREGAMENTO EXCLUSIVO DO PERFIL AUTENTICADO
   const handleAuthSuccess = async (user: any) => {
+    // 1. Limpa imediatamente o estado em memória para evitar vazamento entre perfis
+    setPlaylists([]);
+    isCloudLoadedRef.current = false;
+
     setCurrentUser(user);
     try {
       localStorage.setItem('montanha_music_user', JSON.stringify(user));
@@ -491,26 +498,24 @@ export default function App() {
     showToast(`Conectado como ${user.email}!`);
 
     const userKey = getUserPlaylistStorageKey(user.id, user.email);
-    const cachedUserPls = loadInitialUserPlaylists(user);
 
     try {
-      // 1. Tenta carregar playlists exclusivas deste perfil na nuvem
+      // 2. Busca estritamente as playlists do usuário na nuvem
       const cloudPls = await fetchCloudPlaylists(user.id, user.email);
       if (cloudPls && Array.isArray(cloudPls) && cloudPls.length > 0) {
-        setPlaylists((prev) => {
-          const merged = smartMergePlaylists(prev, cloudPls);
-          try { localStorage.setItem(userKey, JSON.stringify(merged)); } catch {}
-          return merged;
-        });
+        setPlaylists(cloudPls);
+        try { localStorage.setItem(userKey, JSON.stringify(cloudPls)); } catch {}
         isCloudLoadedRef.current = true;
       } else {
-        // Usuário novo ou sem acervo na nuvem: define sua própria biblioteca isolada (NUNCA herda de outros)
+        // Usuário novo ou sem acervo na nuvem: carrega apenas o cache isolado dele (sem herdar nada de terceiros)
+        const cachedUserPls = loadInitialUserPlaylists(user);
         setPlaylists(cachedUserPls);
-        isCloudLoadedRef.current = true;
         try { localStorage.setItem(userKey, JSON.stringify(cachedUserPls)); } catch {}
+        isCloudLoadedRef.current = true;
       }
     } catch (err) {
       console.warn('Erro ao carregar playlists da nuvem:', err);
+      const cachedUserPls = loadInitialUserPlaylists(user);
       setPlaylists(cachedUserPls);
     }
   };
@@ -567,11 +572,13 @@ export default function App() {
         const userKey = getUserPlaylistStorageKey(u.id, u.email);
         fetchCloudPlaylists(u.id, u.email).then((cloudPls) => {
           if (cloudPls && Array.isArray(cloudPls) && cloudPls.length > 0) {
-            setPlaylists((prev) => {
-              const merged = smartMergePlaylists(prev, cloudPls);
-              try { localStorage.setItem(userKey, JSON.stringify(merged)); } catch {}
-              return merged;
-            });
+            setPlaylists(cloudPls);
+            try { localStorage.setItem(userKey, JSON.stringify(cloudPls)); } catch {}
+            isCloudLoadedRef.current = true;
+          } else {
+            const cached = loadInitialUserPlaylists(u);
+            setPlaylists(cached);
+            try { localStorage.setItem(userKey, JSON.stringify(cached)); } catch {}
             isCloudLoadedRef.current = true;
           }
         }).catch(() => {});
@@ -597,11 +604,13 @@ export default function App() {
         const userKey = getUserPlaylistStorageKey(u.id, u.email);
         fetchCloudPlaylists(u.id, u.email).then((cloudPls) => {
           if (cloudPls && Array.isArray(cloudPls) && cloudPls.length > 0) {
-            setPlaylists((prev) => {
-              const merged = smartMergePlaylists(prev, cloudPls);
-              try { localStorage.setItem(userKey, JSON.stringify(merged)); } catch {}
-              return merged;
-            });
+            setPlaylists(cloudPls);
+            try { localStorage.setItem(userKey, JSON.stringify(cloudPls)); } catch {}
+            isCloudLoadedRef.current = true;
+          } else {
+            const cached = loadInitialUserPlaylists(u);
+            setPlaylists(cached);
+            try { localStorage.setItem(userKey, JSON.stringify(cached)); } catch {}
             isCloudLoadedRef.current = true;
           }
         }).catch(() => {});
@@ -615,31 +624,25 @@ export default function App() {
   useEffect(() => {
     if (!currentUser?.id) return;
 
-    // 1. Canal Realtime Broadcast do Supabase (WebSocket Instantâneo)
+    // 1. Canal Realtime Broadcast do Supabase (WebSocket Instantâneo Isolado por Perfil)
     const unsubscribe = subscribeToLibraryChanges(currentUser.id, async () => {
       console.log('[Realtime Auto-Sync] Notificação de biblioteca modificada recebida de outro dispositivo.');
       const cloudPls = await fetchCloudPlaylists(currentUser.id, currentUser.email);
-      if (cloudPls && Array.isArray(cloudPls) && cloudPls.length > 0) {
-        setPlaylists((prev) => {
-          const merged = smartMergePlaylists(prev, cloudPls);
-          const userKey = getUserPlaylistStorageKey(currentUser.id, currentUser.email);
-          try { localStorage.setItem(userKey, JSON.stringify(merged)); } catch {}
-          return merged;
-        });
+      if (cloudPls && Array.isArray(cloudPls)) {
+        setPlaylists(cloudPls);
+        const userKey = getUserPlaylistStorageKey(currentUser.id, currentUser.email);
+        try { localStorage.setItem(userKey, JSON.stringify(cloudPls)); } catch {}
       }
-    });
+    }, currentUser.email);
 
     // 2. Ao desbloquear a tela do celular ou retornar o foco na aba
     const handleVisibilityOrFocus = async () => {
       if (document.visibilityState === 'visible') {
         const cloudPls = await fetchCloudPlaylists(currentUser.id, currentUser.email);
         if (cloudPls && Array.isArray(cloudPls) && cloudPls.length > 0) {
-          setPlaylists((prev) => {
-            const merged = smartMergePlaylists(prev, cloudPls);
-            const userKey = getUserPlaylistStorageKey(currentUser.id, currentUser.email);
-            try { localStorage.setItem(userKey, JSON.stringify(merged)); } catch {}
-            return merged;
-          });
+          setPlaylists(cloudPls);
+          const userKey = getUserPlaylistStorageKey(currentUser.id, currentUser.email);
+          try { localStorage.setItem(userKey, JSON.stringify(cloudPls)); } catch {}
         }
       }
     };

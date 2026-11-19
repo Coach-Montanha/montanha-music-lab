@@ -23,13 +23,19 @@ export const ALBERTO_ALIAS_IDS = new Set([
   'c4c3571d-883f-4164-91e4-3f20cc8666fa'  // albertosarly@hotmail.com
 ]);
 
-export function getCanonicalUserId(userId?: string | null, email?: string | null): string {
-  if (userId && ALBERTO_ALIAS_IDS.has(userId)) return DEFAULT_ALBERTO_ID;
+export function isAlbertoUser(userId?: string | null, email?: string | null): boolean {
+  if (userId && ALBERTO_ALIAS_IDS.has(userId)) return true;
   if (email) {
     const em = email.toLowerCase().trim();
-    if (em.includes('alberto') || em.includes('coachmontanha')) return DEFAULT_ALBERTO_ID;
+    if (em.includes('alberto') || em.includes('coachmontanha')) return true;
   }
-  return userId || DEFAULT_ALBERTO_ID;
+  return false;
+}
+
+export function getCanonicalUserId(userId?: string | null, email?: string | null): string | null {
+  if (isAlbertoUser(userId, email)) return DEFAULT_ALBERTO_ID;
+  if (userId) return userId;
+  return null;
 }
 
 /**
@@ -77,32 +83,38 @@ export function smartMergePlaylists(local: any[], remote: any[]): any[] {
  */
 let realtimeChannel: any = null;
 
-export function broadcastLibraryChange(userId: string, count: number) {
+export function broadcastLibraryChange(userId: string, count: number, email?: string) {
   try {
-    const canonical = getCanonicalUserId(userId);
-    if (!realtimeChannel) {
-      realtimeChannel = supabase.channel('montanha-music-realtime-sync');
-      realtimeChannel.subscribe();
-    }
-    realtimeChannel.send({
-      type: 'broadcast',
-      event: 'library_updated',
-      payload: { userId: canonical, count, timestamp: Date.now() }
+    const canonical = getCanonicalUserId(userId, email);
+    if (!canonical) return;
+
+    const channelName = `montanha-music-sync-${canonical}`;
+    const channel = supabase.channel(channelName);
+    channel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        channel.send({
+          type: 'broadcast',
+          event: 'library_updated',
+          payload: { userId: canonical, count, timestamp: Date.now() }
+        });
+      }
     });
   } catch (err) {
     console.warn('[Realtime Broadcast Warn]', err);
   }
 }
 
-export function subscribeToLibraryChanges(userId: string, onRemoteChange: () => void) {
+export function subscribeToLibraryChanges(userId: string, onRemoteChange: () => void, email?: string) {
   try {
-    const canonical = getCanonicalUserId(userId);
-    const channel = supabase.channel('montanha-music-realtime-sync');
+    const canonical = getCanonicalUserId(userId, email);
+    if (!canonical) return () => {};
+
+    const channelName = `montanha-music-sync-${canonical}`;
+    const channel = supabase.channel(channelName);
     channel
       .on('broadcast', { event: 'library_updated' }, (msg: any) => {
-        // Se a mensagem for para a mesma conta (canônica), dispara a sincronização
-        if (!msg.payload?.userId || msg.payload.userId === canonical) {
-          console.log('[Realtime] Biblioteca modificada em outro aparelho conectado. Puxando atualizações...');
+        if (msg.payload?.userId === canonical) {
+          console.log('[Realtime] Biblioteca modificada neste perfil em outro dispositivo. Puxando atualizações...');
           onRemoteChange();
         }
       })
@@ -136,6 +148,7 @@ export async function syncCloudPlaylists(
   }
 
   const canonicalId = getCanonicalUserId(userId, email);
+  if (!canonicalId) return;
 
   // 1. Tenta via API Serverless /api/sync com canonicalId
   try {
@@ -145,7 +158,7 @@ export async function syncCloudPlaylists(
       body: JSON.stringify({ userId: canonicalId, email, playlists })
     });
     if (res.ok) {
-      console.log(`[Cloud Sync] ${playlists.length} playlists salvas na nuvem com sucesso!`);
+      console.log(`[Cloud Sync] ${playlists.length} playlists salvas na nuvem com sucesso para ${canonicalId}!`);
       return;
     }
   } catch {}
@@ -166,6 +179,7 @@ export async function syncCloudPlaylists(
 export async function fetchCloudPlaylists(userId?: string, email?: string): Promise<any[] | null> {
   if (!userId) return null;
   const canonicalId = getCanonicalUserId(userId, email);
+  if (!canonicalId) return null;
 
   // 1. Tenta via API Serverless /api/sync?userId=...
   try {
