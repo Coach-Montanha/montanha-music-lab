@@ -84,6 +84,8 @@ export default async function handler(req, res) {
   const title = (req.query?.title || req.query?.t || req.body?.title || '').trim();
   const artist = (req.query?.artist || req.query?.a || req.body?.artist || '').trim();
   const id = (req.query?.id || req.body?.id || '').trim();
+  const quality = (req.query?.quality || req.body?.quality || 'high').trim();
+  const bitrateSuffix = quality === 'economy' ? '_96' : quality === 'standard' ? '_160' : '_320';
 
   const cleanT = sanitizeTitle(title);
   const candidates = extractArtistCandidates(artist);
@@ -111,12 +113,12 @@ export default async function handler(req, res) {
       const winner = await Promise.any(saavnPromises);
       if (winner?.streamId) {
         return res.status(200).json({
-          url: `https://aac.saavncdn.com/${winner.streamId}_320.mp4`,
+          url: `https://aac.saavncdn.com/${winner.streamId}${bitrateSuffix}.mp4`,
           duration: 210,
           mimeType: 'audio/mp4',
           title,
           artist: winner.cand,
-          source: 'saavn-320'
+          source: quality === 'economy' ? 'saavn-96' : quality === 'standard' ? 'saavn-160' : 'saavn-320'
         });
       }
     } catch {}
@@ -150,7 +152,8 @@ export default async function handler(req, res) {
               const aMp4 = a.type.startsWith('audio/mp4') ? 1 : 0;
               const bMp4 = b.type.startsWith('audio/webm') ? 0 : 1;
               if (aMp4 !== bMp4) return bMp4 - aMp4;
-              return (parseInt(b.bitrate) || 0) - (parseInt(a.bitrate) || 0);
+              const bitDiff = (parseInt(b.bitrate) || 0) - (parseInt(a.bitrate) || 0);
+              return quality === 'economy' ? -bitDiff : bitDiff;
             });
             const best = audios[0];
             const proxied = best.url.replace(new URL(best.url).origin, host);

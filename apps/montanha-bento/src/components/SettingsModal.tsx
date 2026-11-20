@@ -9,6 +9,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { Playlist } from '../types';
 import { browserOptimizer, BrowserProfile } from '../lib/browserOptimizer';
+import { audioEffectsEngine } from '../lib/audioEffectsEngine';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -143,13 +144,25 @@ export function SettingsModal({
     }
   };
 
-  // Salvar configurações de som
+  // Salvar configurações de som e aplicar imediatamente no motor de áudio em tempo real
   const handleSaveSoundSetting = (key: string, value: any, setter: (val: any) => void) => {
     setter(value);
     try {
-      localStorage.setItem(key, typeof value === 'boolean' ? String(value) : value);
+      localStorage.setItem(key, typeof value === 'boolean' ? String(value) : String(value));
     } catch {}
-    setSuccessMsg('Configurações de áudio salvas!');
+
+    // Aplicação em tempo real no motor de áudio
+    if (key === 'montanha_equalizer') {
+      audioEffectsEngine.setEqualizerPreset(value);
+    } else if (key === 'montanha_volume_norm') {
+      audioEffectsEngine.setVolumeNormalization(Boolean(value));
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('montanha_audio_setting_changed', { detail: { key, value } }));
+    }
+
+    setSuccessMsg('Configurações de áudio salvas e ativas em tempo real!');
     setTimeout(() => setSuccessMsg(''), 2000);
   };
 

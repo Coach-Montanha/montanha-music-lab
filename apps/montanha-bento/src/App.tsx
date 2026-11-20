@@ -66,6 +66,7 @@ import { ReplaceSongModal } from './components/ReplaceSongModal';
 import { AudioScrubber } from './components/AudioScrubber';
 import { mediaSessionController } from './lib/mediaSession';
 import { audioAnchor } from './lib/audioAnchor';
+import { audioEffectsEngine } from './lib/audioEffectsEngine';
 import { browserOptimizer } from './lib/browserOptimizer';
 import { fetchRealTrackCover, cacheImageLocally, downloadImageFile, enrichPlaylistTracks } from './lib/coverEngine';
 import { fetchAudioStream, invalidateStream, getCachedStream } from './lib/audioStreamEngine';
@@ -283,6 +284,7 @@ export default function App() {
   const handlePauseRef = useRef<() => void>(() => {});
   const handleSeekRef = useRef<(t: number) => void>(() => {});
   const nextSongStreamRef = useRef<{ id: string; url: string; duration?: number } | null>(null);
+  const isFadingOutRef = useRef<boolean>(false);
   const originalQueueRef = useRef<Song[]>([]);
   const queueRef = useRef<Song[]>([]);
   const currentSongRef = useRef<Song>(currentSong);
@@ -805,12 +807,16 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isQueueOpen, isFullScreenPlayer, isAuthModalOpen, isSettingsModalOpen, replacingSongContext, isReverifyModalOpen]);
 
-  // Screen Wake Lock API (Evita que a tela do celular apague sozinha durante o treino / reprodução)
+  // Screen Wake Lock API (Evita que a tela do celular apague sozinha durante o treino quando ativado)
   useEffect(() => {
     let wakeLockSentinel: any = null;
 
     const requestWakeLock = async () => {
-      if ('wakeLock' in navigator && isPlaying) {
+      const isWakeLockAllowed = typeof window !== 'undefined'
+        ? localStorage.getItem('montanha_wakelock') !== 'false'
+        : true;
+
+      if ('wakeLock' in navigator && isPlaying && isWakeLockAllowed) {
         try {
           wakeLockSentinel = await (navigator as any).wakeLock.request('screen');
         } catch {}
@@ -826,7 +832,20 @@ export default function App() {
       } catch {}
     }
 
+    const handleSettingChanged = (e: any) => {
+      const { key, value } = e.detail || {};
+      if (key === 'montanha_wakelock') {
+        if (!value && wakeLockSentinel) {
+          try { wakeLockSentinel.release(); wakeLockSentinel = null; } catch {}
+        } else if (value && isPlaying) {
+          requestWakeLock();
+        }
+      }
+    };
+    window.addEventListener('montanha_audio_setting_changed', handleSettingChanged);
+
     return () => {
+      window.removeEventListener('montanha_audio_setting_changed', handleSettingChanged);
       if (wakeLockSentinel) {
         try { wakeLockSentinel.release(); } catch {}
       }
@@ -860,9 +879,13 @@ export default function App() {
     };
   }, []);
 
-  // Inicialização do SilentHoldKeeper e Otimizador Universal de Navegadores
+  // Inicialização do SilentHoldKeeper, Web Audio Effects Engine e Otimizador Universal de Navegadores
   useEffect(() => {
     browserOptimizer.init();
+
+    if (audioRef.current) {
+      audioEffectsEngine.attach(audioRef.current);
+    }
 
     if (audioRef.current && !silentHoldRef.current) {
       try {
@@ -1296,6 +1319,13 @@ export default function App() {
     audio.src = streamUrl;
     audio.currentTime = 0;
     audio.volume = isMuted ? 0 : volume;
+    isFadingOutRef.current = false;
+    const crossfadeSec = typeof window !== 'undefined' ? Number(localStorage.getItem('montanha_crossfade')) || 0 : 0;
+    if (crossfadeSec > 0) {
+      audioEffectsEngine.fadeIn(Math.min(crossfadeSec, 2.5), isMuted ? 0 : volume);
+    } else {
+      audioEffectsEngine.resetMasterGain(isMuted ? 0 : volume);
+    }
     if (streamDuration) {
       setDuration(streamDuration);
     }
@@ -2326,12 +2356,13 @@ export default function App() {
         !currentUser ? 'filter blur-2xl brightness-40 pointer-events-none scale-[0.98]' : 'filter-none brightness-100 scale-100'
       }`}>
       
-      {/* MOTOR DE ÁUDIO HTML5 ULTRA-RESILIENTE (Background-Safe sem crossOrigin) */}
+      {/* MOTOR DE ÁUDIO HTML5 ULTRA-RESILIENTE (Web Audio API Chain + Crossfade + Equalizador) */}
       <audio
         ref={audioRef}
         preload="auto"
         loop={isRepeat}
         playsInline={true}
+        crossOrigin="anonymous"
         style={{
           position: 'fixed',
           bottom: 0,
@@ -2351,6 +2382,10 @@ export default function App() {
           isPlayingRef.current = true;
           mediaSessionController.updatePlaybackState(true);
           audioAnchor.play();
+          if (audioRef.current) {
+            audioEffectsEngine.attach(audioRef.current);
+            audioEffectsEngine.ensureAudioContextRunning();
+          }
           if (currentSongRef.current) {
             mediaSessionController.updateMetadata({
               title: currentSongRef.current.name,
@@ -2376,6 +2411,12 @@ export default function App() {
             // Pré-carrega a próxima faixa com antecedência nos últimos 20 segundos se ainda não carregou
             if (dur > 25 && cur >= dur - 20 && !nextSongStreamRef.current && currentSongRef.current) {
               schedulePreload(currentSongRef.current);
+            }
+            // Crossfade suave nos últimos segundos da música
+            const crossfadeSec = typeof window !== 'undefined' ? Number(localStorage.getItem('montanha_crossfade')) || 0 : 0;
+            if (crossfadeSec > 0 && dur > crossfadeSec * 2 && cur >= dur - crossfadeSec && !isFadingOutRef.current) {
+              isFadingOutRef.current = true;
+              audioEffectsEngine.fadeOut(crossfadeSec);
             }
           }
         }}

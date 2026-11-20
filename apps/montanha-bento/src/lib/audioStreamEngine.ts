@@ -73,10 +73,12 @@ function getArtistCandidates(artistStr: string): string[] {
 // 1. TIER 1: Nosso Endpoint Serverless Próprio /api/stream (Zero Erros de CORS no Navegador)
 async function fetchFromInternalApi(title: string, artist: string, youtubeId?: string): Promise<StreamResult | null> {
   try {
+    const quality = typeof window !== 'undefined' ? localStorage.getItem('montanha_sound_quality') || 'high' : 'high';
     const params = new URLSearchParams();
     if (title) params.set('title', title);
     if (artist) params.set('artist', artist);
     if (youtubeId) params.set('id', youtubeId);
+    params.set('quality', quality);
 
     const res = await fetch(`/api/stream?${params.toString()}`, {
       signal: AbortSignal.timeout(3500)
@@ -104,6 +106,8 @@ async function fetchFromSaavnDirect(title: string, artist: string): Promise<Stre
   if (!cleanT) return null;
   const candidates = getArtistCandidates(artist);
   if (cleanT.length > 4) candidates.push(cleanT);
+  const quality = typeof window !== 'undefined' ? localStorage.getItem('montanha_sound_quality') || 'high' : 'high';
+  const bitrateSuffix = quality === 'economy' ? '_96' : quality === 'standard' ? '_160' : '_320';
 
   const promises = candidates.slice(0, 3).map(async (cand) => {
     const res = await fetch(
@@ -114,12 +118,12 @@ async function fetchFromSaavnDirect(title: string, artist: string): Promise<Stre
       const id = (await res.text()).trim();
       if (id && id.length > 5 && !id.includes('error') && !id.includes('not found')) {
         return {
-          url: `https://aac.saavncdn.com/${id}_320.mp4`,
+          url: `https://aac.saavncdn.com/${id}${bitrateSuffix}.mp4`,
           duration: 210,
           mimeType: 'audio/mp4',
           title,
           artist: cand,
-          source: 'saavn-320' as const
+          source: (quality === 'economy' ? 'saavn-96' : quality === 'standard' ? 'saavn-160' : 'saavn-320') as any
         };
       }
     }
