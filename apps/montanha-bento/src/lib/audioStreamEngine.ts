@@ -81,7 +81,7 @@ async function fetchFromInternalApi(title: string, artist: string, youtubeId?: s
     params.set('quality', quality);
 
     const res = await fetch(`/api/stream?${params.toString()}`, {
-      signal: AbortSignal.timeout(3500)
+      signal: AbortSignal.timeout(7500)
     });
     if (res.ok) {
       const data = await res.json();

@@ -90,8 +90,10 @@ export default async function handler(req, res) {
   const cleanT = sanitizeTitle(title);
   const candidates = extractArtistCandidates(artist);
 
-  // 1. TIER 1: JioSaavn 320kbps MP4 com busca paralela ultrarrápida
-  if (cleanT) {
+  // 1 e 2. Busca Concorrente Paralela: Saavn (Tier 1 320k) e YouTube/Invidious (Tier 2 Universal)
+  // Permite que músicas nacionais (Gospel, Sertanejo, Pagode, Funk, etc.) toquem em < 2 segundos
+  const saavnPromise = (async () => {
+    if (!cleanT) return null;
     const candidateList = [...candidates];
     if (cleanT.length > 4) candidateList.push(cleanT);
 
@@ -103,44 +105,42 @@ export default async function handler(req, res) {
       if (resp.ok) {
         const streamId = (await resp.text()).trim();
         if (streamId && streamId.length > 5 && !streamId.includes('error') && !streamId.includes('not found')) {
-          return { streamId, cand };
+          return {
+            url: `https://aac.saavncdn.com/${streamId}${bitrateSuffix}.mp4`,
+            duration: 210,
+            mimeType: 'audio/mp4',
+            title,
+            artist: cand,
+            source: quality === 'economy' ? 'saavn-96' : quality === 'standard' ? 'saavn-160' : 'saavn-320'
+          };
         }
       }
       throw new Error('not found');
     });
 
     try {
-      const winner = await Promise.any(saavnPromises);
-      if (winner?.streamId) {
-        return res.status(200).json({
-          url: `https://aac.saavncdn.com/${winner.streamId}${bitrateSuffix}.mp4`,
-          duration: 210,
-          mimeType: 'audio/mp4',
-          title,
-          artist: winner.cand,
-          source: quality === 'economy' ? 'saavn-96' : quality === 'standard' ? 'saavn-160' : 'saavn-320'
-        });
-      }
-    } catch {}
-  }
-
-  // 2. TIER 2: YouTube Audio Completo via Invidious (Se Saavn não possuir a faixa)
-  let youtubeId = id.replace(/^yt-/, '').split('&')[0];
-  if (!youtubeId || !/^[a-zA-Z0-9_-]{11}$/.test(youtubeId)) {
-    if (cleanT) {
-      const query = `${cleanT} ${candidates[0] || artist}`.trim();
-      youtubeId = await searchYouTubeVideoId(query);
+      return await Promise.any(saavnPromises);
+    } catch {
+      return null;
     }
-  }
+  })();
 
-  if (youtubeId && /^[a-zA-Z0-9_-]{11}$/.test(youtubeId)) {
-    const mirrors = ['https://yt.chocolatemoo53.com', 'https://invidious.nerdvpn.de'];
+  const ytPromise = (async () => {
+    let youtubeId = id.replace(/^yt-/, '').split('&')[0];
+    if (!youtubeId || !/^[a-zA-Z0-9_-]{11}$/.test(youtubeId)) {
+      if (cleanT) {
+        const query = `${cleanT} ${candidates[0] || artist}`.trim();
+        youtubeId = await searchYouTubeVideoId(query);
+      }
+    }
 
-    for (const host of mirrors) {
-      try {
+    if (youtubeId && /^[a-zA-Z0-9_-]{11}$/.test(youtubeId)) {
+      const mirrors = ['https://yt.chocolatemoo53.com', 'https://inv.nadeko.net'];
+
+      const mirrorPromises = mirrors.map(async (host) => {
         const invRes = await fetch(`${host}/api/v1/videos/${youtubeId}`, {
           headers: { 'User-Agent': 'Mozilla/5.0' },
-          signal: AbortSignal.timeout(2500)
+          signal: AbortSignal.timeout(3200)
         });
         if (invRes.ok) {
           const data = await invRes.json();
@@ -157,18 +157,31 @@ export default async function handler(req, res) {
             });
             const best = audios[0];
             const proxied = best.url.replace(new URL(best.url).origin, host);
-            return res.status(200).json({
+            return {
               url: proxied,
               duration: Number(data.lengthSeconds) || 210,
               mimeType: best.type.split(';')[0] || 'audio/mp4',
               title: data.title || title,
               artist: data.author || artist,
               source: 'invidious'
-            });
+            };
           }
         }
+        throw new Error('mirror failed');
+      });
+
+      try {
+        return await Promise.any(mirrorPromises);
       } catch {}
     }
+    return null;
+  })();
+
+  const [saavnRes, ytRes] = await Promise.all([saavnPromise, ytPromise]);
+  const finalWinner = saavnRes || ytRes;
+
+  if (finalWinner) {
+    return res.status(200).json(finalWinner);
   }
 
   return res.status(404).json({ error: 'Fluxo de áudio não encontrado' });

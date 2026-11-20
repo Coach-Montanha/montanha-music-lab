@@ -3983,6 +3983,10 @@ export default function App() {
               ) : viewingEntity.songs.length > 0 ? (
                 viewingEntity.songs.map((song, idx) => {
                   const isUnavailable = unavailableSongIds.includes(song.id);
+                  const isThisCurrent = currentSong && (currentSong.id === song.id || (currentSong.name?.toLowerCase() === song.name?.toLowerCase() && currentSong.artist?.toLowerCase() === song.artist?.toLowerCase()));
+                  const isThisPlaying = isPlaying && isThisCurrent;
+                  const isThisBuffering = isSwitchingRef.current && isThisCurrent;
+
                   return (
                     <div
                       key={song.id || idx}
@@ -3991,24 +3995,46 @@ export default function App() {
                           showToast(`"${song.name}" está indisponível na fonte. Toque em "Substituir por semelhante".`);
                           return;
                         }
+                        if (isThisCurrent) {
+                          togglePlay();
+                          return;
+                        }
                         setQueue(viewingEntity.songs);
                         playSong(song, viewingEntity.songs);
                       }}
                       className={`flex items-center justify-between p-2.5 rounded-xl transition group ${
                         isUnavailable
                           ? 'bg-red-950/20 border border-red-500/20 opacity-60 hover:opacity-85 cursor-not-allowed'
+                          : isThisPlaying
+                          ? 'bg-[#1DB954]/15 border border-[#1DB954]/40 shadow-sm cursor-pointer'
+                          : isThisCurrent
+                          ? 'bg-white/10 border border-white/20 cursor-pointer'
                           : 'hover:bg-white/5 cursor-pointer'
                       }`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <span className="w-5 text-center text-xs text-neutral-500 font-mono group-hover:text-[#1DB954]">
-                          {idx + 1}
+                        <span className="w-6 text-center text-xs font-mono shrink-0 flex items-center justify-center">
+                          {isThisBuffering ? (
+                            <Loader2 size={13} className="animate-spin text-[#1DB954]" />
+                          ) : isThisPlaying ? (
+                            <div className="flex items-end justify-center gap-0.5 h-3.5 w-3.5">
+                              <span className="w-0.5 h-full bg-[#1DB954] animate-pulse" />
+                              <span className="w-0.5 h-2/3 bg-[#1DB954] animate-pulse delay-75" />
+                              <span className="w-0.5 h-4/5 bg-[#1DB954] animate-pulse delay-150" />
+                            </div>
+                          ) : (
+                            <span className="text-neutral-500 group-hover:text-[#1DB954]">
+                              {idx + 1}
+                            </span>
+                          )}
                         </span>
                         <div className="min-w-0">
                           <p
                             className={`text-sm font-bold truncate ${
                               isUnavailable
                                 ? 'text-red-400 line-through'
+                                : isThisPlaying
+                                ? 'text-[#1DB954]'
                                 : 'text-white group-hover:text-[#1DB954]'
                             }`}
                           >
@@ -4047,6 +4073,41 @@ export default function App() {
                 </div>
               )}
             </div>
+
+            {/* BARRA DE CONTROLE EM TEMPO REAL DENTRO DO MODAL QUANDO TOCANDO */}
+            {currentSong && isPlaying && (
+              <div className="mt-3 pt-3 border-t border-white/10 flex items-center justify-between gap-3 bg-white/[0.04] p-3 rounded-2xl animate-fade-in shrink-0">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="h-10 w-10 rounded-xl overflow-hidden shrink-0 border border-white/10 shadow-md">
+                    <img src={currentSong.thumbnail} alt={currentSong.name} className="h-full w-full object-cover" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="h-2 w-2 rounded-full bg-[#1DB954] animate-pulse shrink-0" />
+                      <p className="text-xs font-black text-white truncate">{currentSong.name}</p>
+                    </div>
+                    <p className="text-[11px] text-neutral-400 truncate">{currentSong.artist}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={togglePlay}
+                    className="h-9 w-9 rounded-full bg-[#1DB954] hover:bg-[#1ed760] text-black flex items-center justify-center transition active:scale-95 shadow-md"
+                    title={isPlaying ? 'Pausar' : 'Tocar'}
+                  >
+                    {isPlaying ? <Pause size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" />}
+                  </button>
+                  <button
+                    onClick={handleNextSong}
+                    className="h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition active:scale-95"
+                    title="Próxima faixa"
+                  >
+                    <SkipForward size={14} />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
