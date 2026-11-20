@@ -226,6 +226,24 @@ export default function App() {
     playlistName: ''
   });
 
+  // Checkpoint de Playlists Verificadas (Persistência no Dispositivo e na Nuvem)
+  const [scannedPlaylistIds, setScannedPlaylistIds] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem('montanha_scanned_playlist_ids') || localStorage.getItem('able_scanned_playlist_ids');
+      if (stored) return JSON.parse(stored);
+    } catch {}
+    return [];
+  });
+
+  const [isReverifyModalOpen, setIsReverifyModalOpen] = useState(false);
+
+  // Helper para checar se a playlist já possui marco/checkpoint de verificação
+  const isPlaylistScanned = (pl: Playlist) => {
+    return Boolean(pl.scannedAt || scannedPlaylistIds.includes(pl.id));
+  };
+
+  const verifiedPlaylistsCount = playlists.filter(isPlaylistScanned).length;
+
   // Audio State
   const [currentSong, setCurrentSong] = useState<Song>(() => playlists[0]?.songs[0] || INITIAL_PLAYLISTS[0].songs[0]);
   const activeSong: Song = currentSong || playlists[0]?.songs[0] || INITIAL_PLAYLISTS[0].songs[0];
@@ -753,6 +771,8 @@ export default function App() {
     const handlePopState = () => {
       if (replacingSongContext) {
         setReplacingSongContext(null);
+      } else if (isReverifyModalOpen) {
+        setIsReverifyModalOpen(false);
       } else if (isQueueOpen) {
         setIsQueueOpen(false);
       } else if (isFullScreenPlayer) {
@@ -767,13 +787,14 @@ export default function App() {
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [selectedPlaylist, isFullScreenPlayer, isQueueOpen, isAuthModalOpen, isSettingsModalOpen, replacingSongContext]);
+  }, [selectedPlaylist, isFullScreenPlayer, isQueueOpen, isAuthModalOpen, isSettingsModalOpen, replacingSongContext, isReverifyModalOpen]);
 
   // Tecla Escape para Fechamento Rápido no Desktop
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         if (replacingSongContext) setReplacingSongContext(null);
+        if (isReverifyModalOpen) setIsReverifyModalOpen(false);
         if (isQueueOpen) setIsQueueOpen(false);
         if (isFullScreenPlayer) setIsFullScreenPlayer(false);
         if (isSettingsModalOpen) setIsSettingsModalOpen(false);
@@ -782,7 +803,7 @@ export default function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isQueueOpen, isFullScreenPlayer, isAuthModalOpen, isSettingsModalOpen, replacingSongContext]);
+  }, [isQueueOpen, isFullScreenPlayer, isAuthModalOpen, isSettingsModalOpen, replacingSongContext, isReverifyModalOpen]);
 
   // Screen Wake Lock API (Evita que a tela do celular apague sozinha durante o treino / reprodução)
   useEffect(() => {
@@ -1623,57 +1644,78 @@ export default function App() {
     }
   };
 
-  // SCAN GERAL INTELIGENTE: ATUALIZAR CAPAS & VERIFICAR MÚSICAS QUEBRADAS EM TODAS AS PLAYLISTS
-  // Pula instantaneamente playlists e faixas que já foram atualizadas/verificadas anteriormente
-  const handleEnrichAllPlaylistsCovers = async () => {
+  // SCAN GERAL INTELIGENTE COM CHECKPOINT: PULA AUTOMATICAMENTE PLAYLISTS JÁ ESCANEADAS
+  const handleEnrichAllPlaylistsCovers = async (forceAll: boolean = false) => {
     if (playlists.length === 0) {
       showToast('Nenhuma playlist para verificar.');
       return;
     }
     if (isEnrichingAllCovers) return;
 
+    // Se forceAll for falso, filtra apenas as que ainda NÃO foram verificadas (checkpoint)
+    const targetPlaylists = forceAll
+      ? [...playlists]
+      : playlists.filter((pl) => !isPlaylistScanned(pl));
+
+    if (!forceAll && targetPlaylists.length === 0) {
+      // Todas as playlists já possuem checkpoint salvo! Abre o modal de controle para decisão voluntária
+      setIsReverifyModalOpen(true);
+      return;
+    }
+
     setIsEnrichingAllCovers(true);
-    showToast(`Iniciando Scan Inteligente em ${playlists.length} playlists...`);
+    setIsReverifyModalOpen(false);
+
+    const alreadyVerifiedCount = forceAll ? 0 : playlists.length - targetPlaylists.length;
+    showToast(
+      forceAll
+        ? `Re-escaneando todo o acervo (${playlists.length} playlists)...`
+        : `Continuando scan a partir do checkpoint: ${targetPlaylists.length} playlists restantes...`
+    );
 
     const newUnavailableIds = new Set(unavailableSongIds);
     const verifiedSet = new Set<string>(verifiedSongIds);
+    let updatedCheckpointIds = forceAll ? [] : [...scannedPlaylistIds];
     let evaluatedCount = 0;
     let skippedCount = 0;
     let brokenCount = 0;
 
     try {
       const updatedPlaylists = [...playlists];
-      for (let i = 0; i < updatedPlaylists.length; i++) {
-        const pl = updatedPlaylists[i];
+
+      for (let k = 0; k < targetPlaylists.length; k++) {
+        const pl = targetPlaylists[k];
+        const currentProgressNum = alreadyVerifiedCount + k + 1;
+
         setEnrichAllProgress({
-          current: i + 1,
-          total: updatedPlaylists.length,
+          current: currentProgressNum,
+          total: playlists.length,
           playlistName: pl.name
         });
 
         const songs = pl.songs || [];
-        if (songs.length === 0) continue;
-
-        // Se a playlist já foi enriquecida e todas as faixas já estão com áudio verificado:
-        const allSongsVerified = songs.every((s) => verifiedSet.has(s.id) && !newUnavailableIds.has(s.id));
-        const hasUnenrichedCovers = songs.some((s) => !s.thumbnail || s.thumbnail === pl.cover);
-
-        if (pl.coversEnriched && !hasUnenrichedCovers && allSongsVerified) {
-          // Pula na hora sem overhead de requisições de rede
-          skippedCount += songs.length;
+        if (songs.length === 0) {
+          if (!updatedCheckpointIds.includes(pl.id)) {
+            updatedCheckpointIds.push(pl.id);
+            setScannedPlaylistIds([...updatedCheckpointIds]);
+            try {
+              localStorage.setItem('montanha_scanned_playlist_ids', JSON.stringify(updatedCheckpointIds));
+              localStorage.setItem('able_scanned_playlist_ids', JSON.stringify(updatedCheckpointIds));
+            } catch {}
+          }
           continue;
         }
 
-        showToast(`(${i + 1}/${updatedPlaylists.length}) Verificando "${pl.name}"...`);
+        showToast(`(${currentProgressNum}/${playlists.length}) Verificando "${pl.name}"...`);
 
-        // 1. Atualização de capas oficiais (pula as que já possuem capas HD individuais)
+        // 1. Atualização de capas oficiais HD
         const enriched = await enrichPlaylistTracks(pl, (done, total) => {
           if (done === total || done % 15 === 0) {
             console.log(`[Cover Engine] Playlist "${pl.name}": ${done}/${total} faixas verificadas.`);
           }
         });
 
-        // 2. Avaliação de integridade de áudio apenas para músicas NÃO verificadas ainda
+        // 2. Avaliação de integridade de áudio apenas para músicas não verificadas ainda
         const unverifiedSongs = enriched.songs.filter(
           (s) => !verifiedSet.has(s.id) && !newUnavailableIds.has(s.id)
         );
@@ -1712,49 +1754,142 @@ export default function App() {
           scannedAt: Date.now()
         };
 
-        updatedPlaylists[i] = updatedPl;
+        const plIdx = updatedPlaylists.findIndex((p) => p.id === pl.id);
+        if (plIdx !== -1) {
+          updatedPlaylists[plIdx] = updatedPl;
+        }
         setPlaylists([...updatedPlaylists]);
         if (selectedPlaylist && selectedPlaylist.id === updatedPl.id) {
           setSelectedPlaylist(updatedPl);
         }
 
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        // SALVA O CHECKPOINT DESTA PLAYLIST IMEDIATAMENTE (GARANTE CONTINUIDADE MESMO COM FECHAMENTO ABRUPTO)
+        if (!updatedCheckpointIds.includes(pl.id)) {
+          updatedCheckpointIds.push(pl.id);
+        }
+        setScannedPlaylistIds([...updatedCheckpointIds]);
+        try {
+          localStorage.setItem('montanha_scanned_playlist_ids', JSON.stringify(updatedCheckpointIds));
+          localStorage.setItem('able_scanned_playlist_ids', JSON.stringify(updatedCheckpointIds));
+          const userKey = getUserPlaylistStorageKey(currentUser?.id, currentUser?.email);
+          localStorage.setItem(userKey, JSON.stringify(updatedPlaylists));
+        } catch {}
+
+        await new Promise((resolve) => setTimeout(resolve, 50));
       }
 
-      // Salva lista de músicas com erro
+      // Salva listas de músicas verificadas e indisponíveis
       const updatedUnavailableList = Array.from(newUnavailableIds);
       setUnavailableSongIds(updatedUnavailableList);
       try {
         localStorage.setItem('able_unavailable_songs', JSON.stringify(updatedUnavailableList));
+        localStorage.setItem('montanha_unavailable_songs', JSON.stringify(updatedUnavailableList));
       } catch {}
 
-      // Salva lista de músicas com áudio verificado
       const updatedVerifiedList = Array.from(verifiedSet);
       setVerifiedSongIds(updatedVerifiedList);
       try {
         localStorage.setItem('able_verified_songs', JSON.stringify(updatedVerifiedList));
+        localStorage.setItem('montanha_verified_songs', JSON.stringify(updatedVerifiedList));
       } catch {}
 
-      // Persistência local no perfil
-      const userKey = getUserPlaylistStorageKey(currentUser?.id, currentUser?.email);
-      try {
-        localStorage.setItem(userKey, JSON.stringify(updatedPlaylists));
-      } catch {}
-
-      // Sincronização em nuvem Supabase
+      // Sincronização em nuvem Supabase ao terminar
       if (currentUser?.id) {
-        showToast('Salvando atualizações na nuvem...');
+        showToast('Salvando checkpoints na nuvem...');
         await syncCloudPlaylists(currentUser.id, updatedPlaylists);
       }
 
-      showToast(`🎉 Scan Inteligente concluído! ${evaluatedCount} novas faixas avaliadas (${brokenCount} com falha), ${skippedCount} faixas mantidas sem repetição.`);
+      showToast(`🎉 Scan concluído! ${targetPlaylists.length} playlists verificadas com sucesso (${evaluatedCount} faixas checadas).`);
     } catch (err) {
       console.error('[Scan Engine Error]', err);
       showToast('Scan concluído com avisos em algumas faixas.');
     } finally {
       setIsEnrichingAllCovers(false);
-      setEnrichAllProgress({ current: 0, total: 0, playlistName: '' });
     }
+  };
+
+  // RE-VERIFICAÇÃO VOLUNTÁRIA DE UMA ÚNICA PLAYLIST
+  const handleEnrichSinglePlaylist = async (playlist: Playlist) => {
+    if (isEnrichingAllCovers) return;
+    setIsEnrichingAllCovers(true);
+    showToast(`Verificando playlist "${playlist.name}"...`);
+    try {
+      const enriched = await enrichPlaylistTracks(playlist);
+      const newUnavailableIds = new Set(unavailableSongIds);
+      const verifiedSet = new Set<string>(verifiedSongIds);
+
+      for (const song of enriched.songs) {
+        try {
+          const stream = await fetchAudioStream(song.youtubeId, song.name, song.artist, song.audioUrl, song.id);
+          if (!stream?.url) {
+            newUnavailableIds.add(song.id);
+            verifiedSet.delete(song.id);
+          } else {
+            newUnavailableIds.delete(song.id);
+            verifiedSet.add(song.id);
+          }
+        } catch {
+          newUnavailableIds.add(song.id);
+        }
+      }
+
+      const updatedPl: Playlist = {
+        ...enriched,
+        coversEnriched: true,
+        scannedAt: Date.now()
+      };
+
+      setPlaylists((prev) => {
+        const next = prev.map((p) => (p.id === playlist.id ? updatedPl : p));
+        if (currentUser?.id) {
+          syncCloudPlaylists(currentUser.id, next);
+        }
+        return next;
+      });
+      setSelectedPlaylist(updatedPl);
+
+      setScannedPlaylistIds((prev) => {
+        const next = prev.includes(playlist.id) ? prev : [...prev, playlist.id];
+        try {
+          localStorage.setItem('montanha_scanned_playlist_ids', JSON.stringify(next));
+          localStorage.setItem('able_scanned_playlist_ids', JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+
+      setUnavailableSongIds(Array.from(newUnavailableIds));
+      setVerifiedSongIds(Array.from(verifiedSet));
+      showToast(`Playlist "${playlist.name}" verificada com sucesso!`);
+    } catch {
+      showToast(`Erro ao verificar "${playlist.name}".`);
+    } finally {
+      setIsEnrichingAllCovers(false);
+    }
+  };
+
+  // LIMPAR CHECKPOINTS DE VERIFICAÇÃO (PARA RE-ESCANEAMENTO COMPLETO VOLUNTÁRIO)
+  const handleClearScanCheckpoints = () => {
+    setScannedPlaylistIds([]);
+    try {
+      localStorage.removeItem('montanha_scanned_playlist_ids');
+      localStorage.removeItem('able_scanned_playlist_ids');
+    } catch {}
+    setPlaylists((prev) => {
+      const reset = prev.map((p) => {
+        const { scannedAt, ...rest } = p;
+        return rest;
+      });
+      const userKey = getUserPlaylistStorageKey(currentUser?.id, currentUser?.email);
+      try {
+        localStorage.setItem(userKey, JSON.stringify(reset));
+      } catch {}
+      if (currentUser?.id) {
+        syncCloudPlaylists(currentUser.id, reset);
+      }
+      return reset;
+    });
+    setIsReverifyModalOpen(false);
+    showToast('Checkpoints limpos! O acervo agora pode ser escaneado novamente do zero.');
   };
 
   // ADICIONAR MÚSICA A UMA PLAYLIST
@@ -2348,17 +2483,39 @@ export default function App() {
         </nav>
 
         <div className="flex items-center gap-1.5 sm:gap-2.5">
-          {/* Botão Scan e Verificação Inteligente do Acervo */}
+          {/* Botão Scan e Verificação Inteligente do Acervo com Checkpoint */}
           <button
-            onClick={handleEnrichAllPlaylistsCovers}
+            onClick={() => handleEnrichAllPlaylistsCovers(false)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setIsReverifyModalOpen(true);
+            }}
             disabled={isEnrichingAllCovers}
             className="flex items-center gap-1.5 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 px-3 py-1.5 sm:py-2 text-xs font-bold text-white transition border border-white/10 flex-shrink-0"
-            title="Scan Inteligente: atualiza capas HD e verifica integridade pulando o que já foi atualizado"
+            title="Scan Inteligente com Checkpoint: pula o que já foi verificado • clique direito para opções"
           >
-            <Sparkles size={14} className={isEnrichingAllCovers ? "animate-spin text-[#1DB954]" : "text-[#1DB954]"} />
-            <span className="hidden sm:inline">
-              {isEnrichingAllCovers ? `Verificando (${enrichAllProgress.current}/${enrichAllProgress.total})` : 'Scan Acervo'}
-            </span>
+            {isEnrichingAllCovers ? (
+              <>
+                <Sparkles size={14} className="animate-spin text-[#1DB954]" />
+                <span className="hidden sm:inline">
+                  Verificando ({enrichAllProgress.current}/{enrichAllProgress.total})
+                </span>
+              </>
+            ) : verifiedPlaylistsCount === playlists.length && playlists.length > 0 ? (
+              <>
+                <CheckCircle2 size={14} className="text-[#1DB954]" />
+                <span className="hidden sm:inline">Acervo Verificado ({playlists.length})</span>
+              </>
+            ) : (
+              <>
+                <Sparkles size={14} className="text-[#1DB954]" />
+                <span className="hidden sm:inline">
+                  {verifiedPlaylistsCount > 0
+                    ? `Verificar (${playlists.length - verifiedPlaylistsCount} rest.)`
+                    : 'Scan Acervo'}
+                </span>
+              </>
+            )}
           </button>
 
           {/* Botão Importar Playlist por Link - Apenas telas médias/grandes (já presente na Home no mobile) */}
@@ -2421,16 +2578,43 @@ export default function App() {
                   {currentUser ? `Sincronizada na nuvem como ${currentUser.email}` : 'Playlists salvas no dispositivo'}
                 </p>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-3">
                 <button
-                  onClick={handleEnrichAllPlaylistsCovers}
+                  onClick={() => handleEnrichAllPlaylistsCovers(false)}
                   disabled={isEnrichingAllCovers}
                   className="text-xs font-bold text-[#1DB954] hover:underline flex items-center gap-1.5 transition disabled:opacity-50 bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-full border border-white/10"
-                  title="Scan Inteligente: atualiza capas HD e verifica integridade pulando o que já foi atualizado"
+                  title="Scan Inteligente com Checkpoint: pula playlists já verificadas"
                 >
-                  <Sparkles size={14} className={isEnrichingAllCovers ? "animate-spin" : ""} />
-                  <span>{isEnrichingAllCovers ? `Verificando (${enrichAllProgress.current}/${enrichAllProgress.total})...` : 'Verificar Acervo'}</span>
+                  {isEnrichingAllCovers ? (
+                    <>
+                      <Sparkles size={14} className="animate-spin" />
+                      <span>Verificando ({enrichAllProgress.current}/${enrichAllProgress.total})...</span>
+                    </>
+                  ) : verifiedPlaylistsCount === playlists.length && playlists.length > 0 ? (
+                    <>
+                      <CheckCircle2 size={14} />
+                      <span>Acervo 100% Verificado</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={14} />
+                      <span>
+                        {verifiedPlaylistsCount > 0
+                          ? `Verificar (${playlists.length - verifiedPlaylistsCount} restantes)`
+                          : 'Verificar Acervo'}
+                      </span>
+                    </>
+                  )}
                 </button>
+                {verifiedPlaylistsCount > 0 && !isEnrichingAllCovers && (
+                  <button
+                    onClick={() => setIsReverifyModalOpen(true)}
+                    className="p-1.5 text-neutral-400 hover:text-white rounded-full bg-white/5 hover:bg-white/10 border border-white/10 transition"
+                    title="Opções de Checkpoint e Re-escaneamento"
+                  >
+                    <Sliders size={13} />
+                  </button>
+                )}
                 <button
                   onClick={() => setIsImportModalOpen(true)}
                   className="text-xs font-bold text-[#1DB954] hover:underline flex items-center gap-1"
@@ -2472,6 +2656,14 @@ export default function App() {
                     {pl.isCustom && (
                       <span className="absolute top-2 left-2 bg-[#1DB954] text-black text-[10px] font-black px-2 py-0.5 rounded-full shadow">
                         Sua
+                      </span>
+                    )}
+                    {isPlaylistScanned(pl) && (
+                      <span
+                        className="absolute top-2 right-2 bg-black/70 backdrop-blur-md text-[#1DB954] border border-[#1DB954]/40 text-[10px] font-bold p-1 rounded-full shadow"
+                        title="Playlist com checkpoint verificado (integridade e capas checadas)"
+                      >
+                        <Check size={11} strokeWidth={3} />
                       </span>
                     )}
                     <button
@@ -3075,6 +3267,18 @@ export default function App() {
                 >
                   <ListOrdered size={15} />
                   <span>{isPlaylistEditingMode ? 'Concluir' : 'Gerenciar Faixas'}</span>
+                </button>
+
+                <button
+                  onClick={() => handleEnrichSinglePlaylist(selectedPlaylist)}
+                  disabled={isEnrichingAllCovers}
+                  className="flex items-center gap-1.5 text-xs text-neutral-300 hover:text-white transition px-3.5 py-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 active:scale-95 disabled:opacity-50"
+                  title="Re-verificar capas e integridade de áudio desta playlist individualmente"
+                >
+                  <RefreshCw size={14} className={isEnrichingAllCovers ? 'animate-spin text-[#1DB954]' : ''} />
+                  <span className="hidden sm:inline">
+                    {isPlaylistScanned(selectedPlaylist) ? 'Re-verificar' : 'Verificar'}
+                  </span>
                 </button>
 
                 <button
@@ -3918,6 +4122,94 @@ export default function App() {
           handleApplySongReplacement(newSong, targetSong, plId);
         }}
       />
+
+      {/* MODAL DE CONTROLE DE CHECKPOINT & SCAN DO ACERVO */}
+      {isReverifyModalOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in select-none">
+          <div
+            className="w-full max-w-md bg-[#181818] border border-white/10 rounded-3xl p-5 sm:p-6 flex flex-col gap-5 shadow-2xl animate-scale-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Cabeçalho */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500/15 text-[#1DB954]">
+                  <Sparkles size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white">Checkpoint do Acervo</h3>
+                  <p className="text-[11px] text-neutral-400 font-medium">Controle de escaneamento de playlists</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsReverifyModalOpen(false)}
+                className="rounded-full p-2 text-neutral-400 hover:text-white hover:bg-white/10 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Painel de Métricas */}
+            <div className="grid grid-cols-3 gap-2.5 text-center">
+              <div className="p-3 rounded-2xl bg-white/[0.03] border border-white/5">
+                <p className="text-xl font-black text-white">{playlists.length}</p>
+                <p className="text-[10px] text-neutral-400 font-semibold uppercase mt-0.5">Total</p>
+              </div>
+              <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
+                <p className="text-xl font-black text-[#1DB954]">{verifiedPlaylistsCount}</p>
+                <p className="text-[10px] text-emerald-400 font-semibold uppercase mt-0.5">Verificadas</p>
+              </div>
+              <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20">
+                <p className="text-xl font-black text-amber-400">{Math.max(0, playlists.length - verifiedPlaylistsCount)}</p>
+                <p className="text-[10px] text-amber-300 font-semibold uppercase mt-0.5">Pendentes</p>
+              </div>
+            </div>
+
+            {/* Explicação */}
+            <div className="p-3.5 rounded-2xl bg-white/[0.02] border border-white/5 text-xs text-neutral-300 space-y-1.5 leading-relaxed">
+              <p className="font-bold text-white flex items-center gap-1.5">
+                <CheckCircle2 size={14} className="text-[#1DB954]" />
+                {verifiedPlaylistsCount === playlists.length
+                  ? 'Todas as playlists já possuem checkpoint salvo!'
+                  : `${verifiedPlaylistsCount} de ${playlists.length} playlists já verificadas.`}
+              </p>
+              <p className="text-[11px] text-neutral-400">
+                Playlists com checkpoint não são re-escaneadas automaticamente, economizando dados e evitando buscas redundantes.
+              </p>
+            </div>
+
+            {/* Ações */}
+            <div className="flex flex-col gap-2 pt-1">
+              {playlists.length - verifiedPlaylistsCount > 0 && (
+                <button
+                  onClick={() => handleEnrichAllPlaylistsCovers(false)}
+                  className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-[#1DB954] hover:bg-[#1ed760] text-black font-extrabold text-xs shadow-lg transition active:scale-98"
+                >
+                  <Sparkles size={16} />
+                  <span>Continuar Scan ({playlists.length - verifiedPlaylistsCount} pendentes)</span>
+                </button>
+              )}
+
+              <button
+                onClick={() => handleEnrichAllPlaylistsCovers(true)}
+                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-2xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs transition active:scale-98 border border-white/10"
+              >
+                <RefreshCw size={14} />
+                <span>Re-escanear Todo o Acervo do Zero</span>
+              </button>
+
+              {verifiedPlaylistsCount > 0 && (
+                <button
+                  onClick={handleClearScanCheckpoints}
+                  className="w-full py-2 px-4 rounded-2xl text-[11px] text-neutral-400 hover:text-red-400 transition"
+                >
+                  Limpar checkpoints salvos
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* PAINEL LATERAL: FILA DE REPRODUÇÃO (QUEUE DRAWER) COM BACKDROP E DISMISSAL TOUCH-FRIENDLY */}
       {isQueueOpen && (
