@@ -51,6 +51,7 @@ import {
   supabase,
   syncCloudPlaylists,
   fetchCloudPlaylists,
+  fetchCloudLibrary,
   smartMergePlaylists,
   broadcastLibraryChange,
   subscribeToLibraryChanges,
@@ -519,11 +520,21 @@ export default function App() {
     const userKey = getUserPlaylistStorageKey(user.id, user.email);
 
     try {
-      // 2. Busca estritamente as playlists do usuário na nuvem
-      const cloudPls = await fetchCloudPlaylists(user.id, user.email);
-      if (cloudPls && Array.isArray(cloudPls) && cloudPls.length > 0) {
-        setPlaylists(cloudPls);
-        try { localStorage.setItem(userKey, JSON.stringify(cloudPls)); } catch {}
+      // 2. Busca estritamente as playlists e estado de faixas do usuário na nuvem
+      const cloudLib = await fetchCloudLibrary(user.id, user.email);
+      if (cloudLib && Array.isArray(cloudLib.playlists) && cloudLib.playlists.length > 0) {
+        setPlaylists(cloudLib.playlists);
+        setUnavailableSongIds(cloudLib.unavailableSongs || []);
+        if (cloudLib.verifiedSongs?.length) setVerifiedSongIds(cloudLib.verifiedSongs);
+        try {
+          localStorage.setItem(userKey, JSON.stringify(cloudLib.playlists));
+          localStorage.setItem('montanha_unavailable_songs', JSON.stringify(cloudLib.unavailableSongs || []));
+          localStorage.setItem('able_unavailable_songs', JSON.stringify(cloudLib.unavailableSongs || []));
+          if (cloudLib.verifiedSongs?.length) {
+            localStorage.setItem('montanha_verified_songs', JSON.stringify(cloudLib.verifiedSongs));
+            localStorage.setItem('able_verified_songs', JSON.stringify(cloudLib.verifiedSongs));
+          }
+        } catch {}
         isCloudLoadedRef.current = true;
       } else {
         // Usuário novo ou sem acervo na nuvem: carrega apenas o cache isolado dele (sem herdar nada de terceiros)
@@ -549,21 +560,31 @@ export default function App() {
     setIsSyncingCloud(true);
     showToast('Sincronizando com a nuvem...');
     try {
-      const cloudPls = await fetchCloudPlaylists(currentUser.id, currentUser.email);
+      const cloudLib = await fetchCloudLibrary(currentUser.id, currentUser.email);
       const userKey = getUserPlaylistStorageKey(currentUser.id, currentUser.email);
 
-      if (cloudPls && Array.isArray(cloudPls) && cloudPls.length > 0) {
+      if (cloudLib && Array.isArray(cloudLib.playlists) && cloudLib.playlists.length > 0) {
         setPlaylists((prev) => {
-          const merged = smartMergePlaylists(prev, cloudPls);
+          const merged = smartMergePlaylists(prev, cloudLib.playlists);
           try { localStorage.setItem(userKey, JSON.stringify(merged)); } catch {}
           return merged;
         });
+        setUnavailableSongIds(cloudLib.unavailableSongs || []);
+        if (cloudLib.verifiedSongs?.length) setVerifiedSongIds(cloudLib.verifiedSongs);
+        try {
+          localStorage.setItem('montanha_unavailable_songs', JSON.stringify(cloudLib.unavailableSongs || []));
+          localStorage.setItem('able_unavailable_songs', JSON.stringify(cloudLib.unavailableSongs || []));
+          if (cloudLib.verifiedSongs?.length) {
+            localStorage.setItem('montanha_verified_songs', JSON.stringify(cloudLib.verifiedSongs));
+            localStorage.setItem('able_verified_songs', JSON.stringify(cloudLib.verifiedSongs));
+          }
+        } catch {}
         isCloudLoadedRef.current = true;
-        showToast(`🎉 ${cloudPls.length} playlists sincronizadas em tempo real!`);
+        showToast(`🎉 ${cloudLib.playlists.length} playlists sincronizadas em tempo real!`);
       } else {
         if (playlists.length > 0) {
           // Se o usuário já criou playlists locais neste perfil, sobe para sua nuvem
-          await syncCloudPlaylists(currentUser.id, playlists, false, currentUser.email);
+          await syncCloudPlaylists(currentUser.id, playlists, false, currentUser.email, unavailableSongIds, verifiedSongIds);
           broadcastLibraryChange(currentUser.id, playlists.length);
           showToast(`Playlists enviadas para a sua nuvem! (${playlists.length} playlists)`);
         } else {
@@ -589,10 +610,20 @@ export default function App() {
         }
 
         const userKey = getUserPlaylistStorageKey(u.id, u.email);
-        fetchCloudPlaylists(u.id, u.email).then((cloudPls) => {
-          if (cloudPls && Array.isArray(cloudPls) && cloudPls.length > 0) {
-            setPlaylists(cloudPls);
-            try { localStorage.setItem(userKey, JSON.stringify(cloudPls)); } catch {}
+        fetchCloudLibrary(u.id, u.email).then((cloudLib) => {
+          if (cloudLib && Array.isArray(cloudLib.playlists) && cloudLib.playlists.length > 0) {
+            setPlaylists(cloudLib.playlists);
+            setUnavailableSongIds(cloudLib.unavailableSongs || []);
+            if (cloudLib.verifiedSongs?.length) setVerifiedSongIds(cloudLib.verifiedSongs);
+            try {
+              localStorage.setItem(userKey, JSON.stringify(cloudLib.playlists));
+              localStorage.setItem('montanha_unavailable_songs', JSON.stringify(cloudLib.unavailableSongs || []));
+              localStorage.setItem('able_unavailable_songs', JSON.stringify(cloudLib.unavailableSongs || []));
+              if (cloudLib.verifiedSongs?.length) {
+                localStorage.setItem('montanha_verified_songs', JSON.stringify(cloudLib.verifiedSongs));
+                localStorage.setItem('able_verified_songs', JSON.stringify(cloudLib.verifiedSongs));
+              }
+            } catch {}
             isCloudLoadedRef.current = true;
           } else {
             const cached = loadInitialUserPlaylists(u);
@@ -621,10 +652,20 @@ export default function App() {
         }
 
         const userKey = getUserPlaylistStorageKey(u.id, u.email);
-        fetchCloudPlaylists(u.id, u.email).then((cloudPls) => {
-          if (cloudPls && Array.isArray(cloudPls) && cloudPls.length > 0) {
-            setPlaylists(cloudPls);
-            try { localStorage.setItem(userKey, JSON.stringify(cloudPls)); } catch {}
+        fetchCloudLibrary(u.id, u.email).then((cloudLib) => {
+          if (cloudLib && Array.isArray(cloudLib.playlists) && cloudLib.playlists.length > 0) {
+            setPlaylists(cloudLib.playlists);
+            setUnavailableSongIds(cloudLib.unavailableSongs || []);
+            if (cloudLib.verifiedSongs?.length) setVerifiedSongIds(cloudLib.verifiedSongs);
+            try {
+              localStorage.setItem(userKey, JSON.stringify(cloudLib.playlists));
+              localStorage.setItem('montanha_unavailable_songs', JSON.stringify(cloudLib.unavailableSongs || []));
+              localStorage.setItem('able_unavailable_songs', JSON.stringify(cloudLib.unavailableSongs || []));
+              if (cloudLib.verifiedSongs?.length) {
+                localStorage.setItem('montanha_verified_songs', JSON.stringify(cloudLib.verifiedSongs));
+                localStorage.setItem('able_verified_songs', JSON.stringify(cloudLib.verifiedSongs));
+              }
+            } catch {}
             isCloudLoadedRef.current = true;
           } else {
             const cached = loadInitialUserPlaylists(u);
@@ -646,22 +687,42 @@ export default function App() {
     // 1. Canal Realtime Broadcast do Supabase (WebSocket Instantâneo Isolado por Perfil)
     const unsubscribe = subscribeToLibraryChanges(currentUser.id, async () => {
       console.log('[Realtime Auto-Sync] Notificação de biblioteca modificada recebida de outro dispositivo.');
-      const cloudPls = await fetchCloudPlaylists(currentUser.id, currentUser.email);
-      if (cloudPls && Array.isArray(cloudPls)) {
-        setPlaylists(cloudPls);
+      const cloudLib = await fetchCloudLibrary(currentUser.id, currentUser.email);
+      if (cloudLib && Array.isArray(cloudLib.playlists)) {
+        setPlaylists(cloudLib.playlists);
+        setUnavailableSongIds(cloudLib.unavailableSongs || []);
+        if (cloudLib.verifiedSongs?.length) setVerifiedSongIds(cloudLib.verifiedSongs);
         const userKey = getUserPlaylistStorageKey(currentUser.id, currentUser.email);
-        try { localStorage.setItem(userKey, JSON.stringify(cloudPls)); } catch {}
+        try {
+          localStorage.setItem(userKey, JSON.stringify(cloudLib.playlists));
+          localStorage.setItem('montanha_unavailable_songs', JSON.stringify(cloudLib.unavailableSongs || []));
+          localStorage.setItem('able_unavailable_songs', JSON.stringify(cloudLib.unavailableSongs || []));
+          if (cloudLib.verifiedSongs?.length) {
+            localStorage.setItem('montanha_verified_songs', JSON.stringify(cloudLib.verifiedSongs));
+            localStorage.setItem('able_verified_songs', JSON.stringify(cloudLib.verifiedSongs));
+          }
+        } catch {}
       }
     }, currentUser.email);
 
     // 2. Ao desbloquear a tela do celular ou retornar o foco na aba
     const handleVisibilityOrFocus = async () => {
       if (document.visibilityState === 'visible') {
-        const cloudPls = await fetchCloudPlaylists(currentUser.id, currentUser.email);
-        if (cloudPls && Array.isArray(cloudPls) && cloudPls.length > 0) {
-          setPlaylists(cloudPls);
+        const cloudLib = await fetchCloudLibrary(currentUser.id, currentUser.email);
+        if (cloudLib && Array.isArray(cloudLib.playlists) && cloudLib.playlists.length > 0) {
+          setPlaylists(cloudLib.playlists);
+          setUnavailableSongIds(cloudLib.unavailableSongs || []);
+          if (cloudLib.verifiedSongs?.length) setVerifiedSongIds(cloudLib.verifiedSongs);
           const userKey = getUserPlaylistStorageKey(currentUser.id, currentUser.email);
-          try { localStorage.setItem(userKey, JSON.stringify(cloudPls)); } catch {}
+          try {
+            localStorage.setItem(userKey, JSON.stringify(cloudLib.playlists));
+            localStorage.setItem('montanha_unavailable_songs', JSON.stringify(cloudLib.unavailableSongs || []));
+            localStorage.setItem('able_unavailable_songs', JSON.stringify(cloudLib.unavailableSongs || []));
+            if (cloudLib.verifiedSongs?.length) {
+              localStorage.setItem('montanha_verified_songs', JSON.stringify(cloudLib.verifiedSongs));
+              localStorage.setItem('able_verified_songs', JSON.stringify(cloudLib.verifiedSongs));
+            }
+          } catch {}
         }
       }
     };
@@ -1950,7 +2011,7 @@ export default function App() {
   };
 
   // AUTO-RECUPERAÇÃO CIRÚRGICA DE UMA FAIXA INDIVIDUAL
-  const handleQuickHealSong = async (song: Song, playlistId?: string) => {
+  const handleQuickHealSong = async (song: Song, playlistId?: string, autoPlay: boolean = false) => {
     showToast(`Buscando áudio e alternativas para "${song.name}"...`);
     try {
       const res = await autoHealOrSubstituteSong(song);
@@ -1968,7 +2029,7 @@ export default function App() {
               };
             });
             if (currentUser?.id) {
-              syncCloudPlaylists(currentUser.id, next);
+              syncCloudPlaylists(currentUser.id, next, false, currentUser.email, unavailableSongIds.filter((id) => id !== song.id && id !== res.healedSong.id));
             }
             try {
               const userKey = getUserPlaylistStorageKey(currentUser?.id, currentUser?.email);
@@ -1985,6 +2046,10 @@ export default function App() {
               } : null
             );
           }
+        }
+
+        if (autoPlay) {
+          playSong(res.healedSong);
         }
 
         showToast(
@@ -3640,7 +3705,7 @@ export default function App() {
                           return;
                         }
                         if (isUnavailable) {
-                          showToast(`"${song.name}" está indisponível na fonte. Toque em "Substituir por semelhante".`);
+                          handleQuickHealSong(song, selectedPlaylist.id, true);
                           return;
                         }
                         playSong(song, selectedPlaylist.songs);
@@ -4119,7 +4184,7 @@ export default function App() {
                       key={song.id || idx}
                       onClick={() => {
                         if (isUnavailable) {
-                          showToast(`"${song.name}" está indisponível na fonte. Toque em "Substituir por semelhante".`);
+                          handleQuickHealSong(song, selectedPlaylist.id, true);
                           return;
                         }
                         if (isThisCurrent) {

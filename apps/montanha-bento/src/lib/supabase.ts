@@ -133,11 +133,19 @@ export function subscribeToLibraryChanges(userId: string, onRemoteChange: () => 
 /**
  * Sincronização em nuvem resiliente com suporte a API Serverless, Storage e Realtime Broadcast
  */
+export interface CloudLibraryResult {
+  playlists: any[];
+  unavailableSongs: string[];
+  verifiedSongs: string[];
+}
+
 export async function syncCloudPlaylists(
   userId: string,
   playlists: any[],
   allowEmpty: boolean = false,
-  email?: string
+  email?: string,
+  unavailableSongs: string[] = [],
+  verifiedSongs: string[] = []
 ) {
   if (!userId || !Array.isArray(playlists)) return;
 
@@ -155,7 +163,13 @@ export async function syncCloudPlaylists(
     const res = await fetch('/api/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: canonicalId, email, playlists })
+      body: JSON.stringify({
+        userId: canonicalId,
+        email,
+        playlists,
+        unavailable_songs: unavailableSongs,
+        verified_songs: verifiedSongs
+      })
     });
     if (res.ok) {
       console.log(`[Cloud Sync] ${playlists.length} playlists salvas na nuvem com sucesso para ${canonicalId}!`);
@@ -167,7 +181,14 @@ export async function syncCloudPlaylists(
   try {
     await supabase.storage.from('music-playlists').upload(
       `${canonicalId}.json`,
-      new Blob([JSON.stringify({ playlists, synced_at: new Date().toISOString() })], { type: 'application/json' }),
+      new Blob([
+        JSON.stringify({
+          playlists,
+          unavailable_songs: unavailableSongs,
+          verified_songs: verifiedSongs,
+          synced_at: new Date().toISOString()
+        })
+      ], { type: 'application/json' }),
       { upsert: true }
     );
     console.log(`[Cloud Sync] ${playlists.length} playlists salvas via Supabase Storage para ${canonicalId}.`);
@@ -176,7 +197,7 @@ export async function syncCloudPlaylists(
   }
 }
 
-export async function fetchCloudPlaylists(userId?: string, email?: string): Promise<any[] | null> {
+export async function fetchCloudLibrary(userId?: string, email?: string): Promise<CloudLibraryResult | null> {
   if (!userId) return null;
   const canonicalId = getCanonicalUserId(userId, email);
   if (!canonicalId) return null;
@@ -190,7 +211,11 @@ export async function fetchCloudPlaylists(userId?: string, email?: string): Prom
       const data = await res.json();
       if (Array.isArray(data.playlists) && data.playlists.length > 0) {
         console.log(`[Cloud Pull] ${data.playlists.length} playlists recuperadas via /api/sync!`);
-        return data.playlists;
+        return {
+          playlists: data.playlists,
+          unavailableSongs: Array.isArray(data.unavailable_songs) ? data.unavailable_songs : [],
+          verifiedSongs: Array.isArray(data.verified_songs) ? data.verified_songs : []
+        };
       }
     }
   } catch {}
@@ -204,10 +229,19 @@ export async function fetchCloudPlaylists(userId?: string, email?: string): Prom
       const sData = await storageRes.json();
       if (Array.isArray(sData.playlists) && sData.playlists.length > 0) {
         console.log(`[Cloud Pull] ${sData.playlists.length} playlists recuperadas do Storage!`);
-        return sData.playlists;
+        return {
+          playlists: sData.playlists,
+          unavailableSongs: Array.isArray(sData.unavailable_songs) ? sData.unavailable_songs : [],
+          verifiedSongs: Array.isArray(sData.verified_songs) ? sData.verified_songs : []
+        };
       }
     }
   } catch {}
 
   return null;
+}
+
+export async function fetchCloudPlaylists(userId?: string, email?: string): Promise<any[] | null> {
+  const lib = await fetchCloudLibrary(userId, email);
+  return lib ? lib.playlists : null;
 }

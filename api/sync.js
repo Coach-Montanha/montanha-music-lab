@@ -55,7 +55,13 @@ export default async function handler(req, res) {
       if (storageResp.ok) {
         const sData = await storageResp.json();
         if (Array.isArray(sData?.playlists)) {
-          return res.status(200).json({ playlists: sData.playlists, synced_at: sData.synced_at, canonicalUserId });
+          return res.status(200).json({
+            playlists: sData.playlists,
+            synced_at: sData.synced_at,
+            unavailable_songs: Array.isArray(sData.unavailable_songs) ? sData.unavailable_songs : [],
+            verified_songs: Array.isArray(sData.verified_songs) ? sData.verified_songs : [],
+            canonicalUserId
+          });
         }
       }
 
@@ -69,7 +75,13 @@ export default async function handler(req, res) {
           if (aliasResp.ok) {
             const aData = await aliasResp.json();
             if (Array.isArray(aData?.playlists) && aData.playlists.length > 0) {
-              return res.status(200).json({ playlists: aData.playlists, synced_at: aData.synced_at, canonicalUserId });
+              return res.status(200).json({
+                playlists: aData.playlists,
+                synced_at: aData.synced_at,
+                unavailable_songs: Array.isArray(aData.unavailable_songs) ? aData.unavailable_songs : [],
+                verified_songs: Array.isArray(aData.verified_songs) ? aData.verified_songs : [],
+                canonicalUserId
+              });
             }
           }
         }
@@ -86,6 +98,8 @@ export default async function handler(req, res) {
     try {
       const body = req.body || {};
       const playlists = body.playlists || [];
+      const unavailableSongs = Array.isArray(body.unavailable_songs) ? body.unavailable_songs : [];
+      const verifiedSongs = Array.isArray(body.verified_songs) ? body.verified_songs : [];
 
       if (!canonicalUserId) {
         return res.status(401).json({ error: 'É necessário estar autenticado para sincronizar playlists.' });
@@ -102,7 +116,13 @@ export default async function handler(req, res) {
         ? Array.from(ALBERTO_ALIAS_IDS)
         : [canonicalUserId];
 
-      const payload = JSON.stringify({ playlists, synced_at: syncedAt, updated_by: rawUserId || canonicalUserId });
+      const payload = JSON.stringify({
+        playlists,
+        unavailable_songs: unavailableSongs,
+        verified_songs: verifiedSongs,
+        synced_at: syncedAt,
+        updated_by: rawUserId || canonicalUserId
+      });
 
       // Salva em paralelo para garantir propagação instantânea em todos os dispositivos
       await Promise.all(
