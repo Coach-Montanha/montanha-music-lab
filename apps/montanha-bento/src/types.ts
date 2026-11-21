@@ -54,3 +54,5 @@ export interface CategorizedSearchResults {
   artists: SearchArtist[];
   playlists: SearchPlaylist[];
 }
+
+export type RepeatMode = 'off' | 'all' | 'one';

@@ -7,6 +7,7 @@ import {
   Volume2,
   VolumeX,
   Repeat,
+  Repeat1,
   Shuffle,
   Search,
   Heart,
@@ -45,7 +46,7 @@ import {
   Mic2
 } from 'lucide-react';
 
-import { Song, Playlist, SearchAlbum, SearchArtist, SearchPlaylist, CategorizedSearchResults } from './types';
+import { Song, Playlist, SearchAlbum, SearchArtist, SearchPlaylist, CategorizedSearchResults, RepeatMode } from './types';
 import { storeOfflineBlob, getOfflineBlob, deleteOfflineBlob } from './lib/offlineDb';
 import {
   supabase,
@@ -264,7 +265,16 @@ export default function App() {
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [isShuffle, setIsShuffle] = useState<boolean>(false);
   const isShuffleRef = useRef<boolean>(false);
-  const [isRepeat, setIsRepeat] = useState<boolean>(false);
+  // Modos de Repetição Inteligente: 'off' (Desativado), 'all' (Loop Infinito da Playlist), 'one' (Repetir Esta Música)
+  const [repeatMode, setRepeatMode] = useState<RepeatMode>(() => {
+    try {
+      const saved = localStorage.getItem('montanha_repeat_mode');
+      if (saved === 'all' || saved === 'one' || saved === 'off') return saved;
+    } catch {}
+    return 'all'; // Padrão inteligente: Loop infinito da playlist para nunca parar
+  });
+  const repeatModeRef = useRef<RepeatMode>(repeatMode);
+  repeatModeRef.current = repeatMode;
   const [queue, setQueue] = useState<Song[]>(() => playlists[0]?.songs || INITIAL_PLAYLISTS[0].songs);
 
   // Letras & Legendas Sincronizadas (LRCLIB)
@@ -1198,10 +1208,14 @@ export default function App() {
   handleSeekRef.current = handleSeek;
 
   const takePreloaded = (songId: string) => {
-    if (nextSongStreamRef.current && nextSongStreamRef.current.id === songId) {
-      const s = nextSongStreamRef.current;
+    if (nextSongStreamRef.current) {
+      if (nextSongStreamRef.current.id === songId) {
+        const s = nextSongStreamRef.current;
+        nextSongStreamRef.current = null;
+        return s;
+      }
+      // Se o ID não for correspondente (transição manual ou troca de playlist), limpa o stream pendente para evitar vazamento
       nextSongStreamRef.current = null;
-      return s;
     }
     return null;
   };
@@ -1209,6 +1223,7 @@ export default function App() {
   const preloadTimeoutRef = useRef<any>(null);
   const schedulePreload = (currentSongItem: Song) => {
     if (preloadTimeoutRef.current) clearTimeout(preloadTimeoutRef.current);
+    if (repeatModeRef.current === 'one') return; // Em modo repetir música atual, não pré-carrega outra faixa
 
     const runPreload = () => {
       const currentQ = queueRef.current;
@@ -1216,7 +1231,15 @@ export default function App() {
       const currentIdx = currentQ.findIndex((s) => s.id === currentSongItem.id);
       if (currentIdx === -1) return;
 
-      const nextIdx = (currentIdx + 1) % currentQ.length;
+      let nextIdx = currentIdx + 1;
+      if (nextIdx >= currentQ.length) {
+        if (repeatModeRef.current === 'all') {
+          nextIdx = 0; // Prepara a faixa 0 para manter o loop infinito sem gaps
+        } else {
+          return;
+        }
+      }
+
       const nextSong = currentQ[nextIdx];
       if (nextSong && !unavailableSongIds.includes(nextSong.id)) {
         fetchAudioStream(nextSong.youtubeId, nextSong.name, nextSong.artist, nextSong.audioUrl, nextSong.id)
@@ -1230,7 +1253,14 @@ export default function App() {
 
       // Pré-carrega faixa N+2 em segundo plano para garantir fila ininterrupta
       if (currentQ.length > 2) {
-        const nextNextIdx = (currentIdx + 2) % currentQ.length;
+        let nextNextIdx = currentIdx + 2;
+        if (nextNextIdx >= currentQ.length) {
+          if (repeatModeRef.current === 'all') {
+            nextNextIdx = nextNextIdx % currentQ.length;
+          } else {
+            return;
+          }
+        }
         const nextNextSong = currentQ[nextNextIdx];
         if (nextNextSong && !unavailableSongIds.includes(nextNextSong.id)) {
           fetchAudioStream(nextNextSong.youtubeId, nextNextSong.name, nextNextSong.artist, nextNextSong.audioUrl, nextNextSong.id)
@@ -1264,9 +1294,30 @@ export default function App() {
 
     setCurrentSong(song);
     setCurrentTime(0);
+
     if (newQueue) {
-      setQueue(newQueue);
-      queueRef.current = newQueue;
+      // 1. LIMPEZA IMEDIATA DE CACHE & PRELOAD: Purga qualquer stream remanescente da playlist anterior
+      if (preloadTimeoutRef.current) clearTimeout(preloadTimeoutRef.current);
+      nextSongStreamRef.current = null;
+
+      // 2. ISOLAMENTO ESTRITO DA FILA: Define a nova playlist como fonte de verdade exclusiva
+      const cleanQueue = [...newQueue];
+      originalQueueRef.current = cleanQueue;
+
+      // 3. SE O SHUFFLE ESTIVER ATIVO, EMBARALHA A NOVA PLAYLIST MANTENDO A MÚSICA ESCOLHIDA NA PRIMEIRA POSIÇÃO
+      if (isShuffleRef.current) {
+        const rest = cleanQueue.filter((s) => s.id !== song.id);
+        for (let i = rest.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [rest[i], rest[j]] = [rest[j], rest[i]];
+        }
+        const shuffledQueue = [song, ...rest];
+        setQueue(shuffledQueue);
+        queueRef.current = shuffledQueue;
+      } else {
+        setQueue(cleanQueue);
+        queueRef.current = cleanQueue;
+      }
     }
     showToast(`Tocando: ${song.name}`);
 
@@ -1423,13 +1474,15 @@ export default function App() {
   };
 
   const handleNextSong = () => {
-    if (isRepeat) {
+    // 1. MODO REPETIR UMA MÚSICA ('one')
+    if (repeatModeRef.current === 'one') {
       if (audioRef.current) {
         audioRef.current.currentTime = 0;
         audioRef.current.play().catch(() => {});
       }
       return;
     }
+
     const currentQ = queueRef.current;
     if (currentQ.length === 0) return;
     const curSong = currentSongRef.current;
@@ -1439,8 +1492,42 @@ export default function App() {
         (s) => s.name?.toLowerCase() === curSong.name?.toLowerCase() && s.artist?.toLowerCase() === curSong.artist?.toLowerCase()
       );
     }
+
     let nextIdx = currentIdx + 1;
-    if (nextIdx >= currentQ.length || nextIdx < 0) nextIdx = 0;
+
+    // Fim da fila alcançado
+    if (nextIdx >= currentQ.length) {
+      if (repeatModeRef.current === 'off') {
+        showToast('Fim da playlist.');
+        setIsPlaying(false);
+        isPlayingRef.current = false;
+        mediaSessionController.updatePlaybackState(false);
+        return;
+      }
+
+      // Modo 'all' (Loop Infinito da Playlist):
+      if (isShuffleRef.current) {
+        // Se estiver no modo aleatório, re-embaralha toda a playlist limpa para continuar indefinidamente sem parar
+        const base = originalQueueRef.current.length > 0 ? [...originalQueueRef.current] : [...currentQ];
+        for (let i = base.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [base[i], base[j]] = [base[j], base[i]];
+        }
+        setQueue(base);
+        queueRef.current = base;
+        nextIdx = 0;
+        const nextSong = base[0];
+        if (nextSong) {
+          playSong(nextSong);
+        }
+        return;
+      } else {
+        // Modo sequencial: volta à primeira música da fila
+        nextIdx = 0;
+      }
+    }
+
+    if (nextIdx < 0) nextIdx = 0;
     const nextSong = currentQ[nextIdx];
     if (nextSong) {
       playSong(nextSong);
@@ -1460,13 +1547,43 @@ export default function App() {
       );
     }
     let prevIdx = currentIdx - 1;
-    if (prevIdx < 0) prevIdx = currentQ.length - 1;
+    if (prevIdx < 0) {
+      if (repeatModeRef.current !== 'off') {
+        prevIdx = currentQ.length - 1;
+      } else {
+        prevIdx = 0;
+      }
+    }
     const prevSong = currentQ[prevIdx];
     if (prevSong) {
       playSong(prevSong);
     }
   };
   handlePrevSongRef.current = handlePrevSong;
+
+  // CICLO INTELIGENTE DE REPETIÇÃO: off -> all (loop da playlist) -> one (repetir música atual) -> off
+  const toggleRepeatMode = () => {
+    setRepeatMode((prev) => {
+      let next: RepeatMode = 'off';
+      if (prev === 'off') next = 'all';
+      else if (prev === 'all') next = 'one';
+      else next = 'off';
+
+      repeatModeRef.current = next;
+      try {
+        localStorage.setItem('montanha_repeat_mode', next);
+      } catch {}
+
+      if (next === 'all') {
+        showToast('🔁 Repetir Playlist Ativado: loop infinito sem parar!');
+      } else if (next === 'one') {
+        showToast('🔂 Repetir Esta Música Ativado');
+      } else {
+        showToast('Repetição desativada.');
+      }
+      return next;
+    });
+  };
 
   // BOTÃO SHUFFLE REAL: Embaralha imediatamente a fila de execução visível e sincroniza refs
   const toggleShuffle = (overrideQueue?: Song[] | any, targetSong?: Song) => {
@@ -1475,7 +1592,7 @@ export default function App() {
     isShuffleRef.current = nextShuffle;
 
     const validOverride = Array.isArray(overrideQueue) ? overrideQueue : undefined;
-    const baseQueue = validOverride || (queueRef.current.length > 0 ? queueRef.current : queue);
+    const baseQueue = validOverride || (originalQueueRef.current.length > 0 ? originalQueueRef.current : (queueRef.current.length > 0 ? queueRef.current : queue));
     const activeSong = targetSong || currentSongRef.current || currentSong;
 
     if (nextShuffle) {
@@ -1589,10 +1706,15 @@ export default function App() {
     showToast('Música removida dos downloads.');
   };
 
-  // SELEÇÃO DE PLAYLIST: APENAS ABRE A PLAYLIST PARA VISUALIZAÇÃO
-  // (A fila de reprodução é relacionada exclusivamente ao tocar a playlist ou faixa)
+  // SELEÇÃO DE PLAYLIST: ABRE A PLAYLIST E ISOLA ESTRITAMENTE A FILA
+  // (Limpa qualquer stream pré-carregado remanescente da playlist anterior para evitar vazamento entre listas)
   const handleSelectPlaylist = (pl: Playlist) => {
     setSelectedPlaylist(pl);
+    if (pl.songs && pl.songs.length > 0) {
+      originalQueueRef.current = [...pl.songs];
+      if (preloadTimeoutRef.current) clearTimeout(preloadTimeoutRef.current);
+      nextSongStreamRef.current = null;
+    }
   };
 
   // DOWNLOAD DE PLAYLIST COMPLETA
@@ -2528,7 +2650,7 @@ export default function App() {
       <audio
         ref={audioRef}
         preload="auto"
-        loop={isRepeat}
+        loop={repeatMode === 'one'}
         playsInline={true}
         crossOrigin="anonymous"
         style={{
@@ -3594,21 +3716,26 @@ export default function App() {
                     <Shuffle size={18} />
                   </button>
 
-                  {/* BOTÃO REPEAT NA PLAYLIST */}
+                  {/* BOTÃO REPEAT NA PLAYLIST (Ciclo Inteligente: Playlist Loop -> Música Atual -> Desligado) */}
                   <button
-                    onClick={() => {
-                      const nextRepeat = !isRepeat;
-                      setIsRepeat(nextRepeat);
-                      showToast(nextRepeat ? 'Repetir música ativado' : 'Repetição desativada');
-                    }}
-                    className={`flex h-10 w-10 items-center justify-center rounded-full border transition active:scale-95 ${
-                      isRepeat
+                    onClick={toggleRepeatMode}
+                    className={`relative flex h-10 w-10 items-center justify-center rounded-full border transition active:scale-95 ${
+                      repeatMode !== 'off'
                         ? 'bg-[#1DB954]/20 border-[#1DB954] text-[#1DB954]'
                         : 'bg-white/5 border-white/10 text-neutral-300 hover:text-white hover:bg-white/10'
                     }`}
-                    title={isRepeat ? 'Repetição Ativada' : 'Ativar Repetição'}
+                    title={
+                      repeatMode === 'all'
+                        ? 'Repetir Playlist (Loop Infinito Ativado)'
+                        : repeatMode === 'one'
+                        ? 'Repetir Esta Música (Loop Único Ativado)'
+                        : 'Ativar Repetição de Playlist'
+                    }
                   >
-                    <Repeat size={18} />
+                    {repeatMode === 'one' ? <Repeat1 size={18} /> : <Repeat size={18} />}
+                    {repeatMode === 'all' && (
+                      <span className="absolute bottom-1.5 h-1 w-1 rounded-full bg-[#1DB954]" />
+                    )}
                   </button>
 
                   <button
@@ -4818,19 +4945,24 @@ export default function App() {
                 <SkipForward size={18} fill="currentColor" />
               </button>
 
-              {/* BOTÃO REPEAT NO DESKTOP */}
+              {/* BOTÃO REPEAT NO DESKTOP (Ciclo: Loop da Playlist -> Repetir Música -> Desativado) */}
               <button
-                onClick={() => {
-                  const nextRep = !isRepeat;
-                  setIsRepeat(nextRep);
-                  showToast(nextRep ? 'Repetir música ativado' : 'Repetição desativada');
-                }}
-                className={`p-1.5 rounded-full transition ${
-                  isRepeat ? 'text-[#1DB954] bg-[#1DB954]/15' : 'text-neutral-400 hover:text-white'
+                onClick={toggleRepeatMode}
+                className={`relative p-1.5 rounded-full transition flex items-center justify-center ${
+                  repeatMode !== 'off' ? 'text-[#1DB954] bg-[#1DB954]/15' : 'text-neutral-400 hover:text-white'
                 }`}
-                title={isRepeat ? 'Repetir Música Ativado' : 'Ativar Repetição'}
+                title={
+                  repeatMode === 'all'
+                    ? 'Repetir Playlist (Loop Infinito)'
+                    : repeatMode === 'one'
+                    ? 'Repetir Esta Música'
+                    : 'Ativar Repetição de Playlist'
+                }
               >
-                <Repeat size={16} />
+                {repeatMode === 'one' ? <Repeat1 size={16} /> : <Repeat size={16} />}
+                {repeatMode === 'all' && (
+                  <span className="absolute bottom-0.5 h-1 w-1 rounded-full bg-[#1DB954]" />
+                )}
               </button>
             </div>
 
@@ -5083,11 +5215,24 @@ export default function App() {
                 <SkipForward size={28} fill="currentColor" />
               </button>
 
+              {/* BOTÃO REPEAT NO FULLSCREEN PLAYER (Ciclo Inteligente) */}
               <button
-                onClick={() => setIsRepeat(!isRepeat)}
-                className={`p-2 transition ${isRepeat ? 'text-[#1DB954]' : 'text-neutral-400 hover:text-white'}`}
+                onClick={toggleRepeatMode}
+                className={`relative p-2 transition flex items-center justify-center ${
+                  repeatMode !== 'off' ? 'text-[#1DB954]' : 'text-neutral-400 hover:text-white'
+                }`}
+                title={
+                  repeatMode === 'all'
+                    ? 'Repetir Playlist (Loop Infinito)'
+                    : repeatMode === 'one'
+                    ? 'Repetir Esta Música'
+                    : 'Ativar Repetição de Playlist'
+                }
               >
-                <Repeat size={20} />
+                {repeatMode === 'one' ? <Repeat1 size={20} /> : <Repeat size={20} />}
+                {repeatMode === 'all' && (
+                  <span className="absolute bottom-1 h-1 w-1 rounded-full bg-[#1DB954]" />
+                )}
               </button>
             </div>
           </div>
