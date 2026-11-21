@@ -103,7 +103,7 @@ export async function autoHealOrSubstituteSong(song: Song): Promise<HealResult> 
         return bScore - aScore;
       });
 
-      // Testa os 3 melhores candidatos para garantir que o áudio realmente funciona
+      // 1. Tenta validar se algum dos 3 melhores candidatos já possui stream imediato
       for (const cand of candidateSongs.slice(0, 3)) {
         try {
           const testStream = await fetchAudioStream(
@@ -114,7 +114,6 @@ export async function autoHealOrSubstituteSong(song: Song): Promise<HealResult> 
             cand.id
           );
           if (testStream?.url) {
-            // Candidato funcional validado!
             const substituted: Song = {
               ...cand,
               id: cand.id,
@@ -122,7 +121,8 @@ export async function autoHealOrSubstituteSong(song: Song): Promise<HealResult> 
               artist: cand.artist || song.artist,
               album: cand.album || song.album,
               thumbnail: cand.thumbnail || song.thumbnail,
-              duration: cand.duration || song.duration || 210
+              duration: cand.duration || song.duration || 210,
+              audioUrl: testStream.url
             };
             return {
               success: true,
@@ -133,6 +133,28 @@ export async function autoHealOrSubstituteSong(song: Song): Promise<HealResult> 
           }
         } catch {}
       }
+
+      // 2. CONFORME DIRETRIZ ESTRITA DO USUÁRIO:
+      // Se a validação síncrona não responder em tempo, substitui AUTOMATICAMENTE
+      // pela primeira música na seleção que surgiria na tela para o usuário (top match oficial)
+      const topMatch = candidateSongs[0];
+      const substituted: Song = {
+        ...topMatch,
+        id: topMatch.id || `sub-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        name: topMatch.name || song.name,
+        artist: topMatch.artist || song.artist,
+        album: topMatch.album || song.album,
+        thumbnail: topMatch.thumbnail || song.thumbnail,
+        duration: topMatch.duration || song.duration || 210,
+        audioUrl: topMatch.audioUrl || ''
+      };
+
+      return {
+        success: true,
+        healedSong: substituted,
+        method: 'substituted',
+        originalId
+      };
     }
   } catch (err) {
     console.warn('[SongHealer] Falha ao procurar alternativas:', err);

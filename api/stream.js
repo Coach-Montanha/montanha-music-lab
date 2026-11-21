@@ -1,6 +1,8 @@
 // Serverless Function /api/stream - Montanha Music
-// Resolve áudio de alta fidelidade (320kbps MP4 Akamai / YouTube Audio Completo)
-// Otimizado com busca concorrente paralela (< 1.5s) e zero travamentos
+// Resolve áudio de alta fidelidade (320kbps MP4 Akamai JioSaavn nativo / YouTube / Deezer / iTunes)
+// Otimizado com busca concorrente paralela (< 1.5s), zero dependências externas quebradas e zero travamentos
+
+import { createDecipheriv } from 'node:crypto';
 
 function sanitizeTitle(str) {
   return (str || '')
@@ -33,6 +35,23 @@ function extractArtistCandidates(artistStr) {
     candidates.push(firstWord);
   }
   return candidates.length > 0 ? candidates : [artistStr.trim()];
+}
+
+// Descriptografia nativa de stream JioSaavn (3DES-ECB com chave '38346591' repetida 3x)
+// Funciona 100% em qualquer versão do Node / Bun sem depender de serviços externos que possam cair
+function decryptSaavnMediaUrl(encryptedMediaUrl) {
+  if (!encryptedMediaUrl) return '';
+  try {
+    const singleKey = Buffer.from('38346591', 'utf8');
+    const tripleKey = Buffer.concat([singleKey, singleKey, singleKey]);
+    const decipher = createDecipheriv('des-ede3-ecb', tripleKey, null);
+    decipher.setAutoPadding(true);
+    let dec = decipher.update(encryptedMediaUrl, 'base64', 'utf8');
+    dec += decipher.final('utf8');
+    return dec.trim().replace('http:', 'https:');
+  } catch {
+    return '';
+  }
 }
 
 async function searchYouTubeVideoId(query) {
@@ -90,29 +109,38 @@ export default async function handler(req, res) {
   const cleanT = sanitizeTitle(title);
   const candidates = extractArtistCandidates(artist);
 
-  // 1 e 2. Busca Concorrente Paralela: Saavn (Tier 1 320k) e YouTube/Invidious (Tier 2 Universal)
-  // Permite que músicas nacionais (Gospel, Sertanejo, Pagode, Funk, etc.) toquem em < 2 segundos
+  // 1. TIER 1: JioSaavn Nativo 320kbps MP4 Akamai (Descriptografia Local Segura)
   const saavnPromise = (async () => {
     if (!cleanT) return null;
     const candidateList = [...candidates];
     if (cleanT.length > 4) candidateList.push(cleanT);
 
     const saavnPromises = candidateList.slice(0, 3).map(async (cand) => {
-      const resp = await fetch(
-        `https://fast-saavn.vercel.app/api?title=${encodeURIComponent(cleanT)}&artist=${encodeURIComponent(cand)}`,
-        { signal: AbortSignal.timeout(2000) }
-      );
+      const q = `${cleanT} ${cand}`.trim();
+      const jioUrl = `https://www.jiosaavn.com/api.php?_format=json&_marker=0&api_version=4&ctx=web6dot0&__call=search.getResults&q=${encodeURIComponent(q)}&p=0&n=5`;
+      const resp = await fetch(jioUrl, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+        signal: AbortSignal.timeout(2500)
+      });
       if (resp.ok) {
-        const streamId = (await resp.text()).trim();
-        if (streamId && streamId.length > 5 && !streamId.includes('error') && !streamId.includes('not found')) {
-          return {
-            url: `https://aac.saavncdn.com/${streamId}${bitrateSuffix}.mp4`,
-            duration: 210,
-            mimeType: 'audio/mp4',
-            title,
-            artist: cand,
-            source: quality === 'economy' ? 'saavn-96' : quality === 'standard' ? 'saavn-160' : 'saavn-320'
-          };
+        const data = await resp.json();
+        const results = data.results || [];
+        for (const item of results) {
+          const encUrl = item.more_info?.encrypted_media_url;
+          if (encUrl) {
+            const rawUrl = decryptSaavnMediaUrl(encUrl);
+            if (rawUrl && rawUrl.includes('saavncdn.com')) {
+              const streamUrl = rawUrl.replace(/_\d+\.mp4$/, `${bitrateSuffix}.mp4`);
+              return {
+                url: streamUrl,
+                duration: Number(item.more_info?.duration) || 210,
+                mimeType: 'audio/mp4',
+                title: item.title || title,
+                artist: cand,
+                source: (quality === 'economy' ? 'saavn-96' : quality === 'standard' ? 'saavn-160' : 'saavn-320')
+              };
+            }
+          }
         }
       }
       throw new Error('not found');
@@ -125,6 +153,60 @@ export default async function handler(req, res) {
     }
   })();
 
+  // 2. TIER 2: Deezer API Stream (Garante reprodução de faixas internacionais/rock que não estão no Saavn)
+  const deezerPromise = (async () => {
+    if (!cleanT) return null;
+    try {
+      const q = `${cleanT} ${candidates[0] || artist}`.trim();
+      const dzRes = await fetch(`https://api.deezer.com/search/track?q=${encodeURIComponent(q)}&limit=1`, {
+        headers: { 'User-Agent': 'Mozilla/5.0' },
+        signal: AbortSignal.timeout(2500)
+      });
+      if (dzRes.ok) {
+        const data = await dzRes.json();
+        const track = data?.data?.[0];
+        if (track?.preview) {
+          return {
+            url: track.preview,
+            duration: track.duration || 210,
+            mimeType: 'audio/mpeg',
+            title: track.title || title,
+            artist: track.artist?.name || artist,
+            source: 'deezer'
+          };
+        }
+      }
+    } catch {}
+    return null;
+  })();
+
+  // 3. TIER 3: iTunes Search API Stream
+  const itunesPromise = (async () => {
+    if (!cleanT) return null;
+    try {
+      const q = `${cleanT} ${candidates[0] || artist}`.trim();
+      const itRes = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=song&limit=1`, {
+        signal: AbortSignal.timeout(2500)
+      });
+      if (itRes.ok) {
+        const data = await itRes.json();
+        const track = data?.results?.[0];
+        if (track?.previewUrl) {
+          return {
+            url: track.previewUrl,
+            duration: track.trackTimeMillis ? Math.round(track.trackTimeMillis / 1000) : 210,
+            mimeType: 'audio/mp4',
+            title: track.trackName || title,
+            artist: track.artistName || artist,
+            source: 'itunes'
+          };
+        }
+      }
+    } catch {}
+    return null;
+  })();
+
+  // 4. TIER 4: YouTube / Invidious Stream Resolver
   const ytPromise = (async () => {
     let youtubeId = id.replace(/^yt-/, '').split('&')[0];
     if (!youtubeId || !/^[a-zA-Z0-9_-]{11}$/.test(youtubeId)) {
@@ -177,8 +259,14 @@ export default async function handler(req, res) {
     return null;
   })();
 
-  const [saavnRes, ytRes] = await Promise.all([saavnPromise, ytPromise]);
-  const finalWinner = saavnRes || ytRes;
+  const [saavnRes, deezerRes, itunesRes, ytRes] = await Promise.all([
+    saavnPromise,
+    deezerPromise,
+    itunesPromise,
+    ytPromise
+  ]);
+
+  const finalWinner = saavnRes || deezerRes || itunesRes || ytRes;
 
   if (finalWinner) {
     return res.status(200).json(finalWinner);

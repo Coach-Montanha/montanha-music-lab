@@ -1416,6 +1416,49 @@ export default function App() {
         streamUrl = song.audioUrl;
         streamDuration = song.duration || 210;
       } else {
+        // AUTOCURA EM TEMPO REAL ON-THE-FLY:
+        // Evita pausa ou interrupção na reprodução substituindo a faixa automaticamente pela melhor alternativa da seleção
+        showToast(`Auto-recuperando "${song.name}"...`);
+        try {
+          const healRes = await autoHealOrSubstituteSong(song);
+          if (healRes.success && healRes.healedSong && healRes.healedSong.id !== song.id) {
+            const healed = healRes.healedSong;
+
+            setPlaylists((prev) => {
+              const updated = prev.map((pl) => ({
+                ...pl,
+                songs: pl.songs.map((s) => (s.id === song.id ? healed : s))
+              }));
+              if (currentUser?.id) {
+                syncCloudPlaylists(currentUser.id, updated).catch(() => {});
+              }
+              try {
+                const userKey = getUserPlaylistStorageKey(currentUser?.id, currentUser?.email);
+                localStorage.setItem(userKey, JSON.stringify(updated));
+              } catch {}
+              return updated;
+            });
+
+            if (selectedPlaylist) {
+              setSelectedPlaylist((prev) =>
+                prev ? { ...prev, songs: prev.songs.map((s) => (s.id === song.id ? healed : s)) } : null
+              );
+            }
+
+            setQueue((prev) => prev.map((s) => (s.id === song.id ? healed : s)));
+            queueRef.current = queueRef.current.map((s) => (s.id === song.id ? healed : s));
+            originalQueueRef.current = originalQueueRef.current.map((s) => (s.id === song.id ? healed : s));
+
+            markSongAvailable(song.id);
+            markSongAvailable(healed.id);
+
+            showToast(`"${healed.name}" recuperada automaticamente!`);
+            return playSong(healed);
+          }
+        } catch (healErr) {
+          console.warn('[AutoHeal On-The-Fly Error]', healErr);
+        }
+
         markSongUnavailable(song.id);
         isSwitchingRef.current = false;
         showToast(`"${song.name}" está indisponível na fonte. Toque em "Substituir por semelhante".`);

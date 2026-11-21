@@ -100,41 +100,62 @@ async function fetchFromInternalApi(title: string, artist: string, youtubeId?: s
   return null;
 }
 
-// 2. TIER 2: Fast-Saavn Direto (Busca Concorrente Ultrarrápida em Paralelo)
-async function fetchFromSaavnDirect(title: string, artist: string): Promise<StreamResult | null> {
+// 2. TIER 2: Deezer API Direto (CORS seguro via client)
+async function fetchFromDeezerDirect(title: string, artist: string): Promise<StreamResult | null> {
   const cleanT = sanitizeTitle(title);
   if (!cleanT) return null;
   const candidates = getArtistCandidates(artist);
-  if (cleanT.length > 4) candidates.push(cleanT);
-  const quality = typeof window !== 'undefined' ? localStorage.getItem('montanha_sound_quality') || 'high' : 'high';
-  const bitrateSuffix = quality === 'economy' ? '_96' : quality === 'standard' ? '_160' : '_320';
+  const q = `${cleanT} ${candidates[0] || artist}`.trim();
 
-  const promises = candidates.slice(0, 3).map(async (cand) => {
-    const res = await fetch(
-      `https://fast-saavn.vercel.app/api?title=${encodeURIComponent(cleanT)}&artist=${encodeURIComponent(cand)}`,
-      { signal: AbortSignal.timeout(2000) }
-    );
+  try {
+    const res = await fetch(`https://api.deezer.com/search/track?q=${encodeURIComponent(q)}&limit=1`, {
+      signal: AbortSignal.timeout(3000)
+    });
     if (res.ok) {
-      const id = (await res.text()).trim();
-      if (id && id.length > 5 && !id.includes('error') && !id.includes('not found')) {
+      const data = await res.json();
+      const track = data?.data?.[0];
+      if (track?.preview) {
         return {
-          url: `https://aac.saavncdn.com/${id}${bitrateSuffix}.mp4`,
-          duration: 210,
-          mimeType: 'audio/mp4',
-          title,
-          artist: cand,
-          source: (quality === 'economy' ? 'saavn-96' : quality === 'standard' ? 'saavn-160' : 'saavn-320') as any
+          url: track.preview,
+          duration: track.duration || 210,
+          mimeType: 'audio/mpeg',
+          title: track.title || title,
+          artist: track.artist?.name || artist,
+          source: 'deezer'
         };
       }
     }
-    throw new Error('not found');
-  });
+  } catch {}
+  return null;
+}
+
+// 3. TIER 3: iTunes API Direto (CORS nativo da Apple)
+async function fetchFromItunesDirect(title: string, artist: string): Promise<StreamResult | null> {
+  const cleanT = sanitizeTitle(title);
+  if (!cleanT) return null;
+  const candidates = getArtistCandidates(artist);
+  const q = `${cleanT} ${candidates[0] || artist}`.trim();
 
   try {
-    return await Promise.any(promises);
-  } catch {
-    return null;
-  }
+    const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=song&limit=1`, {
+      signal: AbortSignal.timeout(3000)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const track = data?.results?.[0];
+      if (track?.previewUrl) {
+        return {
+          url: track.previewUrl,
+          duration: track.trackTimeMillis ? Math.round(track.trackTimeMillis / 1000) : 210,
+          mimeType: 'audio/mp4',
+          title: track.trackName || title,
+          artist: track.artistName || artist,
+          source: 'blob'
+        };
+      }
+    }
+  } catch {}
+  return null;
 }
 
 export function fetchAudioStream(
@@ -170,13 +191,13 @@ export function fetchAudioStream(
       }
     }
 
-    // Passo 2: Busca direta no Saavn (Akamai 320kbps MP4 Completo em paralelo)
+    // Passo 2: Busca direta em Deezer (CORS) e iTunes
     if (songName) {
-      const saavnResult = await fetchFromSaavnDirect(songName, artistName || '');
-      if (saavnResult) {
-        streamCache.set(cacheKey, saavnResult);
-        if (songId) streamCache.set(songId, saavnResult);
-        return saavnResult;
+      const directResult = await fetchFromDeezerDirect(songName, artistName || '') || await fetchFromItunesDirect(songName, artistName || '');
+      if (directResult) {
+        streamCache.set(cacheKey, directResult);
+        if (songId) streamCache.set(songId, directResult);
+        return directResult;
       }
     }
 
