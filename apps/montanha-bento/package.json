@@ -1,8 +1,8 @@
 {
-  "name": "montanha-music-lab",
+  "name": "montanha-music",
   "private": true,
   "version": "1.0.0",
-  "description": "Montanha Music Lab • Streaming & Playlists sem limites, integrado ao Ecossistema Montanha",
+  "description": "Montanha Music • Streaming & Playlists sem limites, integrado ao Ecossistema Montanha",
   "author": "Coach Montanha",
   "type": "module",
   "scripts": {

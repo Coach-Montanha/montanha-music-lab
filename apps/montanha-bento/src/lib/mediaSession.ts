@@ -46,8 +46,8 @@ export class MediaSessionController {
       const artwork = normalizeArtwork(track.artworkUrl);
       navigator.mediaSession.metadata = new MediaMetadata({
         title: track.title || 'Música',
-        artist: track.artist || 'Montanha Music Lab',
-        album: track.album || 'Montanha Music Lab',
+        artist: track.artist || 'Montanha Music',
+        album: track.album || 'Montanha Music',
         artwork,
       });
       // Garante que o playbackState permaneça 'playing' para evitar descarte da notificação pelo SO

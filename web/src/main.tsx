@@ -50,7 +50,7 @@ class RootErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState
             <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-400">
               <span className="text-xl font-bold">M</span>
             </div>
-            <h1 className="text-xl font-bold text-white">Montanha Music Lab</h1>
+            <h1 className="text-xl font-bold text-white">Montanha Music</h1>
             <p className="mt-2 text-sm text-gray-400">
               Detectamos uma atualização nos arquivos da aplicação.
             </p>

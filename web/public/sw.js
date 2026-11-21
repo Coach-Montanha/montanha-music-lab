@@ -1,4 +1,4 @@
-// Service Worker para Montanha Music Lab PWA - Versão 4.0 Resiliente Anti-Cache Trap
+// Service Worker para Montanha Music PWA - Versão 4.0 Resiliente Anti-Cache Trap
 const CACHE_NAME = 'montanha-music-v4';
 
 self.addEventListener('install', (event) => {

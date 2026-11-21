@@ -264,9 +264,9 @@ interface DownloadJob {
   items?: DownloadJobItem[];
 }
 
-const GITHUB_RELEASES_LATEST_URL = 'https://github.com/hasbuen/Montanha Music Lab/releases/latest';
-const GITHUB_ANDROID_APK_URL = `${GITHUB_RELEASES_LATEST_URL}/download/Montanha Music Lab-Android.apk`;
-const GITHUB_ANDROID_APK_ASSET_NAME = 'Montanha Music Lab-Android.apk';
+const GITHUB_RELEASES_LATEST_URL = 'https://github.com/hasbuen/Montanha Music/releases/latest';
+const GITHUB_ANDROID_APK_URL = `${GITHUB_RELEASES_LATEST_URL}/download/Montanha Music-Android.apk`;
+const GITHUB_ANDROID_APK_ASSET_NAME = 'Montanha Music-Android.apk';
 
 type ViewMode = 'grid' | 'list';
 type Section = 'home' | 'search' | 'playlists' | 'albums' | 'favorites' | 'local_files' | 'downloads' | 'settings' | 'explore' | 'library' | 'download';
@@ -326,7 +326,7 @@ const DESKTOP_ONBOARDING_STEPS: DesktopOnboardingStep[] = [
   {
     id: 'nav-download',
     title: 'Entrada de captura',
-    description: 'O Montanha Music Lab já pode abrir direto em downloads. Esse atalho concentra busca no YouTube, fila e publicação no catálogo.',
+    description: 'O Montanha Music já pode abrir direto em downloads. Esse atalho concentra busca no YouTube, fila e publicação no catálogo.',
     accent: 'Use a seção "Baixar do YouTube" como ponto de entrada para novas faixas.'
   },
   {
@@ -339,7 +339,7 @@ const DESKTOP_ONBOARDING_STEPS: DesktopOnboardingStep[] = [
     id: 'youtube-search',
     title: 'Busca integrada no YouTube',
     description: 'A seção de downloads resolve pesquisa e seleção dentro do app, reduzindo ida e volta entre navegador e player.',
-    accent: 'Busque, analise e publique faixas sem sair do Montanha Music Lab.'
+    accent: 'Busque, analise e publique faixas sem sair do Montanha Music.'
   },
   {
     id: 'mini-player',
@@ -700,7 +700,7 @@ const DEFAULT_LOCAL_PLAYLISTS: Playlist[] = [
 
 export default function App() {
   const storedDeviceId = localStorage.getItem(DEVICE_ID_STORAGE_KEY) || createDeviceId();
-  let rawDeviceName = 'Notebook Montanha Music Lab';
+  let rawDeviceName = 'Notebook Montanha Music';
   const storedDeviceName = rawDeviceName;
   localStorage.setItem(DEVICE_ID_STORAGE_KEY, storedDeviceId);
   localStorage.setItem(DEVICE_NAME_STORAGE_KEY, storedDeviceName);
@@ -1364,8 +1364,8 @@ export default function App() {
     if (currentSong) {
       mediaSessionController.updateMetadata({
         title: currentSong.title,
-        artist: currentSong.artist || 'Coach Montanha Music Lab',
-        album: (currentSong as any).album || 'Montanha Music Lab',
+        artist: currentSong.artist || 'Coach Montanha Music',
+        album: (currentSong as any).album || 'Montanha Music',
         artworkUrl: currentSong.thumbnail || undefined
       });
     }
@@ -2505,7 +2505,7 @@ export default function App() {
   );
   const updateHeadline =
     desktopUpdateStatus.releaseName ||
-    (desktopUpdateStatus.availableVersion ? `Montanha Music Lab ${desktopUpdateStatus.availableVersion}` : 'Atualizacao do Montanha Music Lab');
+    (desktopUpdateStatus.availableVersion ? `Montanha Music ${desktopUpdateStatus.availableVersion}` : 'Atualizacao do Montanha Music');
   const desktopTourFocusClass = 'border-cyan-300/45 bg-cyan-300/[0.08] shadow-[0_0_0_1px_rgba(103,232,249,0.18),0_20px_60px_rgba(8,145,178,0.12)]';
 
   const settingsContent = (
@@ -2612,7 +2612,7 @@ export default function App() {
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-white">Atualização automática</p>
                   <p className="mt-2 text-sm leading-6 text-gray-400">
-                    Verifica novas versões do Montanha Music Lab em segundo plano e baixa o instalador sozinho quando houver update.
+                    Verifica novas versões do Montanha Music em segundo plano e baixa o instalador sozinho quando houver update.
                   </p>
                 </div>
                 <span className={`shrink-0 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] ${desktopPreferences.autoUpdateEnabled ? 'bg-green-500/15 text-green-300' : 'bg-white/10 text-gray-400'}`}>
@@ -2646,7 +2646,7 @@ export default function App() {
                         }))
                       }
                       onBlur={() => void updateDesktopPreference({ backupDirectory: desktopPreferences.backupDirectory })}
-                      placeholder="Ex.: C:\\Users\\SeuUsuario\\Music\\Montanha Music Lab Backup"
+                      placeholder="Ex.: C:\\Users\\SeuUsuario\\Music\\Montanha Music Backup"
                       className="mt-2 h-9 w-full truncate bg-transparent text-sm font-semibold text-white outline-none placeholder:text-gray-600"
                     />
                   </div>
@@ -2732,7 +2732,7 @@ export default function App() {
                     <p className="text-xs uppercase tracking-[0.22em] text-gray-500">Atualizações do GitHub</p>
                     <p className="mt-3 text-base font-semibold text-white">Versão atual {desktopUpdateStatus.currentVersion}</p>
                     <p className="mt-2 text-sm leading-6 text-gray-400">
-                      O Montanha Music Lab verifica as releases publicadas em segundo plano e avisa quando entra uma atualização nova.
+                      O Montanha Music verifica as releases publicadas em segundo plano e avisa quando entra uma atualização nova.
                     </p>
                   </div>
                   <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] uppercase tracking-[0.22em] text-gray-300">
@@ -2933,8 +2933,8 @@ export default function App() {
                   <p className="mt-4 text-sm font-semibold text-white">QR do ultimo APK publicado</p>
                   <p className="mt-2 text-xs leading-5 text-gray-500">
                     {androidApkInfo?.fileExists
-                      ? 'O APK local ja foi gerado, mas este QR baixa direto o Montanha Music Lab-Android.apk do latest release no GitHub.'
-                      : 'Ao ler com o celular, o download abre direto no asset Montanha Music Lab-Android.apk do latest release no GitHub.'}
+                      ? 'O APK local ja foi gerado, mas este QR baixa direto o Montanha Music-Android.apk do latest release no GitHub.'
+                      : 'Ao ler com o celular, o download abre direto no asset Montanha Music-Android.apk do latest release no GitHub.'}
                   </p>
                 </div>
               </div>
@@ -4233,9 +4233,9 @@ export default function App() {
           <div className="flex flex-col justify-between border-r border-white/10 bg-[linear-gradient(180deg,rgba(9,30,20,0.92)_0%,rgba(5,5,5,0.92)_100%)] p-10">
             <div>
               <div className="inline-flex items-center gap-4 rounded-full border border-white/10 bg-white/[0.04] px-4 py-3">
-                <img src={brandMark} alt="Montanha Music Lab" className="h-12 w-12 rounded-2xl" />
+                <img src={brandMark} alt="Montanha Music" className="h-12 w-12 rounded-2xl" />
                 <div>
-                  <p className="text-xs uppercase tracking-[0.32em] text-green-400/80">Montanha Music Lab Desktop</p>
+                  <p className="text-xs uppercase tracking-[0.32em] text-green-400/80">Montanha Music Desktop</p>
                   <p className="mt-1 text-sm text-gray-400">Player local com cara de produto</p>
                 </div>
               </div>
@@ -4308,7 +4308,7 @@ export default function App() {
                   onClick={() => void openBrowserClient()}
                   className="w-full rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-gray-300 transition hover:border-cyan-400/40 hover:text-white"
                 >
-                  Abrir Montanha Music Lab no navegador
+                  Abrir Montanha Music no navegador
                 </button>
 
                 {authMessage ? <p className="text-sm text-gray-400">{authMessage}</p> : null}
@@ -4401,7 +4401,7 @@ export default function App() {
         <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-tr from-[#004799] to-[#0066cc] shadow-[0_0_35px_rgba(0,102,204,0.5)] border border-blue-400/30">
           <LoaderCircle size={26} className="animate-spin text-white" />
         </div>
-        <p className="mt-4 text-xs font-semibold tracking-wider text-sky-400 uppercase">Montanha Music Lab</p>
+        <p className="mt-4 text-xs font-semibold tracking-wider text-sky-400 uppercase">Montanha Music</p>
       </div>
     );
   }
@@ -4442,7 +4442,7 @@ export default function App() {
       />
 
       <div className="flex h-full min-h-0">
-        {/* DESKTOP SIDEBAR - 100% FIEL AO SPOTUBE / MONTANHA MUSIC LAB */}
+        {/* DESKTOP SIDEBAR - 100% FIEL AO SPOTUBE / MONTANHA MUSIC */}
         <aside className="hidden h-full w-72 flex-col overflow-y-auto border-r border-white/5 bg-[#090b10] lg:flex select-none">
           {/* Header Brand */}
           <div className="flex items-center gap-3 px-6 py-5 border-b border-white/5">
@@ -4450,7 +4450,7 @@ export default function App() {
               <ScreenShare size={20} />
             </div>
             <div>
-              <h1 className="text-base font-bold tracking-tight text-white">Montanha Music Lab</h1>
+              <h1 className="text-base font-bold tracking-tight text-white">Montanha Music</h1>
               <p className="text-[10px] uppercase tracking-wider text-sky-400 font-medium">Spotube Core Engine</p>
             </div>
           </div>
@@ -5526,7 +5526,7 @@ export default function App() {
                 <div className="flex items-center justify-between border-b border-white/5 pb-4">
                   <div>
                     <h2 className="text-2xl font-black text-white">Minhas Playlists</h2>
-                    <p className="text-xs text-gray-400 mt-1">Playlists salvas e criadas no Montanha Music Lab</p>
+                    <p className="text-xs text-gray-400 mt-1">Playlists salvas e criadas no Montanha Music</p>
                   </div>
                   <button
                     type="button"

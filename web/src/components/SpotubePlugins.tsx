@@ -352,7 +352,7 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
                     />
                   </div>
                   <p className="text-[11px] text-gray-400 leading-relaxed">
-                    Sincroniza automaticamente suas playlists públicas e favoritas do Spotify diretamente no Montanha Music Lab.
+                    Sincroniza automaticamente suas playlists públicas e favoritas do Spotify diretamente no Montanha Music.
                   </p>
                   <button
                     type="button"
@@ -723,7 +723,7 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
           <div className="space-y-6">
             <div>
               <h2 className="text-xl font-bold text-white">Aparência</h2>
-              <p className="text-xs text-gray-400 mt-1">Personalize os temas e a paleta de cores do Montanha Music Lab.</p>
+              <p className="text-xs text-gray-400 mt-1">Personalize os temas e a paleta de cores do Montanha Music.</p>
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 space-y-5">
@@ -952,7 +952,7 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
         return (
           <div className="space-y-6">
             <div>
-              <h2 className="text-xl font-bold text-white">Sobre o Montanha Music Lab</h2>
+              <h2 className="text-xl font-bold text-white">Sobre o Montanha Music</h2>
               <p className="text-xs text-gray-400 mt-1">Informações de versão, arquitetura e conexões ativas.</p>
             </div>
 
@@ -962,7 +962,7 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
                   <Music2 size={28} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-white">Montanha Music Lab</h3>
+                  <h3 className="text-lg font-bold text-white">Montanha Music</h3>
                   <p className="text-xs text-sky-400 font-mono">Versão 1.0.0 (Spotube Core Engine)</p>
                   <p className="text-[11px] text-gray-500 mt-0.5">Arquitetura Spotube Core • 100% Livre de Anúncios</p>
                 </div>
@@ -1251,7 +1251,7 @@ export const SpotubePlugins: React.FC<SpotubePluginsProps> = ({
           </div>
 
           <div className="px-3 text-[11px] text-gray-500">
-            Montanha Music Lab v1.0.0
+            Montanha Music v1.0.0
           </div>
         </aside>
 

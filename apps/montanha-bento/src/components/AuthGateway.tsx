@@ -80,12 +80,12 @@ export function AuthGateway({ onSuccess }: AuthGatewayProps) {
         {/* CABEÇALHO DO GATEWAY */}
         <div className="text-center space-y-3">
           <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-white/5 border border-white/10 shadow-[0_10px_30px_rgba(29,185,84,0.2)] p-2">
-            <img src="/icon-192.png" alt="Montanha Music Lab" className="w-full h-full object-contain drop-shadow" />
+            <img src="/icon-192.png" alt="Montanha Music" className="w-full h-full object-contain drop-shadow" />
           </div>
           <div>
             <h2 className="text-2xl font-black text-white tracking-tight flex items-center justify-center gap-2">
               <span>Montanha</span>
-              <span className="text-[#1DB954]">Music Lab</span>
+              <span className="text-[#1DB954]">Music</span>
             </h2>
             <p className="text-xs text-neutral-400 mt-1 max-w-xs mx-auto leading-relaxed">
               {isRegister
@@ -185,7 +185,7 @@ export function AuthGateway({ onSuccess }: AuthGatewayProps) {
               <Loader2 size={18} className="animate-spin" />
             ) : (
               <>
-                <span>{isRegister ? 'Criar Conta e Entrar' : 'Entrar no Montanha Music Lab'}</span>
+                <span>{isRegister ? 'Criar Conta e Entrar' : 'Entrar no Montanha Music'}</span>
                 <ArrowRight size={16} />
               </>
             )}

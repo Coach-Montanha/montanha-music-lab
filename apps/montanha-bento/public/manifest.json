@@ -1,7 +1,7 @@
 {
-  "name": "Montanha Music Lab",
-  "short_name": "Montanha Music Lab",
-  "description": "Montanha Music Lab • Streaming & Playlists sem limites, integrado ao Ecossistema Montanha",
+  "name": "Montanha Music",
+  "short_name": "Montanha Music",
+  "description": "Montanha Music • Streaming & Playlists sem limites, integrado ao Ecossistema Montanha",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#121212",

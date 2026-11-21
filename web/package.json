@@ -2,7 +2,7 @@
   "name": "montanha-desktop-web",
   "private": true,
   "version": "1.0.0",
-  "description": "Montanha Music Lab universal desktop and web player with library sync, mini player, tray mode, and background playback",
+  "description": "Montanha Music universal desktop and web player with library sync, mini player, tray mode, and background playback",
   "author": "Coach Montanha",
   "type": "module",
   "scripts": {

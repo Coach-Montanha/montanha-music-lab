@@ -86,7 +86,7 @@ const INITIAL_PLAYLISTS: Playlist[] = [
   {
     id: "sp-pl-running",
     name: "Running",
-    creator: "Montanha Music Lab",
+    creator: "Montanha Music",
     cover: "https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?w=600&q=80",
     songs: [
       { id: "run-1", name: "Till I Collapse", artist: "Eminem, Nate Dogg", youtubeId: "ytQ5CYE1VZw", thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80", duration: 297 },
@@ -98,7 +98,7 @@ const INITIAL_PLAYLISTS: Playlist[] = [
   {
     id: "sp-pl-cth-dance",
     name: "CTH 2.0 Dance",
-    creator: "Montanha Music Lab",
+    creator: "Montanha Music",
     cover: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600&q=80",
     songs: [
       { id: "dance-1", name: "Put Your Hands Up For Detroit", artist: "Fedde Le Grand", youtubeId: "SYs2HGYbr28", thumbnail: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=400&q=80", duration: 150 },
@@ -109,7 +109,7 @@ const INITIAL_PLAYLISTS: Playlist[] = [
   {
     id: "sp-pl-cth-2",
     name: "CTH 2.0",
-    creator: "Montanha Music Lab",
+    creator: "Montanha Music",
     cover: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=600&q=80",
     songs: [
       { id: "cth-1", name: "The Way I Am", artist: "Eminem", youtubeId: "mQvteoFiMlg", thumbnail: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=400&q=80", duration: 290 },
@@ -119,7 +119,7 @@ const INITIAL_PLAYLISTS: Playlist[] = [
   {
     id: "sp-pl-my-workout",
     name: "My Workout",
-    creator: "Montanha Music Lab",
+    creator: "Montanha Music",
     cover: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600&q=80",
     songs: [
       { id: "wod-1", name: "Remember the Name", artist: "Fort Minor", youtubeId: "VDvr08sCPOc", thumbnail: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=400&q=80", duration: 230 },
@@ -130,7 +130,7 @@ const INITIAL_PLAYLISTS: Playlist[] = [
   {
     id: "sp-pl-barbecue-rock",
     name: "Barbecue Rock",
-    creator: "Montanha Music Lab",
+    creator: "Montanha Music",
     cover: "https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=600&q=80",
     songs: [
       { id: "rock-1", name: "Back in Black", artist: "AC/DC", youtubeId: "pAgnJDJN4VA", thumbnail: "https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=400&q=80", duration: 255 },
@@ -1026,7 +1026,7 @@ export default function App() {
     const { outcome } = await deferredPrompt.userChoice;
     if (outcome === 'accepted') {
       setIsInstallable(false);
-      showToast('Able Music Player instalado com sucesso!');
+      showToast('Montanha Music instalado com sucesso!');
     }
     setDeferredPrompt(null);
   };
@@ -1037,7 +1037,7 @@ export default function App() {
       mediaSessionController.updateMetadata({
         title: currentSong.name,
         artist: currentSong.artist,
-        album: currentSong.album || 'Able Music',
+        album: currentSong.album || 'Montanha Music',
         artworkUrl: currentSong.thumbnail
       });
     }
@@ -1253,7 +1253,7 @@ export default function App() {
     };
   }, []);
 
-  // Motor Unificado Padrão Montanha Music Lab (HTML5 Audio com Streaming 320kbps e Background-Safe)
+  // Motor Unificado Padrão Montanha Music (HTML5 Audio com Streaming 320kbps e Background-Safe)
   const playSong = async (song: Song, newQueue?: Song[], retry = 0) => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -1274,7 +1274,7 @@ export default function App() {
     mediaSessionController.updateMetadata({
       title: song.name,
       artist: song.artist,
-      album: song.album || 'Able Music',
+      album: song.album || 'Montanha Music',
       artworkUrl: song.thumbnail,
     });
     mediaSessionController.updatePlaybackState(true);
@@ -2488,7 +2488,7 @@ export default function App() {
     const newPl: Playlist = {
       id: `pl-${entity.type}-${Date.now()}`,
       name: titlePrefix,
-      creator: entity.subtitle || 'Montanha Music Lab',
+      creator: entity.subtitle || 'Montanha Music',
       cover: entity.cover,
       songs: entity.songs,
       isCustom: true
@@ -2558,7 +2558,7 @@ export default function App() {
             mediaSessionController.updateMetadata({
               title: currentSongRef.current.name,
               artist: currentSongRef.current.artist,
-              album: currentSongRef.current.album || 'Montanha Music Lab',
+              album: currentSongRef.current.album || 'Montanha Music',
               artworkUrl: currentSongRef.current.thumbnail,
             });
           }
@@ -2653,11 +2653,11 @@ export default function App() {
 
           <div className="flex items-center gap-2.5 flex-shrink-0 select-none">
             <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-white/5 border border-white/10 shadow-lg p-1 flex-shrink-0">
-              <img src="/icon-192.png" alt="Montanha Music Lab" className="w-full h-full object-contain drop-shadow" />
+              <img src="/icon-192.png" alt="Montanha Music" className="w-full h-full object-contain drop-shadow" />
             </div>
             <div className="flex flex-col justify-center leading-none">
               <span className="text-sm sm:text-base font-black tracking-tight text-white leading-none">Montanha</span>
-              <span className="text-[8px] sm:text-[9px] font-extrabold tracking-widest text-[#1DB954] uppercase mt-1 leading-none">MUSIC LAB</span>
+              <span className="text-[8px] sm:text-[9px] font-extrabold tracking-widest text-[#1DB954] uppercase mt-1 leading-none">MUSIC</span>
             </div>
           </div>
         </div>
@@ -2752,7 +2752,7 @@ export default function App() {
           <button
             onClick={handleInstallPwa}
             className="flex items-center gap-1.5 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-bold text-white transition border border-white/10 flex-shrink-0"
-            title="Baixar e Instalar Montanha Music Lab no seu Celular ou Computador"
+            title="Baixar e Instalar Montanha Music no seu Celular ou Computador"
           >
             <Smartphone size={14} className="text-[#1DB954]" />
             <span className="hidden sm:inline">Baixar App</span>

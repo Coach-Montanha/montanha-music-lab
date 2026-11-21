@@ -1,4 +1,4 @@
-// Serverless Function /api/stream - Montanha Music Lab
+// Serverless Function /api/stream - Montanha Music
 // Resolve áudio de alta fidelidade (320kbps MP4 Akamai / YouTube Audio Completo)
 // Otimizado com busca concorrente paralela (< 1.5s) e zero travamentos
 

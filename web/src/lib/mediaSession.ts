@@ -1,5 +1,5 @@
 /**
- * Montanha Music Lab - MediaSession API Service
+ * Montanha Music - MediaSession API Service
  * Permite reprodução em segundo plano e controles nativos no iOS (Lock Screen, AirPods, CarPlay, Dynamic Island),
  * Android (Notificação de Mídia) e Desktop (Teclas multimídia do teclado).
  */
@@ -26,7 +26,7 @@ export class MediaSessionController {
 
     navigator.mediaSession.metadata = new MediaMetadata({
       title: track.title,
-      artist: track.artist || 'Montanha Music Lab',
+      artist: track.artist || 'Montanha Music',
       album: track.album || 'Biblioteca Pessoal',
       artwork: track.artworkUrl
         ? [

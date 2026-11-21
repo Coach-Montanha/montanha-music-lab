@@ -210,7 +210,7 @@ export const SupabaseAuthModal: React.FC<SupabaseAuthModalProps> = ({
             <Cloud size={24} />
           </div>
           <div>
-            <h2 className="text-xl font-bold tracking-tight text-white">Montanha Music Lab</h2>
+            <h2 className="text-xl font-bold tracking-tight text-white">Montanha Music</h2>
             <p className="text-xs text-sky-400 font-medium flex items-center gap-1.5 mt-0.5">
               <ShieldCheck size={13} className="text-sky-400" />
               Sincronização em Nuvem (Supabase)
