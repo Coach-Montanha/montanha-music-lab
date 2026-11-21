@@ -7,11 +7,28 @@ export interface StreamResult {
   mimeType: string;
   title?: string;
   artist?: string;
-  source: 'saavn-320' | 'invidious' | 'deezer' | 'blob';
+  source: 'saavn-320' | 'youtube-full' | 'invidious-full' | 'blob';
 }
 
 const streamCache = new Map<string, StreamResult>();
 const inflight = new Map<string, Promise<StreamResult | null>>();
+
+export function isDisallowedPreview(url?: string, duration?: number): boolean {
+  if (!url || typeof url !== 'string') return true;
+  if (
+    url.includes('dzcdn.net') ||
+    url.includes('preview') ||
+    url.includes('apple.com') ||
+    url.includes('mzstatic') ||
+    url.includes('sndcdn.com/preview')
+  ) {
+    return true;
+  }
+  if (duration && Number(duration) <= 30) {
+    return true;
+  }
+  return false;
+}
 
 export function getCachedStream(song: { id?: string; youtubeId?: string; name?: string; artist?: string } | string): StreamResult | null {
   if (typeof song === 'string') {
@@ -100,64 +117,6 @@ async function fetchFromInternalApi(title: string, artist: string, youtubeId?: s
   return null;
 }
 
-// 2. TIER 2: Deezer API Direto (CORS seguro via client)
-async function fetchFromDeezerDirect(title: string, artist: string): Promise<StreamResult | null> {
-  const cleanT = sanitizeTitle(title);
-  if (!cleanT) return null;
-  const candidates = getArtistCandidates(artist);
-  const q = `${cleanT} ${candidates[0] || artist}`.trim();
-
-  try {
-    const res = await fetch(`https://api.deezer.com/search/track?q=${encodeURIComponent(q)}&limit=1`, {
-      signal: AbortSignal.timeout(3000)
-    });
-    if (res.ok) {
-      const data = await res.json();
-      const track = data?.data?.[0];
-      if (track?.preview) {
-        return {
-          url: track.preview,
-          duration: track.duration || 210,
-          mimeType: 'audio/mpeg',
-          title: track.title || title,
-          artist: track.artist?.name || artist,
-          source: 'deezer'
-        };
-      }
-    }
-  } catch {}
-  return null;
-}
-
-// 3. TIER 3: iTunes API Direto (CORS nativo da Apple)
-async function fetchFromItunesDirect(title: string, artist: string): Promise<StreamResult | null> {
-  const cleanT = sanitizeTitle(title);
-  if (!cleanT) return null;
-  const candidates = getArtistCandidates(artist);
-  const q = `${cleanT} ${candidates[0] || artist}`.trim();
-
-  try {
-    const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=song&limit=1`, {
-      signal: AbortSignal.timeout(3000)
-    });
-    if (res.ok) {
-      const data = await res.json();
-      const track = data?.results?.[0];
-      if (track?.previewUrl) {
-        return {
-          url: track.previewUrl,
-          duration: track.trackTimeMillis ? Math.round(track.trackTimeMillis / 1000) : 210,
-          mimeType: 'audio/mp4',
-          title: track.trackName || title,
-          artist: track.artistName || artist,
-          source: 'blob'
-        };
-      }
-    }
-  } catch {}
-  return null;
-}
-
 export function fetchAudioStream(
   youtubeId?: string,
   songName?: string,
@@ -169,11 +128,19 @@ export function fetchAudioStream(
   const cacheKey = cleanId || `${songName || ''}-${artistName || ''}`;
 
   if (songId && streamCache.has(songId)) {
-    return Promise.resolve(streamCache.get(songId)!);
+    const cached = streamCache.get(songId)!;
+    if (!isDisallowedPreview(cached.url, cached.duration)) {
+      return Promise.resolve(cached);
+    }
+    streamCache.delete(songId);
   }
 
   if (streamCache.has(cacheKey)) {
-    return Promise.resolve(streamCache.get(cacheKey)!);
+    const cached = streamCache.get(cacheKey)!;
+    if (!isDisallowedPreview(cached.url, cached.duration)) {
+      return Promise.resolve(cached);
+    }
+    streamCache.delete(cacheKey);
   }
 
   if (inflight.has(cacheKey)) {
@@ -181,35 +148,18 @@ export function fetchAudioStream(
   }
 
   const promise = (async () => {
-    // Passo 1: Busca via Serverless API interna (Saavn 320kbps + Invidious YouTube Completo)
+    // Passo 1: Busca via Serverless API interna (Saavn 320kbps + YTDL YouTube Completo — Zero 30s)
     if (songName || cleanId) {
       const internalResult = await fetchFromInternalApi(songName || '', artistName || '', cleanId);
-      if (internalResult) {
+      if (internalResult && !isDisallowedPreview(internalResult.url, internalResult.duration)) {
         streamCache.set(cacheKey, internalResult);
         if (songId) streamCache.set(songId, internalResult);
         return internalResult;
       }
     }
 
-    // Passo 2: Busca direta em Deezer (CORS) e iTunes
-    if (songName) {
-      const directResult = await fetchFromDeezerDirect(songName, artistName || '') || await fetchFromItunesDirect(songName, artistName || '');
-      if (directResult) {
-        streamCache.set(cacheKey, directResult);
-        if (songId) streamCache.set(songId, directResult);
-        return directResult;
-      }
-    }
-
-    // Passo 3: Fallback do objeto original (apenas se for áudio completo, rejeita previews de 30s)
-    if (
-      fallbackAudioUrl &&
-      fallbackAudioUrl.startsWith('http') &&
-      !fallbackAudioUrl.includes('preview') &&
-      !fallbackAudioUrl.includes('dzcdn.net') &&
-      !fallbackAudioUrl.includes('apple.com') &&
-      !fallbackAudioUrl.includes('mzstatic')
-    ) {
+    // Passo 2: Fallback do áudio salvo originalmente (SE E SOMENTE SE for áudio completo — zero previews de 30s)
+    if (fallbackAudioUrl && !isDisallowedPreview(fallbackAudioUrl)) {
       const fallbackResult: StreamResult = {
         url: fallbackAudioUrl,
         duration: 210,

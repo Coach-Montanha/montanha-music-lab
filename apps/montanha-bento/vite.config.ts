@@ -1,5 +1,9 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { createDecipheriv } from 'node:crypto';
+import { Ytdl } from '@distube/ytdl-core';
+
+const ytdlClient = new Ytdl();
 
 const SUPABASE_URL = 'https://muryznvaxzszcffrbxpv.supabase.co';
 const SUPABASE_SERVICE_ROLE_KEY =
@@ -79,7 +83,7 @@ export default defineConfig({
           next();
         });
 
-        // 1.5. /api/stream middleware (Proxy local com suporte a Saavn 320kbps e Invidious)
+        // 1.5. /api/stream middleware (Proxy local com suporte a Saavn 320kbps nativo e YTDL Completo)
         server.middlewares.use(async (req, res, next) => {
           if (!req.url?.startsWith('/api/stream')) return next();
           res.setHeader('Content-Type', 'application/json');
@@ -113,19 +117,65 @@ export default defineConfig({
           const firstWord = rawArtists[0]?.split(' ')[0];
           if (firstWord && firstWord.length > 2) candidates.add(firstWord);
 
-          // Tier 1: Saavn 320kbps MP4 Completo com busca paralela ultrarrápida
+          function decryptSaavnMedia(encryptedMediaUrl: string): string {
+            if (!encryptedMediaUrl) return '';
+            try {
+              const singleKey = Buffer.from('38346591', 'utf8');
+              const tripleKey = Buffer.concat([singleKey, singleKey, singleKey]);
+              const decipher = createDecipheriv('des-ede3-ecb', tripleKey, null);
+              decipher.setAutoPadding(true);
+              let dec = decipher.update(encryptedMediaUrl, 'base64', 'utf8');
+              dec += decipher.final('utf8');
+              return dec.trim().replace('http:', 'https:');
+            } catch {
+              return '';
+            }
+          }
+
+          function isDisallowed(url: string, duration?: number): boolean {
+            if (!url || typeof url !== 'string') return true;
+            if (url.includes('dzcdn.net') || url.includes('mzstatic') || url.includes('apple.com') || url.includes('preview')) {
+              return true;
+            }
+            if (duration && Number(duration) <= 30) {
+              return true;
+            }
+            return false;
+          }
+
+          // Tier 1: Saavn 320kbps MP4 Completo Nativo com 3DES
           if (cleanT) {
             const candidateList = Array.from(candidates);
             if (cleanT.length > 4) candidateList.push(cleanT);
 
             const saavnPromises = candidateList.slice(0, 3).map(async (cand) => {
-              const saavnRes = await fetch(
-                `https://fast-saavn.vercel.app/api?title=${encodeURIComponent(cleanT)}&artist=${encodeURIComponent(cand)}`
-              );
+              const q = `${cleanT} ${cand}`.trim();
+              const jioUrl = `https://www.jiosaavn.com/api.php?_format=json&_marker=0&api_version=4&ctx=web6dot0&__call=search.getResults&q=${encodeURIComponent(q)}&p=0&n=5`;
+              const saavnRes = await fetch(jioUrl, {
+                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+                signal: AbortSignal.timeout(3000)
+              });
               if (saavnRes.ok) {
-                const streamId = (await saavnRes.text()).trim();
-                if (streamId && streamId.length > 5 && !streamId.includes('error') && !streamId.includes('not found')) {
-                  return { streamId, cand };
+                const data = await saavnRes.json();
+                for (const item of (data.results || [])) {
+                  const encUrl = item.more_info?.encrypted_media_url;
+                  if (encUrl) {
+                    const rawUrl = decryptSaavnMedia(encUrl);
+                    if (rawUrl && rawUrl.includes('saavncdn.com')) {
+                      const streamUrl = rawUrl.replace(/_\d+\.mp4$/, '_320.mp4');
+                      const duration = Number(item.more_info?.duration) || 210;
+                      if (!isDisallowed(streamUrl, duration)) {
+                        return {
+                          url: streamUrl,
+                          duration,
+                          mimeType: 'audio/mp4',
+                          title: item.title || title,
+                          artist: cand,
+                          source: 'saavn-320'
+                        };
+                      }
+                    }
+                  }
                 }
               }
               throw new Error('not found');
@@ -133,32 +183,26 @@ export default defineConfig({
 
             try {
               const winner = await Promise.any(saavnPromises);
-              if (winner?.streamId) {
+              if (winner?.url) {
                 res.statusCode = 200;
-                res.end(JSON.stringify({
-                  url: `https://aac.saavncdn.com/${winner.streamId}_320.mp4`,
-                  duration: 210,
-                  mimeType: 'audio/mp4',
-                  title,
-                  artist: winner.cand,
-                  source: 'saavn-320'
-                }));
+                res.end(JSON.stringify(winner));
                 return;
               }
             } catch {}
           }
 
-          // Tier 2: Invidious YouTube Resolver (Com Resolução Automática de ID)
-          let youtubeId = id.replace(/^yt-/, '').split('&')[0];
-          if (!youtubeId || !/^[a-zA-Z0-9_-]{11}$/.test(youtubeId)) {
-            if (cleanT) {
-              try {
+          // Tier 2: YouTube Completo via YTDL nativo (Zero 30s)
+          try {
+            let youtubeId = id.replace(/^yt-/, '').split('&')[0];
+            if (!youtubeId || !/^[a-zA-Z0-9_-]{11}$/.test(youtubeId)) {
+              if (cleanT) {
                 const query = `${cleanT} ${Array.from(candidates)[0] || artist}`.trim();
                 const ytResp = await fetch(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`, {
                   headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                     'Accept-Language': 'en-US,en;q=0.9'
-                  }
+                  },
+                  signal: AbortSignal.timeout(3000)
                 });
                 if (ytResp.ok) {
                   const html = await ytResp.text();
@@ -167,49 +211,39 @@ export default defineConfig({
                     youtubeId = match[1];
                   }
                 }
-              } catch {}
+              }
             }
-          }
 
-          const mirrors = ['https://yt.chocolatemoo53.com', 'https://invidious.nerdvpn.de', 'https://inv.nadeko.net'];
-          if (youtubeId && /^[a-zA-Z0-9_-]{11}$/.test(youtubeId)) {
-            for (const host of mirrors) {
-              try {
-                const invRes = await fetch(`${host}/api/v1/videos/${youtubeId}`, {
-                  headers: { 'User-Agent': 'Mozilla/5.0' }
+            if (youtubeId && /^[a-zA-Z0-9_-]{11}$/.test(youtubeId)) {
+              const info = await ytdlClient.getInfo(`https://www.youtube.com/watch?v=${youtubeId}`);
+              const duration = Number(info.videoDetails?.lengthSeconds) || 210;
+              const audioFormats = (info.formats || []).filter((f: any) => f.hasAudio && !f.hasVideo && f.url);
+              if (audioFormats.length > 0) {
+                const sorted = [...audioFormats].sort((a: any, b: any) => {
+                  const aMp4 = (a.mimeType || '').includes('mp4') ? 1 : 0;
+                  const bMp4 = (b.mimeType || '').includes('mp4') ? 1 : 0;
+                  if (aMp4 !== bMp4) return bMp4 - aMp4;
+                  return (b.audioBitrate || 0) - (a.audioBitrate || 0);
                 });
-                if (invRes.ok) {
-                  const data = await invRes.json();
-                  const audios = (data.adaptiveFormats || []).filter(
-                    (f: any) => f.type && (f.type.startsWith('audio/mp4') || f.type.startsWith('audio/webm'))
-                  );
-                  if (audios.length > 0) {
-                    audios.sort((a: any, b: any) => {
-                      const aMp4 = a.type.startsWith('audio/mp4') ? 1 : 0;
-                      const bMp4 = b.type.startsWith('audio/webm') ? 0 : 1;
-                      if (aMp4 !== bMp4) return bMp4 - aMp4;
-                      return (parseInt(b.bitrate) || 0) - (parseInt(a.bitrate) || 0);
-                    });
-                    const best = audios[0];
-                    const proxied = best.url.replace(new URL(best.url).origin, host);
-                    res.statusCode = 200;
-                    res.end(JSON.stringify({
-                      url: proxied,
-                      duration: Number(data.lengthSeconds) || 210,
-                      mimeType: best.type.split(';')[0] || 'audio/mp4',
-                      title: data.title || title,
-                      artist: data.author || artist,
-                      source: 'invidious'
-                    }));
-                    return;
-                  }
+                const best = sorted[0];
+                if (best?.url && !isDisallowed(best.url, duration)) {
+                  res.statusCode = 200;
+                  res.end(JSON.stringify({
+                    url: best.url,
+                    duration,
+                    mimeType: best.mimeType ? best.mimeType.split(';')[0] : 'audio/mp4',
+                    title: info.videoDetails?.title || title,
+                    artist: info.videoDetails?.author?.name || artist,
+                    source: 'youtube-full'
+                  }));
+                  return;
                 }
-              } catch {}
+              }
             }
-          }
+          } catch {}
 
           res.statusCode = 404;
-          res.end(JSON.stringify({ error: 'Áudio não encontrado' }));
+          res.end(JSON.stringify({ error: 'Áudio completo não encontrado' }));
         });
 
         // 2. /api/youtube-search middleware

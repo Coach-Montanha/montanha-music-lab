@@ -1,5 +1,5 @@
 import { Song } from '../types';
-import { fetchAudioStream } from './audioStreamEngine';
+import { fetchAudioStream, isDisallowedPreview } from './audioStreamEngine';
 import { searchCategorized } from './searchEngine';
 
 export interface HealResult {
@@ -113,7 +113,8 @@ export async function autoHealOrSubstituteSong(song: Song): Promise<HealResult> 
             cand.audioUrl,
             cand.id
           );
-          if (testStream?.url) {
+          if (testStream?.url && !isDisallowedPreview(testStream.url, testStream.duration)) {
+            const permanentAudio = testStream.url.includes('saavncdn.com') ? testStream.url : '';
             const substituted: Song = {
               ...cand,
               id: cand.id,
@@ -121,8 +122,8 @@ export async function autoHealOrSubstituteSong(song: Song): Promise<HealResult> 
               artist: cand.artist || song.artist,
               album: cand.album || song.album,
               thumbnail: cand.thumbnail || song.thumbnail,
-              duration: cand.duration || song.duration || 210,
-              audioUrl: testStream.url
+              duration: testStream.duration || cand.duration || song.duration || 210,
+              audioUrl: permanentAudio
             };
             return {
               success: true,

@@ -1,8 +1,11 @@
 // Serverless Function /api/stream - Montanha Music
-// Resolve áudio de alta fidelidade (320kbps MP4 Akamai JioSaavn nativo / YouTube / Deezer / iTunes)
-// Otimizado com busca concorrente paralela (< 1.5s), zero dependências externas quebradas e zero travamentos
+// Resolve áudio de alta fidelidade (320kbps MP4 Akamai JioSaavn nativo / YouTube Completo)
+// 100% MÚSICAS COMPLETAS — PREVIEWS DE 30s BANIDOS TERMINANTEMENTE
 
 import { createDecipheriv } from 'node:crypto';
+import { Ytdl } from '@distube/ytdl-core';
+
+const ytdlClient = new Ytdl();
 
 function sanitizeTitle(str) {
   return (str || '')
@@ -38,7 +41,6 @@ function extractArtistCandidates(artistStr) {
 }
 
 // Descriptografia nativa de stream JioSaavn (3DES-ECB com chave '38346591' repetida 3x)
-// Funciona 100% em qualquer versão do Node / Bun sem depender de serviços externos que possam cair
 function decryptSaavnMediaUrl(encryptedMediaUrl) {
   if (!encryptedMediaUrl) return '';
   try {
@@ -59,7 +61,7 @@ async function searchYouTubeVideoId(query) {
   try {
     const ytSearchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
     const ytResp = await fetch(ytSearchUrl, {
-      signal: AbortSignal.timeout(2200),
+      signal: AbortSignal.timeout(3000),
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept-Language': 'en-US,en;q=0.9'
@@ -74,21 +76,18 @@ async function searchYouTubeVideoId(query) {
       }
     }
   } catch {}
-
-  // Fallback rápido Invidious
-  try {
-    const r = await fetch(`https://yt.chocolatemoo53.com/api/v1/search?q=${encodeURIComponent(query)}&type=video`, {
-      signal: AbortSignal.timeout(2000)
-    });
-    if (r.ok) {
-      const data = await r.json();
-      if (Array.isArray(data) && data[0]?.videoId) {
-        return data[0].videoId;
-      }
-    }
-  } catch {}
-
   return null;
+}
+
+function isDisallowedPreview(url, duration) {
+  if (!url || typeof url !== 'string') return true;
+  if (url.includes('dzcdn.net') || url.includes('mzstatic') || url.includes('apple.com') || url.includes('preview')) {
+    return true;
+  }
+  if (duration && Number(duration) <= 30) {
+    return true;
+  }
+  return false;
 }
 
 export default async function handler(req, res) {
@@ -109,7 +108,7 @@ export default async function handler(req, res) {
   const cleanT = sanitizeTitle(title);
   const candidates = extractArtistCandidates(artist);
 
-  // 1. TIER 1: JioSaavn Nativo 320kbps MP4 Akamai (Descriptografia Local Segura)
+  // 1. TIER 1: JioSaavn Nativo 320kbps MP4 Akamai (Áudio 100% Completo)
   const saavnPromise = (async () => {
     if (!cleanT) return null;
     const candidateList = [...candidates];
@@ -120,7 +119,7 @@ export default async function handler(req, res) {
       const jioUrl = `https://www.jiosaavn.com/api.php?_format=json&_marker=0&api_version=4&ctx=web6dot0&__call=search.getResults&q=${encodeURIComponent(q)}&p=0&n=5`;
       const resp = await fetch(jioUrl, {
         headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
-        signal: AbortSignal.timeout(2500)
+        signal: AbortSignal.timeout(3000)
       });
       if (resp.ok) {
         const data = await resp.json();
@@ -131,14 +130,17 @@ export default async function handler(req, res) {
             const rawUrl = decryptSaavnMediaUrl(encUrl);
             if (rawUrl && rawUrl.includes('saavncdn.com')) {
               const streamUrl = rawUrl.replace(/_\d+\.mp4$/, `${bitrateSuffix}.mp4`);
-              return {
-                url: streamUrl,
-                duration: Number(item.more_info?.duration) || 210,
-                mimeType: 'audio/mp4',
-                title: item.title || title,
-                artist: cand,
-                source: (quality === 'economy' ? 'saavn-96' : quality === 'standard' ? 'saavn-160' : 'saavn-320')
-              };
+              const duration = Number(item.more_info?.duration) || 210;
+              if (!isDisallowedPreview(streamUrl, duration)) {
+                return {
+                  url: streamUrl,
+                  duration,
+                  mimeType: 'audio/mp4',
+                  title: item.title || title,
+                  artist: cand,
+                  source: (quality === 'economy' ? 'saavn-96' : quality === 'standard' ? 'saavn-160' : 'saavn-320')
+                };
+              }
             }
           }
         }
@@ -153,61 +155,49 @@ export default async function handler(req, res) {
     }
   })();
 
-  // 2. TIER 2: Deezer API Stream (Garante reprodução de faixas internacionais/rock que não estão no Saavn)
-  const deezerPromise = (async () => {
-    if (!cleanT) return null;
+  // 2. TIER 2: YouTube Completo via YTDL nativo (Zero 30s, faixas completas com 206 HTTP)
+  const ytdlPromise = (async () => {
     try {
-      const q = `${cleanT} ${candidates[0] || artist}`.trim();
-      const dzRes = await fetch(`https://api.deezer.com/search/track?q=${encodeURIComponent(q)}&limit=1`, {
-        headers: { 'User-Agent': 'Mozilla/5.0' },
-        signal: AbortSignal.timeout(2500)
-      });
-      if (dzRes.ok) {
-        const data = await dzRes.json();
-        const track = data?.data?.[0];
-        if (track?.preview) {
-          return {
-            url: track.preview,
-            duration: track.duration || 210,
-            mimeType: 'audio/mpeg',
-            title: track.title || title,
-            artist: track.artist?.name || artist,
-            source: 'deezer'
-          };
+      let youtubeId = id.replace(/^yt-/, '').split('&')[0];
+      if (!youtubeId || !/^[a-zA-Z0-9_-]{11}$/.test(youtubeId)) {
+        if (cleanT) {
+          const query = `${cleanT} ${candidates[0] || artist}`.trim();
+          youtubeId = await searchYouTubeVideoId(query);
+        }
+      }
+
+      if (youtubeId && /^[a-zA-Z0-9_-]{11}$/.test(youtubeId)) {
+        const info = await ytdlClient.getInfo(`https://www.youtube.com/watch?v=${youtubeId}`);
+        const duration = Number(info.videoDetails?.lengthSeconds) || 210;
+        const audioFormats = (info.formats || []).filter(f => f.hasAudio && !f.hasVideo && f.url);
+        
+        if (audioFormats.length > 0) {
+          // Seleciona o melhor formato de áudio (preferência mp4/m4a para iOS/Android)
+          const sorted = [...audioFormats].sort((a, b) => {
+            const aMp4 = (a.mimeType || '').includes('mp4') ? 1 : 0;
+            const bMp4 = (b.mimeType || '').includes('mp4') ? 1 : 0;
+            if (aMp4 !== bMp4) return bMp4 - aMp4;
+            return (b.audioBitrate || 0) - (a.audioBitrate || 0);
+          });
+          const best = sorted[0];
+          if (best?.url && !isDisallowedPreview(best.url, duration)) {
+            return {
+              url: best.url,
+              duration,
+              mimeType: best.mimeType ? best.mimeType.split(';')[0] : 'audio/mp4',
+              title: info.videoDetails?.title || title,
+              artist: info.videoDetails?.author?.name || artist,
+              source: 'youtube-full'
+            };
+          }
         }
       }
     } catch {}
     return null;
   })();
 
-  // 3. TIER 3: iTunes Search API Stream
-  const itunesPromise = (async () => {
-    if (!cleanT) return null;
-    try {
-      const q = `${cleanT} ${candidates[0] || artist}`.trim();
-      const itRes = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=song&limit=1`, {
-        signal: AbortSignal.timeout(2500)
-      });
-      if (itRes.ok) {
-        const data = await itRes.json();
-        const track = data?.results?.[0];
-        if (track?.previewUrl) {
-          return {
-            url: track.previewUrl,
-            duration: track.trackTimeMillis ? Math.round(track.trackTimeMillis / 1000) : 210,
-            mimeType: 'audio/mp4',
-            title: track.trackName || title,
-            artist: track.artistName || artist,
-            source: 'itunes'
-          };
-        }
-      }
-    } catch {}
-    return null;
-  })();
-
-  // 4. TIER 4: YouTube / Invidious Stream Resolver
-  const ytPromise = (async () => {
+  // 3. TIER 3: Invidious YouTube Resolver (Fallback secundário para stream completo)
+  const invidiousPromise = (async () => {
     let youtubeId = id.replace(/^yt-/, '').split('&')[0];
     if (!youtubeId || !/^[a-zA-Z0-9_-]{11}$/.test(youtubeId)) {
       if (cleanT) {
@@ -226,6 +216,7 @@ export default async function handler(req, res) {
         });
         if (invRes.ok) {
           const data = await invRes.json();
+          const duration = Number(data.lengthSeconds) || 210;
           const audios = (data.adaptiveFormats || []).filter(
             (f) => f.type && (f.type.startsWith('audio/mp4') || f.type.startsWith('audio/webm'))
           );
@@ -239,14 +230,16 @@ export default async function handler(req, res) {
             });
             const best = audios[0];
             const proxied = best.url.replace(new URL(best.url).origin, host);
-            return {
-              url: proxied,
-              duration: Number(data.lengthSeconds) || 210,
-              mimeType: best.type.split(';')[0] || 'audio/mp4',
-              title: data.title || title,
-              artist: data.author || artist,
-              source: 'invidious'
-            };
+            if (!isDisallowedPreview(proxied, duration)) {
+              return {
+                url: proxied,
+                duration,
+                mimeType: best.type.split(';')[0] || 'audio/mp4',
+                title: data.title || title,
+                artist: data.author || artist,
+                source: 'invidious-full'
+              };
+            }
           }
         }
         throw new Error('mirror failed');
@@ -259,18 +252,17 @@ export default async function handler(req, res) {
     return null;
   })();
 
-  const [saavnRes, deezerRes, itunesRes, ytRes] = await Promise.all([
+  const [saavnRes, ytdlRes, invRes] = await Promise.all([
     saavnPromise,
-    deezerPromise,
-    itunesPromise,
-    ytPromise
+    ytdlPromise,
+    invidiousPromise
   ]);
 
-  const finalWinner = saavnRes || deezerRes || itunesRes || ytRes;
+  const finalWinner = saavnRes || ytdlRes || invRes;
 
-  if (finalWinner) {
+  if (finalWinner && !isDisallowedPreview(finalWinner.url, finalWinner.duration)) {
     return res.status(200).json(finalWinner);
   }
 
-  return res.status(404).json({ error: 'Fluxo de áudio não encontrado' });
+  return res.status(404).json({ error: 'Fluxo de áudio completo não encontrado' });
 }
