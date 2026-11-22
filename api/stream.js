@@ -5,7 +5,7 @@
 import { createDecipheriv } from 'node:crypto';
 import { Ytdl } from '@distube/ytdl-core';
 
-const ytdlClient = new Ytdl();
+const ytdlClient = new Ytdl({ clients: ['tv', 'web_embedded', 'mweb'] });
 
 function sanitizeTitle(str) {
   return (str || '')
