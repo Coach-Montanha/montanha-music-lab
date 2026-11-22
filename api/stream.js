@@ -180,6 +180,7 @@ export default async function handler(req, res) {
   })();
 
   // 2. TIER 2: YouTube Completo via YTDL nativo (Zero 30s, faixas completas com 206 HTTP)
+  let ytdlErr = null;
   const ytdlPromise = (async () => {
     try {
       let youtubeId = id.replace(/^yt-/, '').split('&')[0];
@@ -215,7 +216,9 @@ export default async function handler(req, res) {
           }
         }
       }
-    } catch {}
+    } catch (e) {
+      ytdlErr = e?.message || String(e);
+    }
     return null;
   })();
 
@@ -287,5 +290,5 @@ export default async function handler(req, res) {
     return res.status(200).json(finalWinner);
   }
 
-  return res.status(404).json({ error: 'Fluxo de áudio completo não encontrado' });
+  return res.status(404).json({ error: 'Fluxo de áudio completo não encontrado', ytdlError: ytdlErr });
 }
