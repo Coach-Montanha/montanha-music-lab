@@ -132,9 +132,28 @@ export default defineConfig({
             }
           }
 
+          function isTitleMatch(saavnTitle: string, targetTitle: string): boolean {
+            if (!saavnTitle || !targetTitle) return false;
+            const s = (saavnTitle || '').toLowerCase().replace(/[^\p{L}\p{N}\s'-]/gu, ' ').replace(/\s+/g, ' ').trim();
+            const t = (targetTitle || '').toLowerCase().replace(/[^\p{L}\p{N}\s'-]/gu, ' ').replace(/\s+/g, ' ').trim();
+            if (s === t) return true;
+            if (s.includes(t) || t.includes(s)) return true;
+            const sWords = s.split(' ').filter(w => w.length > 2);
+            const tWords = t.split(' ').filter(w => w.length > 2);
+            if (tWords.length === 0) return true;
+            const common = sWords.filter(w => tWords.includes(w));
+            return common.length >= Math.min(2, tWords.length);
+          }
+
           function isDisallowed(url: string, duration?: number): boolean {
             if (!url || typeof url !== 'string') return true;
-            if (url.includes('dzcdn.net') || url.includes('mzstatic') || url.includes('apple.com') || url.includes('preview')) {
+            if (
+              url.includes('dzcdn.net') ||
+              url.includes('mzstatic') ||
+              url.includes('apple.com') ||
+              url.includes('preview') ||
+              url.includes('p.scdn.co')
+            ) {
               return true;
             }
             if (duration && Number(duration) <= 30) {
@@ -158,6 +177,7 @@ export default defineConfig({
               if (saavnRes.ok) {
                 const data = await saavnRes.json();
                 for (const item of (data.results || [])) {
+                  if (!isTitleMatch(item.title, cleanT)) continue;
                   const encUrl = item.more_info?.encrypted_media_url;
                   if (encUrl) {
                     const rawUrl = decryptSaavnMedia(encUrl);

@@ -9,6 +9,7 @@ const ytdlClient = new Ytdl();
 
 function sanitizeTitle(str) {
   return (str || '')
+    .replace(/[\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]/g, ' ')
     .replace(/\(.*?\)/g, '')
     .replace(/\[.*?\]/g, '')
     .replace(/feat\..*$/i, '')
@@ -20,13 +21,14 @@ function sanitizeTitle(str) {
 
 function extractArtistCandidates(artistStr) {
   if (!artistStr) return [];
-  const rawList = artistStr
+  const normalized = artistStr.replace(/[\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]/g, ' ');
+  const rawList = normalized
     .split(/[,&/]|feat\.|ft\.|x\s+/i)
     .map(a => sanitizeTitle(a))
     .filter(a => a.length > 1);
 
   const candidates = [];
-  const cleanedFull = sanitizeTitle(artistStr);
+  const cleanedFull = sanitizeTitle(normalized);
   if (cleanedFull && !candidates.includes(cleanedFull)) {
     candidates.push(cleanedFull);
   }
@@ -37,7 +39,20 @@ function extractArtistCandidates(artistStr) {
   if (firstWord && firstWord.length > 2 && !candidates.includes(firstWord)) {
     candidates.push(firstWord);
   }
-  return candidates.length > 0 ? candidates : [artistStr.trim()];
+  return candidates.length > 0 ? candidates : [normalized.trim()];
+}
+
+function isTitleMatch(saavnTitle, targetTitle) {
+  if (!saavnTitle || !targetTitle) return false;
+  const s = sanitizeTitle(saavnTitle).toLowerCase();
+  const t = sanitizeTitle(targetTitle).toLowerCase();
+  if (s === t) return true;
+  if (s.includes(t) || t.includes(s)) return true;
+  const sWords = s.split(' ').filter(w => w.length > 2);
+  const tWords = t.split(' ').filter(w => w.length > 2);
+  if (tWords.length === 0) return true;
+  const common = sWords.filter(w => tWords.includes(w));
+  return common.length >= Math.min(2, tWords.length);
 }
 
 // Descriptografia nativa de stream JioSaavn (3DES-ECB com chave '38346591' repetida 3x)
@@ -61,7 +76,7 @@ async function searchYouTubeVideoId(query) {
   try {
     const ytSearchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
     const ytResp = await fetch(ytSearchUrl, {
-      signal: AbortSignal.timeout(3000),
+      signal: AbortSignal.timeout(3500),
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept-Language': 'en-US,en;q=0.9'
@@ -81,7 +96,13 @@ async function searchYouTubeVideoId(query) {
 
 function isDisallowedPreview(url, duration) {
   if (!url || typeof url !== 'string') return true;
-  if (url.includes('dzcdn.net') || url.includes('mzstatic') || url.includes('apple.com') || url.includes('preview')) {
+  if (
+    url.includes('dzcdn.net') ||
+    url.includes('mzstatic') ||
+    url.includes('apple.com') ||
+    url.includes('preview') ||
+    url.includes('p.scdn.co')
+  ) {
     return true;
   }
   if (duration && Number(duration) <= 30) {
@@ -108,7 +129,7 @@ export default async function handler(req, res) {
   const cleanT = sanitizeTitle(title);
   const candidates = extractArtistCandidates(artist);
 
-  // 1. TIER 1: JioSaavn Nativo 320kbps MP4 Akamai (Áudio 100% Completo)
+  // 1. TIER 1: JioSaavn Nativo 320kbps MP4 Akamai (Validação estrita de título)
   const saavnPromise = (async () => {
     if (!cleanT) return null;
     const candidateList = [...candidates];
@@ -125,6 +146,9 @@ export default async function handler(req, res) {
         const data = await resp.json();
         const results = data.results || [];
         for (const item of results) {
+          // Verifica correspondência semântica de título para evitar músicas aleatórias
+          if (!isTitleMatch(item.title, cleanT)) continue;
+
           const encUrl = item.more_info?.encrypted_media_url;
           if (encUrl) {
             const rawUrl = decryptSaavnMediaUrl(encUrl);
@@ -172,7 +196,6 @@ export default async function handler(req, res) {
         const audioFormats = (info.formats || []).filter(f => f.hasAudio && !f.hasVideo && f.url);
         
         if (audioFormats.length > 0) {
-          // Seleciona o melhor formato de áudio (preferência mp4/m4a para iOS/Android)
           const sorted = [...audioFormats].sort((a, b) => {
             const aMp4 = (a.mimeType || '').includes('mp4') ? 1 : 0;
             const bMp4 = (b.mimeType || '').includes('mp4') ? 1 : 0;

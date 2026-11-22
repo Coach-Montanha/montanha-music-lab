@@ -20,6 +20,7 @@ export function isDisallowedPreview(url?: string, duration?: number): boolean {
     url.includes('preview') ||
     url.includes('apple.com') ||
     url.includes('mzstatic') ||
+    url.includes('p.scdn.co') ||
     url.includes('sndcdn.com/preview')
   ) {
     return true;

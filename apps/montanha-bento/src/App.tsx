@@ -71,7 +71,7 @@ import { audioAnchor } from './lib/audioAnchor';
 import { audioEffectsEngine } from './lib/audioEffectsEngine';
 import { browserOptimizer } from './lib/browserOptimizer';
 import { fetchRealTrackCover, cacheImageLocally, downloadImageFile, enrichPlaylistTracks } from './lib/coverEngine';
-import { fetchAudioStream, invalidateStream, getCachedStream } from './lib/audioStreamEngine';
+import { fetchAudioStream, invalidateStream, getCachedStream, isDisallowedPreview } from './lib/audioStreamEngine';
 import { fetchLyrics, LyricsData } from './lib/lyricsEngine';
 import { autoHealOrSubstituteSong } from './lib/songHealerEngine';
 import { SilentHoldKeeper, GestureGuardian } from 'pwa-audio-player';
@@ -1408,11 +1408,7 @@ export default function App() {
     if (reqId !== playRequestIdRef.current) return;
 
     if (!streamUrl) {
-      // Rejeita previews de 30s da Deezer / Apple
-      const isPreview = (url?: string) =>
-        Boolean(url && (url.includes('preview') || url.includes('dzcdn.net') || url.includes('apple.com') || url.includes('mzstatic')));
-
-      if (song.audioUrl && !isPreview(song.audioUrl)) {
+      if (song.audioUrl && !isDisallowedPreview(song.audioUrl, song.duration)) {
         streamUrl = song.audioUrl;
         streamDuration = song.duration || 210;
       } else {
@@ -1690,11 +1686,8 @@ export default function App() {
   const handleDownloadSong = async (song: Song) => {
     showToast(`Baixando "${song.name}" para offline...`);
 
-    const isPreview = (url?: string) =>
-      Boolean(url && (url.includes('preview') || url.includes('dzcdn.net') || url.includes('apple.com') || url.includes('mzstatic')));
-
     let audioSourceUrl: string | null = null;
-    if (song.audioUrl && !isPreview(song.audioUrl)) {
+    if (song.audioUrl && !isDisallowedPreview(song.audioUrl, song.duration)) {
       audioSourceUrl = song.audioUrl;
     } else {
       try {
@@ -1777,13 +1770,10 @@ export default function App() {
       return updated;
     });
 
-    const isPreview = (url?: string) =>
-      Boolean(url && (url.includes('preview') || url.includes('dzcdn.net') || url.includes('apple.com') || url.includes('mzstatic')));
-
     for (let i = 0; i < playlist.songs.length; i++) {
       const song = playlist.songs[i];
       let streamUrl: string | null = null;
-      if (song.audioUrl && !isPreview(song.audioUrl)) {
+      if (song.audioUrl && !isDisallowedPreview(song.audioUrl, song.duration)) {
         streamUrl = song.audioUrl;
       } else {
         try {
@@ -1792,7 +1782,7 @@ export default function App() {
         } catch {}
       }
 
-      if (streamUrl && !isPreview(streamUrl)) {
+      if (streamUrl && !isDisallowedPreview(streamUrl)) {
         try {
           const resp = await fetch(streamUrl);
           if (resp.ok) {
