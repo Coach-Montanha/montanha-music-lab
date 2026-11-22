@@ -5,7 +5,7 @@
 import { createDecipheriv } from 'node:crypto';
 import { Ytdl } from '@distube/ytdl-core';
 
-const ytdlClient = new Ytdl({ clients: ['tv', 'web_embedded', 'mweb'] });
+const ytdlClient = new Ytdl({ clients: ['web_embedded', 'tv'] });
 
 function sanitizeTitle(str) {
   return (str || '')
@@ -114,10 +114,27 @@ function isDisallowedPreview(url, duration) {
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Range');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
+  }
+
+  // FAST-PATH: Transmissão direta de áudio do YouTube quando ?yt=ID for solicitado
+  const ytDirectId = (req.query?.yt || req.body?.yt || '').trim();
+  if (ytDirectId && /^[a-zA-Z0-9_-]{11}$/.test(ytDirectId)) {
+    try {
+      const audioStream = await ytdlClient.download(ytDirectId, {
+        filter: f => f.hasAudio && !f.hasVideo
+      });
+      res.setHeader('Content-Type', 'audio/mp4');
+      res.setHeader('Accept-Ranges', 'bytes');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      audioStream.pipe(res);
+      return;
+    } catch (err) {
+      return res.status(500).json({ error: 'Erro ao transmitir áudio: ' + (err?.message || err) });
+    }
   }
 
   const title = (req.query?.title || req.query?.t || req.body?.title || '').trim();
@@ -146,15 +163,15 @@ export default async function handler(req, res) {
         const data = await resp.json();
         const results = data.results || [];
         for (const item of results) {
-          // Verifica correspondência semântica de título para evitar músicas aleatórias
           if (!isTitleMatch(item.title, cleanT)) continue;
 
-          const encUrl = item.more_info?.encrypted_media_url;
-          if (encUrl) {
-            const rawUrl = decryptSaavnMediaUrl(encUrl);
-            if (rawUrl && rawUrl.includes('saavncdn.com')) {
-              const streamUrl = rawUrl.replace(/_\d+\.mp4$/, `${bitrateSuffix}.mp4`);
+          const enc = item.more_info?.encrypted_media_url;
+          if (enc) {
+            const raw = decryptSaavnMediaUrl(enc);
+            if (raw && raw.includes('saavncdn.com')) {
+              const streamUrl = raw.replace(/_\d+\.mp4$/, `${bitrateSuffix}.mp4`);
               const duration = Number(item.more_info?.duration) || 210;
+
               if (!isDisallowedPreview(streamUrl, duration)) {
                 return {
                   url: streamUrl,
@@ -179,41 +196,39 @@ export default async function handler(req, res) {
     }
   })();
 
-  // 2. TIER 2: YouTube Completo via YTDL nativo (Zero 30s, faixas completas com 206 HTTP)
+  // 2. TIER 2: YouTube Completo via YTDL nativo (Zero 30s, faixas completas)
   let ytdlErr = null;
   const ytdlPromise = (async () => {
     try {
       let youtubeId = id.replace(/^yt-/, '').split('&')[0];
       if (!youtubeId || !/^[a-zA-Z0-9_-]{11}$/.test(youtubeId)) {
         if (cleanT) {
-          const query = `${cleanT} ${candidates[0] || artist}`.trim();
-          youtubeId = await searchYouTubeVideoId(query);
+          const queries = [
+            `${cleanT} ${candidates[0] || artist}`.trim(),
+            candidates[1] ? `${cleanT} ${candidates[1]}` : null,
+            cleanT
+          ].filter(Boolean);
+
+          for (const q of queries) {
+            youtubeId = await searchYouTubeVideoId(q);
+            if (youtubeId) break;
+          }
         }
       }
 
       if (youtubeId && /^[a-zA-Z0-9_-]{11}$/.test(youtubeId)) {
-        const info = await ytdlClient.getInfo(`https://www.youtube.com/watch?v=${youtubeId}`, { client: ['android', 'ios', 'tv'] });
+        const info = await ytdlClient.getInfo(youtubeId);
         const duration = Number(info.videoDetails?.lengthSeconds) || 210;
-        const audioFormats = (info.formats || []).filter(f => f.hasAudio && !f.hasVideo && f.url);
-        
-        if (audioFormats.length > 0) {
-          const sorted = [...audioFormats].sort((a, b) => {
-            const aMp4 = (a.mimeType || '').includes('mp4') ? 1 : 0;
-            const bMp4 = (b.mimeType || '').includes('mp4') ? 1 : 0;
-            if (aMp4 !== bMp4) return bMp4 - aMp4;
-            return (b.audioBitrate || 0) - (a.audioBitrate || 0);
-          });
-          const best = sorted[0];
-          if (best?.url && !isDisallowedPreview(best.url, duration)) {
-            return {
-              url: best.url,
-              duration,
-              mimeType: best.mimeType ? best.mimeType.split(';')[0] : 'audio/mp4',
-              title: info.videoDetails?.title || title,
-              artist: info.videoDetails?.author?.name || artist,
-              source: 'youtube-full'
-            };
-          }
+
+        if (duration > 30) {
+          return {
+            url: `/api/stream?yt=${youtubeId}`,
+            duration,
+            mimeType: 'audio/mp4',
+            title: info.videoDetails?.title || title,
+            artist: info.videoDetails?.author?.name || artist,
+            source: 'youtube-full'
+          };
         }
       }
     } catch (e) {
@@ -222,69 +237,12 @@ export default async function handler(req, res) {
     return null;
   })();
 
-  // 3. TIER 3: Invidious YouTube Resolver (Fallback secundário para stream completo)
-  const invidiousPromise = (async () => {
-    let youtubeId = id.replace(/^yt-/, '').split('&')[0];
-    if (!youtubeId || !/^[a-zA-Z0-9_-]{11}$/.test(youtubeId)) {
-      if (cleanT) {
-        const query = `${cleanT} ${candidates[0] || artist}`.trim();
-        youtubeId = await searchYouTubeVideoId(query);
-      }
-    }
-
-    if (youtubeId && /^[a-zA-Z0-9_-]{11}$/.test(youtubeId)) {
-      const mirrors = ['https://yt.chocolatemoo53.com', 'https://inv.nadeko.net'];
-
-      const mirrorPromises = mirrors.map(async (host) => {
-        const invRes = await fetch(`${host}/api/v1/videos/${youtubeId}`, {
-          headers: { 'User-Agent': 'Mozilla/5.0' },
-          signal: AbortSignal.timeout(3200)
-        });
-        if (invRes.ok) {
-          const data = await invRes.json();
-          const duration = Number(data.lengthSeconds) || 210;
-          const audios = (data.adaptiveFormats || []).filter(
-            (f) => f.type && (f.type.startsWith('audio/mp4') || f.type.startsWith('audio/webm'))
-          );
-          if (audios.length > 0) {
-            audios.sort((a, b) => {
-              const aMp4 = a.type.startsWith('audio/mp4') ? 1 : 0;
-              const bMp4 = b.type.startsWith('audio/webm') ? 0 : 1;
-              if (aMp4 !== bMp4) return bMp4 - aMp4;
-              const bitDiff = (parseInt(b.bitrate) || 0) - (parseInt(a.bitrate) || 0);
-              return quality === 'economy' ? -bitDiff : bitDiff;
-            });
-            const best = audios[0];
-            const proxied = best.url.replace(new URL(best.url).origin, host);
-            if (!isDisallowedPreview(proxied, duration)) {
-              return {
-                url: proxied,
-                duration,
-                mimeType: best.type.split(';')[0] || 'audio/mp4',
-                title: data.title || title,
-                artist: data.author || artist,
-                source: 'invidious-full'
-              };
-            }
-          }
-        }
-        throw new Error('mirror failed');
-      });
-
-      try {
-        return await Promise.any(mirrorPromises);
-      } catch {}
-    }
-    return null;
-  })();
-
-  const [saavnRes, ytdlRes, invRes] = await Promise.all([
+  const [saavnRes, ytdlRes] = await Promise.all([
     saavnPromise,
-    ytdlPromise,
-    invidiousPromise
+    ytdlPromise
   ]);
 
-  const finalWinner = saavnRes || ytdlRes || invRes;
+  const finalWinner = saavnRes || ytdlRes;
 
   if (finalWinner && !isDisallowedPreview(finalWinner.url, finalWinner.duration)) {
     return res.status(200).json(finalWinner);

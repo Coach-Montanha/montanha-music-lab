@@ -1355,8 +1355,11 @@ export default function App() {
     // Isso garante que o Android / iOS considere a transição como contínua e NUNCA
     // bloqueie o áudio em background na tela bloqueada.
     // =========================================================================
-    const cachedStream = takePreloaded(song.id) || getCachedStream(song);
-    let streamUrl: string | null = cachedStream?.url || null;
+    const preloaded = takePreloaded(song.id);
+    const cachedStream = (preloaded && !isDisallowedPreview(preloaded.url, preloaded.duration))
+      ? preloaded
+      : getCachedStream(song);
+    let streamUrl: string | null = (cachedStream && !isDisallowedPreview(cachedStream.url, cachedStream.duration)) ? cachedStream.url : null;
     let streamDuration: number | undefined = cachedStream?.duration;
 
     if (streamUrl) {
@@ -2745,8 +2748,22 @@ export default function App() {
         }}
         onLoadedMetadata={() => {
           if (silentHoldRef.current?.isHolding()) return;
-          if (audioRef.current && audioRef.current.duration && Number.isFinite(audioRef.current.duration) && audioRef.current.duration > 1) {
-            setDuration(Math.floor(audioRef.current.duration));
+          const a = audioRef.current;
+          if (a && a.duration && Number.isFinite(a.duration) && a.duration > 1) {
+            const loadedDur = Math.floor(a.duration);
+            if (loadedDur <= 30 && (currentSongRef.current?.duration || 210) > 40) {
+              console.warn('[Anti-30s] Faixa com preview de 30s detectada no player. Disparando cura imediata...');
+              if (currentSongRef.current) {
+                invalidateStream(currentSongRef.current);
+                autoHealOrSubstituteSong(currentSongRef.current).then((healRes) => {
+                  if (healRes.success && healRes.healedSong && healRes.healedSong.id !== currentSongRef.current?.id) {
+                    playSong(healRes.healedSong);
+                  }
+                });
+              }
+              return;
+            }
+            setDuration(loadedDur);
           }
         }}
         onEnded={() => {

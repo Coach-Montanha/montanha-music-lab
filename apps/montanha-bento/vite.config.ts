@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react';
 import { createDecipheriv } from 'node:crypto';
 import { Ytdl } from '@distube/ytdl-core';
 
-const ytdlClient = new Ytdl({ clients: ['tv', 'web_embedded', 'mweb'] });
+const ytdlClient = new Ytdl({ clients: ['web_embedded', 'tv'] });
 
 const SUPABASE_URL = 'https://muryznvaxzszcffrbxpv.supabase.co';
 const SUPABASE_SERVICE_ROLE_KEY =
@@ -86,10 +86,31 @@ export default defineConfig({
         // 1.5. /api/stream middleware (Proxy local com suporte a Saavn 320kbps nativo e YTDL Completo)
         server.middlewares.use(async (req, res, next) => {
           if (!req.url?.startsWith('/api/stream')) return next();
-          res.setHeader('Content-Type', 'application/json');
           res.setHeader('Access-Control-Allow-Origin', '*');
 
           const urlObj = new URL(req.url, 'http://localhost');
+
+          // FAST-PATH: Transmissão direta de áudio do YouTube quando ?yt=ID for solicitado
+          const ytDirectId = (urlObj.searchParams.get('yt') || '').trim();
+          if (ytDirectId && /^[a-zA-Z0-9_-]{11}$/.test(ytDirectId)) {
+            try {
+              const audioStream = await ytdlClient.download(ytDirectId, {
+                filter: (f: any) => f.hasAudio && !f.hasVideo
+              });
+              res.setHeader('Content-Type', 'audio/mp4');
+              res.setHeader('Accept-Ranges', 'bytes');
+              res.setHeader('Cache-Control', 'public, max-age=86400');
+              audioStream.pipe(res);
+              return;
+            } catch (err: any) {
+              res.statusCode = 500;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: 'Erro ao transmitir áudio: ' + (err?.message || err) }));
+              return;
+            }
+          }
+
+          res.setHeader('Content-Type', 'application/json');
           const title = (urlObj.searchParams.get('title') || urlObj.searchParams.get('t') || '').trim();
           const artist = (urlObj.searchParams.get('artist') || urlObj.searchParams.get('a') || '').trim();
           const id = (urlObj.searchParams.get('id') || '').trim();
@@ -235,29 +256,19 @@ export default defineConfig({
             }
 
             if (youtubeId && /^[a-zA-Z0-9_-]{11}$/.test(youtubeId)) {
-              const info = await ytdlClient.getInfo(`https://www.youtube.com/watch?v=${youtubeId}`, { client: ['android', 'ios', 'tv'] });
+              const info = await ytdlClient.getInfo(youtubeId);
               const duration = Number(info.videoDetails?.lengthSeconds) || 210;
-              const audioFormats = (info.formats || []).filter((f: any) => f.hasAudio && !f.hasVideo && f.url);
-              if (audioFormats.length > 0) {
-                const sorted = [...audioFormats].sort((a: any, b: any) => {
-                  const aMp4 = (a.mimeType || '').includes('mp4') ? 1 : 0;
-                  const bMp4 = (b.mimeType || '').includes('mp4') ? 1 : 0;
-                  if (aMp4 !== bMp4) return bMp4 - aMp4;
-                  return (b.audioBitrate || 0) - (a.audioBitrate || 0);
-                });
-                const best = sorted[0];
-                if (best?.url && !isDisallowed(best.url, duration)) {
-                  res.statusCode = 200;
-                  res.end(JSON.stringify({
-                    url: best.url,
-                    duration,
-                    mimeType: best.mimeType ? best.mimeType.split(';')[0] : 'audio/mp4',
-                    title: info.videoDetails?.title || title,
-                    artist: info.videoDetails?.author?.name || artist,
-                    source: 'youtube-full'
-                  }));
-                  return;
-                }
+              if (duration > 30) {
+                res.statusCode = 200;
+                res.end(JSON.stringify({
+                  url: `/api/stream?yt=${youtubeId}`,
+                  duration,
+                  mimeType: 'audio/mp4',
+                  title: info.videoDetails?.title || title,
+                  artist: info.videoDetails?.author?.name || artist,
+                  source: 'youtube-full'
+                }));
+                return;
               }
             }
           } catch {}

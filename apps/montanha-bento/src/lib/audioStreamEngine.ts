@@ -33,13 +33,26 @@ export function isDisallowedPreview(url?: string, duration?: number): boolean {
 
 export function getCachedStream(song: { id?: string; youtubeId?: string; name?: string; artist?: string } | string): StreamResult | null {
   if (typeof song === 'string') {
-    return streamCache.get(song) || null;
+    const res = streamCache.get(song) || null;
+    if (res && isDisallowedPreview(res.url, res.duration)) {
+      streamCache.delete(song);
+      return null;
+    }
+    return res;
   }
   const cleanId = (song.youtubeId || '').replace(/^yt-/, '').split('&')[0].trim();
   const cacheKey = cleanId || `${song.name || ''}-${song.artist || ''}`;
-  if (streamCache.has(cacheKey)) return streamCache.get(cacheKey)!;
-  if (song.id && streamCache.has(song.id)) return streamCache.get(song.id)!;
-  return null;
+  let res: StreamResult | null = null;
+  if (streamCache.has(cacheKey)) {
+    res = streamCache.get(cacheKey)!;
+  } else if (song.id && streamCache.has(song.id)) {
+    res = streamCache.get(song.id)!;
+  }
+  if (res && isDisallowedPreview(res.url, res.duration)) {
+    invalidateStream(song);
+    return null;
+  }
+  return res;
 }
 
 export function invalidateStream(song: { id?: string; youtubeId?: string; name?: string; artist?: string } | string) {
@@ -103,7 +116,7 @@ async function fetchFromInternalApi(title: string, artist: string, youtubeId?: s
     });
     if (res.ok) {
       const data = await res.json();
-      if (data?.url && data.url.startsWith('http')) {
+      if (data?.url && (data.url.startsWith('http') || data.url.startsWith('/'))) {
         return {
           url: data.url,
           duration: Number(data.duration) || 210,
