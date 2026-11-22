@@ -192,7 +192,7 @@ export default async function handler(req, res) {
       }
 
       if (youtubeId && /^[a-zA-Z0-9_-]{11}$/.test(youtubeId)) {
-        const info = await ytdlClient.getInfo(`https://www.youtube.com/watch?v=${youtubeId}`);
+        const info = await ytdlClient.getInfo(`https://www.youtube.com/watch?v=${youtubeId}`, { client: ['android', 'ios', 'tv'] });
         const duration = Number(info.videoDetails?.lengthSeconds) || 210;
         const audioFormats = (info.formats || []).filter(f => f.hasAudio && !f.hasVideo && f.url);
         
