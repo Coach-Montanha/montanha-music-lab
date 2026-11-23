@@ -5,7 +5,7 @@
 import { createDecipheriv } from 'node:crypto';
 import { Ytdl } from '@distube/ytdl-core';
 
-const ytdlClient = new Ytdl({ clients: ['visionos', 'tv'] });
+const ytdlClient = new Ytdl({ clients: ['web_embedded'] });
 const ytCache = new Map();
 
 function sanitizeTitle(str) {
@@ -159,7 +159,7 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  // 1. FAST-PATH: Range Proxying para YouTube (Status 206, chunk rápido em ~100ms, zero timeout Vercel)
+  // 1. FAST-PATH: Range Proxying para YouTube (Status 206, chunked streaming seguro contra timeout)
   const ytDirectId = (req.query?.yt || req.body?.yt || '').trim();
   if (ytDirectId && /^[a-zA-Z0-9_-]{11}$/.test(ytDirectId)) {
     try {
@@ -167,32 +167,50 @@ export default async function handler(req, res) {
       if (!cached || Date.now() > cached.expires) {
         const info = await ytdlClient.getInfo(ytDirectId);
         const format = info.formats.find(f => f.itag === 140) || info.formats.find(f => f.hasAudio && !f.hasVideo);
-        if (!format || !format.url) {
-          return res.status(404).json({ error: 'Nenhum formato de áudio disponível para este vídeo' });
+        if (!format) {
+          return res.status(404).json({ error: 'Nenhum formato de áudio disponível' });
         }
-        cached = { url: format.url, contentLength: format.contentLength, expires: Date.now() + 3600000 };
+        cached = {
+          contentLength: Number(format.contentLength) || 5000000,
+          expires: Date.now() + 3600000
+        };
         ytCache.set(ytDirectId, cached);
       }
 
-      const clientRange = req.headers?.range || 'bytes=0-';
-      const upstream = await fetch(cached.url, {
-        headers: { 'Range': clientRange }
-      });
+      const totalLen = cached.contentLength;
+      let start = 0;
+      let end = totalLen - 1;
 
-      res.status(upstream.status);
-      res.setHeader('Content-Type', upstream.headers.get('content-type') || 'audio/mp4');
-      if (upstream.headers.get('content-range')) {
-        res.setHeader('Content-Range', upstream.headers.get('content-range'));
+      const clientRange = req.headers?.range;
+      if (clientRange && clientRange.startsWith('bytes=')) {
+        const parts = clientRange.replace(/bytes=/, '').split('-');
+        start = parseInt(parts[0], 10) || 0;
+        if (parts[1]) {
+          end = parseInt(parts[1], 10);
+        } else {
+          // Chunk de 1MB por requisição garante resposta instantânea sem timeout na Vercel
+          end = Math.min(start + 1048576, totalLen - 1);
+        }
+      } else {
+        end = Math.min(1048576, totalLen - 1);
       }
-      if (upstream.headers.get('content-length')) {
-        res.setHeader('Content-Length', upstream.headers.get('content-length'));
-      }
+
+      const chunkSize = end - start + 1;
+      res.status(206);
+      res.setHeader('Content-Type', 'audio/mp4');
+      res.setHeader('Content-Range', `bytes ${start}-${end}/${totalLen}`);
+      res.setHeader('Content-Length', chunkSize);
       res.setHeader('Accept-Ranges', 'bytes');
       res.setHeader('Access-Control-Allow-Origin', '*');
       res.setHeader('Cache-Control', 'public, max-age=3600');
 
-      const arrayBuf = await upstream.arrayBuffer();
-      return res.send(Buffer.from(arrayBuf));
+      const downloadStream = ytdlClient.download(ytDirectId, {
+        filter: f => f.hasAudio && !f.hasVideo,
+        range: { start, end }
+      });
+
+      downloadStream.pipe(res);
+      return;
     } catch (err) {
       return res.status(500).json({ error: 'Erro ao transmitir áudio: ' + (err?.message || err) });
     }
@@ -294,8 +312,11 @@ export default async function handler(req, res) {
       const duration = Number(info.videoDetails?.lengthSeconds) || 210;
       const format = info.formats.find(f => f.itag === 140) || info.formats.find(f => f.hasAudio && !f.hasVideo);
 
-      if (duration > 30 && format?.url) {
-        ytCache.set(youtubeId, { url: format.url, contentLength: format.contentLength, expires: Date.now() + 3600000 });
+      if (duration > 30) {
+        ytCache.set(youtubeId, {
+          contentLength: Number(format?.contentLength) || 5000000,
+          expires: Date.now() + 3600000
+        });
         return res.status(200).json({
           url: `/api/stream?yt=${youtubeId}`,
           duration,
