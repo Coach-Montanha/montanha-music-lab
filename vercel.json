@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "vite",
-  "installCommand": "npm install --prefix apps/montanha-bento",
+  "installCommand": "npm install && npm install --prefix apps/montanha-bento",
   "buildCommand": "npm run build --prefix apps/montanha-bento",
   "outputDirectory": "apps/montanha-bento/dist",
   "rewrites": [
