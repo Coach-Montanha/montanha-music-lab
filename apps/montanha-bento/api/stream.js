@@ -270,6 +270,7 @@ export default async function handler(req, res) {
     } catch {}
   }
 
+  let lastYtError = null;
   // TIER 2: YouTube Completo via Range Proxy (Todas as faixas ocidentais, rock, metal, dance, sem 30s)
   try {
     let youtubeId = id.replace(/^yt-/, '').split('&')[0];
@@ -304,10 +305,13 @@ export default async function handler(req, res) {
           source: 'youtube-full'
         });
       }
+    } else {
+      lastYtError = 'No videoId resolved from YouTube search';
     }
   } catch (ytErr) {
+    lastYtError = ytErr?.message || String(ytErr);
     console.warn('[Stream YouTube Fallback Error]', ytErr?.message || ytErr);
   }
 
-  return res.status(404).json({ error: 'Fluxo de áudio completo não encontrado na fonte' });
+  return res.status(404).json({ error: 'Fluxo de áudio completo não encontrado na fonte', ytError: lastYtError });
 }
