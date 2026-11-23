@@ -290,6 +290,7 @@ export default function App() {
   const userInitiatedPauseRef = useRef<boolean>(false);
   const isSwitchingRef = useRef<boolean>(false);
   const playRequestIdRef = useRef<number>(0);
+  const consecutiveFailuresRef = useRef<number>(0);
   const handleNextSongRef = useRef<() => void>(() => {});
   const handlePrevSongRef = useRef<() => void>(() => {});
   const handlePlayRef = useRef<() => void>(() => {});
@@ -1284,7 +1285,7 @@ export default function App() {
   }, []);
 
   // Motor Unificado Padrão Montanha Music (HTML5 Audio com Streaming 320kbps e Background-Safe)
-  const playSong = async (song: Song, newQueue?: Song[], retry = 0) => {
+  const playSong = async (song: Song, newQueue?: Song[], retry = 0, isAutoHealed = false) => {
     const audio = audioRef.current;
     if (!audio) return;
     const reqId = ++playRequestIdRef.current;
@@ -1415,6 +1416,26 @@ export default function App() {
         streamUrl = song.audioUrl;
         streamDuration = song.duration || 210;
       } else {
+        // Se já é uma tentativa pós-autocura, aborta para evitar loop infinito de substituições
+        if (isAutoHealed) {
+          markSongUnavailable(song.id);
+          isSwitchingRef.current = false;
+          consecutiveFailuresRef.current = (consecutiveFailuresRef.current || 0) + 1;
+          showToast(`"${song.name}" indisponível.`);
+          if (consecutiveFailuresRef.current >= 3) {
+            isPlayingRef.current = false;
+            setIsPlaying(false);
+            showToast('Reprodução pausada após faixas indisponíveis.');
+            return;
+          }
+          setTimeout(() => {
+            if (isPlayingRef.current) {
+              handleNextSongRef.current();
+            }
+          }, 1000);
+          return;
+        }
+
         // AUTOCURA EM TEMPO REAL ON-THE-FLY:
         // Evita pausa ou interrupção na reprodução substituindo a faixa automaticamente pela melhor alternativa da seleção
         showToast(`Auto-recuperando "${song.name}"...`);
@@ -1452,7 +1473,7 @@ export default function App() {
             markSongAvailable(healed.id);
 
             showToast(`"${healed.name}" recuperada automaticamente!`);
-            return playSong(healed);
+            return playSong(healed, undefined, 0, true);
           }
         } catch (healErr) {
           console.warn('[AutoHeal On-The-Fly Error]', healErr);
@@ -1460,7 +1481,14 @@ export default function App() {
 
         markSongUnavailable(song.id);
         isSwitchingRef.current = false;
+        consecutiveFailuresRef.current = (consecutiveFailuresRef.current || 0) + 1;
         showToast(`"${song.name}" está indisponível na fonte. Toque em "Substituir por semelhante".`);
+        if (consecutiveFailuresRef.current >= 3) {
+          isPlayingRef.current = false;
+          setIsPlaying(false);
+          showToast('Reprodução pausada após faixas indisponíveis.');
+          return;
+        }
         // Se estiver em background com tela bloqueada, avança para a próxima música para não travar a playlist
         setTimeout(() => {
           if (isPlayingRef.current) {
@@ -2704,6 +2732,7 @@ export default function App() {
             return;
           }
           isSwitchingRef.current = false;
+          consecutiveFailuresRef.current = 0;
           setIsPlaying(true);
           isPlayingRef.current = true;
           mediaSessionController.updatePlaybackState(true);

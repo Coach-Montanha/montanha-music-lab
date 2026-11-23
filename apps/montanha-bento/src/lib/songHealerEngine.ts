@@ -103,8 +103,8 @@ export async function autoHealOrSubstituteSong(song: Song): Promise<HealResult> 
         return bScore - aScore;
       });
 
-      // 1. Tenta validar se algum dos 3 melhores candidatos já possui stream imediato
-      for (const cand of candidateSongs.slice(0, 3)) {
+      // 1. Valida se algum dos candidatos possui stream imediato e funcional
+      for (const cand of candidateSongs.slice(0, 5)) {
         try {
           const testStream = await fetchAudioStream(
             cand.youtubeId,
@@ -114,7 +114,6 @@ export async function autoHealOrSubstituteSong(song: Song): Promise<HealResult> 
             cand.id
           );
           if (testStream?.url && !isDisallowedPreview(testStream.url, testStream.duration)) {
-            const permanentAudio = testStream.url.includes('saavncdn.com') ? testStream.url : '';
             const substituted: Song = {
               ...cand,
               id: cand.id,
@@ -123,7 +122,7 @@ export async function autoHealOrSubstituteSong(song: Song): Promise<HealResult> 
               album: cand.album || song.album,
               thumbnail: cand.thumbnail || song.thumbnail,
               duration: testStream.duration || cand.duration || song.duration || 210,
-              audioUrl: permanentAudio
+              audioUrl: testStream.url
             };
             return {
               success: true,
@@ -135,25 +134,11 @@ export async function autoHealOrSubstituteSong(song: Song): Promise<HealResult> 
         } catch {}
       }
 
-      // 2. CONFORME DIRETRIZ ESTRITA DO USUÁRIO:
-      // Se a validação síncrona não responder em tempo, substitui AUTOMATICAMENTE
-      // pela primeira música na seleção que surgiria na tela para o usuário (top match oficial)
-      const topMatch = candidateSongs[0];
-      const substituted: Song = {
-        ...topMatch,
-        id: topMatch.id || `sub-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        name: topMatch.name || song.name,
-        artist: topMatch.artist || song.artist,
-        album: topMatch.album || song.album,
-        thumbnail: topMatch.thumbnail || song.thumbnail,
-        duration: topMatch.duration || song.duration || 210,
-        audioUrl: topMatch.audioUrl || ''
-      };
-
+      // Se nenhum candidato possui áudio funcional comprovado, não substitui às cegas para evitar loop de erros
       return {
-        success: true,
-        healedSong: substituted,
-        method: 'substituted',
+        success: false,
+        healedSong: song,
+        method: 'failed',
         originalId
       };
     }

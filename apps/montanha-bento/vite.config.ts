@@ -3,7 +3,8 @@ import react from '@vitejs/plugin-react';
 import { createDecipheriv } from 'node:crypto';
 import { Ytdl } from '@distube/ytdl-core';
 
-const ytdlClient = new Ytdl({ clients: ['web_embedded', 'tv'] });
+const ytdlClient = new Ytdl({ clients: ['visionos', 'tv'] });
+const ytCache = new Map();
 
 const SUPABASE_URL = 'https://muryznvaxzszcffrbxpv.supabase.co';
 const SUPABASE_SERVICE_ROLE_KEY =
@@ -90,17 +91,43 @@ export default defineConfig({
 
           const urlObj = new URL(req.url, 'http://localhost');
 
-          // FAST-PATH: Transmissão direta de áudio do YouTube quando ?yt=ID for solicitado
+          // FAST-PATH: Range Proxying para YouTube (Status 206 com suporte a scrub/seek)
           const ytDirectId = (urlObj.searchParams.get('yt') || '').trim();
           if (ytDirectId && /^[a-zA-Z0-9_-]{11}$/.test(ytDirectId)) {
             try {
-              const audioStream = await ytdlClient.download(ytDirectId, {
-                filter: (f: any) => f.hasAudio && !f.hasVideo
+              let cached = ytCache.get(ytDirectId);
+              if (!cached || Date.now() > cached.expires) {
+                const info = await ytdlClient.getInfo(ytDirectId);
+                const format = info.formats.find((f: any) => f.itag === 140) || info.formats.find((f: any) => f.hasAudio && !f.hasVideo);
+                if (!format || !format.url) {
+                  res.statusCode = 404;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ error: 'Nenhum formato de áudio encontrado para este vídeo' }));
+                  return;
+                }
+                cached = { url: format.url, contentLength: format.contentLength, expires: Date.now() + 3600000 };
+                ytCache.set(ytDirectId, cached);
+              }
+
+              const clientRange = req.headers.range || 'bytes=0-';
+              const upstream = await fetch(cached.url, {
+                headers: { 'Range': clientRange }
               });
-              res.setHeader('Content-Type', 'audio/mp4');
+
+              res.statusCode = upstream.status;
+              res.setHeader('Content-Type', upstream.headers.get('content-type') || 'audio/mp4');
+              if (upstream.headers.get('content-range')) {
+                res.setHeader('Content-Range', upstream.headers.get('content-range')!);
+              }
+              if (upstream.headers.get('content-length')) {
+                res.setHeader('Content-Length', upstream.headers.get('content-length')!);
+              }
               res.setHeader('Accept-Ranges', 'bytes');
-              res.setHeader('Cache-Control', 'public, max-age=86400');
-              audioStream.pipe(res);
+              res.setHeader('Access-Control-Allow-Origin', '*');
+              res.setHeader('Cache-Control', 'public, max-age=3600');
+
+              const arrayBuf = await upstream.arrayBuffer();
+              res.end(Buffer.from(arrayBuf));
               return;
             } catch (err: any) {
               res.statusCode = 500;
@@ -258,7 +285,9 @@ export default defineConfig({
             if (youtubeId && /^[a-zA-Z0-9_-]{11}$/.test(youtubeId)) {
               const info = await ytdlClient.getInfo(youtubeId);
               const duration = Number(info.videoDetails?.lengthSeconds) || 210;
-              if (duration > 30) {
+              const format = info.formats.find((f: any) => f.itag === 140) || info.formats.find((f: any) => f.hasAudio && !f.hasVideo);
+              if (duration > 30 && format?.url) {
+                ytCache.set(youtubeId, { url: format.url, contentLength: format.contentLength, expires: Date.now() + 3600000 });
                 res.statusCode = 200;
                 res.end(JSON.stringify({
                   url: `/api/stream?yt=${youtubeId}`,
