@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react';
 import { createDecipheriv } from 'node:crypto';
 import { Ytdl } from '@distube/ytdl-core';
 
-const ytdlClient = new Ytdl({ clients: ['web_embedded'] });
+const ytdlClient = new Ytdl();
 const ytCache = new Map();
 
 const SUPABASE_URL = 'https://muryznvaxzszcffrbxpv.supabase.co';
