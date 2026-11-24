@@ -51,8 +51,7 @@ import {
   CheckSquare,
   Square,
   ListOrdered,
-  Mic2,
-  Tv
+  Mic2
 } from 'lucide-react';
 
 import { Song, Playlist, SearchAlbum, SearchArtist, SearchPlaylist, CategorizedSearchResults, RepeatMode } from './types';
@@ -294,7 +293,6 @@ export default function App() {
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [activePlayerType, setActivePlayerType] = useState<'native' | 'youtube'>('native');
-  const [showVideoDock, setShowVideoDock] = useState<boolean>(false);
   const activePlayerTypeRef = useRef<'native' | 'youtube'>('native');
   activePlayerTypeRef.current = activePlayerType;
   const ytHostRef = useRef<HTMLDivElement>(null);
@@ -2945,48 +2943,23 @@ export default function App() {
         !currentUser ? 'filter blur-2xl brightness-40 pointer-events-none scale-[0.98]' : 'filter-none brightness-100 scale-100'
       }`}>
       
-      {/* MOTOR TRANSPARENTE YOUTUBE IFRAME (Estrutura de DOM 100% Estática - Sem Reconciliação React no IFrame) */}
+      {/* MOTOR TRANSPARENTE YOUTUBE IFRAME (Invisível no DOM, focado puramente em áudio de fundo) */}
       <div
         style={{
           position: 'fixed',
-          bottom: showVideoDock && activePlayerType === 'youtube' ? '88px' : '0px',
-          right: showVideoDock && activePlayerType === 'youtube' ? '16px' : '0px',
-          width: showVideoDock && activePlayerType === 'youtube' ? '280px' : '1px',
-          height: showVideoDock && activePlayerType === 'youtube' ? '158px' : '1px',
-          zIndex: showVideoDock && activePlayerType === 'youtube' ? 45 : -1,
-          borderRadius: '12px',
+          bottom: '0px',
+          right: '0px',
+          width: '1px',
+          height: '1px',
+          zIndex: -1,
           overflow: 'hidden',
-          boxShadow: showVideoDock && activePlayerType === 'youtube' ? '0 12px 36px rgba(0,0,0,0.75)' : 'none',
-          border: showVideoDock && activePlayerType === 'youtube' ? '1px solid rgba(255,255,255,0.15)' : 'none',
-          backgroundColor: '#000',
-          transition: 'all 0.3s ease',
-          pointerEvents: showVideoDock && activePlayerType === 'youtube' ? 'auto' : 'none',
-          opacity: showVideoDock && activePlayerType === 'youtube' ? 1 : 0.001,
+          pointerEvents: 'none',
+          opacity: 0.001,
           visibility: 'visible'
         }}
       >
         <div id="yt-hidden-player" ref={ytHostRef} className="w-full h-full" />
       </div>
-
-      {/* Botão de Fechar Mini-Dock (Isolado no DOM, sem colisão com o IFrame) */}
-      {showVideoDock && activePlayerType === 'youtube' && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setShowVideoDock(false);
-          }}
-          style={{
-            position: 'fixed',
-            bottom: '214px',
-            right: '24px',
-            zIndex: 46
-          }}
-          className="p-1 rounded-full bg-black/80 hover:bg-black text-white/90 hover:text-white transition shadow-lg border border-white/20"
-          title="Ocultar tela do clipe"
-        >
-          <X size={14} />
-        </button>
-      )}
 
       {/* MOTOR DE ÁUDIO HTML5 ULTRA-RESILIENTE (Web Audio API Chain + Crossfade + Equalizador) */}
       <audio
@@ -3116,9 +3089,9 @@ export default function App() {
         </div>
       )}
 
-      {/* TOP HEADER (Com proteção ativa contra notch/Dynamic Island do iPhone) */}
-      <header className="flex shrink-0 items-center justify-between px-4 sm:px-6 border-b border-white/[0.06] bg-[#121212]/90 backdrop-blur-md z-10 safe-header-top">
-        <div className="flex items-center gap-3">
+      {/* TOP HEADER (Com proteção ativa contra notch/Dynamic Island e layout adaptativo tablet/desktop) */}
+      <header className="flex shrink-0 items-center justify-between px-3 sm:px-6 border-b border-white/[0.06] bg-[#121212]/90 backdrop-blur-md z-10 safe-header-top w-full max-w-full overflow-hidden">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           {/* BOTÃO DE VOLTAR DE NAVEGAÇÃO NO HEADER */}
           {selectedPlaylist && (
             <button
@@ -3130,7 +3103,7 @@ export default function App() {
             </button>
           )}
 
-          <div className="flex items-center gap-2.5 flex-shrink-0 select-none">
+          <div className="flex items-center gap-2 sm:gap-2.5 flex-shrink-0 select-none">
             <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-white/5 border border-white/10 shadow-lg p-1 flex-shrink-0">
               <img src="/icon-192.png" alt="Montanha Music" className="w-full h-full object-contain drop-shadow" />
             </div>
@@ -3141,8 +3114,8 @@ export default function App() {
           </div>
         </div>
 
-        {/* NAVEGAÇÃO CENTRAL DESKTOP */}
-        <nav className="hidden sm:flex items-center gap-1 bg-[#181818] p-1 rounded-full border border-white/5 shadow-inner">
+        {/* NAVEGAÇÃO CENTRAL DESKTOP (Aparece a partir de telas médias/grandes - md:flex) */}
+        <nav className="hidden md:flex items-center gap-1 bg-[#181818] p-1 rounded-full border border-white/5 shadow-inner shrink-0">
           {[
             { id: 'home', label: 'Início', icon: HomeIcon },
             { id: 'search', label: 'Buscar', icon: Search },
@@ -3157,7 +3130,7 @@ export default function App() {
                   setActiveTab(item.id as any);
                   setSelectedPlaylist(null);
                 }}
-                className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition ${
+                className={`flex items-center gap-2 px-3 lg:px-4 py-1.5 rounded-full text-xs font-bold transition ${
                   isActive
                     ? 'bg-white text-black shadow'
                     : 'text-neutral-400 hover:text-white hover:bg-white/5'
@@ -3170,7 +3143,7 @@ export default function App() {
           })}
         </nav>
 
-        <div className="flex items-center gap-1.5 sm:gap-2.5">
+        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
           {/* Botão Scan e Verificação Inteligente do Acervo com Checkpoint */}
           <button
             onClick={() => handleEnrichAllPlaylistsCovers(false)}
@@ -3179,25 +3152,25 @@ export default function App() {
               setIsReverifyModalOpen(true);
             }}
             disabled={isEnrichingAllCovers}
-            className="flex items-center gap-1.5 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 px-3 py-1.5 sm:py-2 text-xs font-bold text-white transition border border-white/10 flex-shrink-0"
+            className="flex items-center gap-1.5 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-bold text-white transition border border-white/10 flex-shrink-0"
             title="Scan Inteligente com Checkpoint: pula o que já foi verificado • clique direito para opções"
           >
             {isEnrichingAllCovers ? (
               <>
                 <Sparkles size={14} className="animate-spin text-[#1DB954]" />
-                <span className="hidden sm:inline">
+                <span className="hidden xl:inline">
                   Verificando ({enrichAllProgress.current}/{enrichAllProgress.total})
                 </span>
               </>
             ) : verifiedPlaylistsCount === playlists.length && playlists.length > 0 ? (
               <>
                 <CheckCircle2 size={14} className="text-[#1DB954]" />
-                <span className="hidden sm:inline">Acervo Verificado ({playlists.length})</span>
+                <span className="hidden xl:inline">Acervo Verificado ({playlists.length})</span>
               </>
             ) : (
               <>
                 <Sparkles size={14} className="text-[#1DB954]" />
-                <span className="hidden sm:inline">
+                <span className="hidden xl:inline">
                   {verifiedPlaylistsCount > 0
                     ? `Verificar (${playlists.length - verifiedPlaylistsCount} rest.)`
                     : 'Scan Acervo'}
@@ -3206,17 +3179,17 @@ export default function App() {
             )}
           </button>
 
-          {/* Botão Importar Playlist por Link - Apenas telas médias/grandes (já presente na Home no mobile) */}
+          {/* Botão Importar Playlist por Link - Apenas em desktop grande (lg:flex) */}
           <button
             onClick={() => setIsImportModalOpen(true)}
-            className="hidden md:flex items-center gap-2 rounded-full bg-[#1DB954] hover:bg-[#1ed760] active:scale-95 px-4 py-2 text-xs font-bold text-black shadow-lg transition"
+            className="hidden lg:flex items-center gap-2 rounded-full bg-[#1DB954] hover:bg-[#1ed760] active:scale-95 px-3.5 py-1.5 sm:py-2 text-xs font-bold text-black shadow-lg transition shrink-0"
             title="Importar Playlist"
           >
-            <Link2 size={16} strokeWidth={2.5} />
+            <Link2 size={15} strokeWidth={2.5} />
             <span>Importar</span>
           </button>
 
-          {/* Botão de Atualizar / Sincronizar em Nuvem - VISÍVEL SEMPRE (Mobile e Desktop) */}
+          {/* Botão de Atualizar / Sincronizar em Nuvem */}
           <button
             onClick={handleForceCloudSync}
             disabled={isSyncingCloud}
@@ -3224,17 +3197,17 @@ export default function App() {
             title="Atualizar e sincronizar biblioteca com a nuvem"
           >
             <RefreshCw size={14} className={isSyncingCloud ? "animate-spin text-[#1DB954]" : "text-[#1DB954]"} />
-            <span className="hidden sm:inline">Atualizar</span>
+            <span className="hidden xl:inline">Atualizar</span>
           </button>
 
-          {/* Botão Instalar App PWA - VISÍVEL SEMPRE (Mobile e Desktop) */}
+          {/* Botão Instalar App PWA */}
           <button
             onClick={handleInstallPwa}
             className="flex items-center gap-1.5 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-bold text-white transition border border-white/10 flex-shrink-0"
             title="Baixar e Instalar Montanha Music no seu Celular ou Computador"
           >
             <Smartphone size={14} className="text-[#1DB954]" />
-            <span className="hidden sm:inline">Baixar App</span>
+            <span className="hidden xl:inline">Baixar App</span>
           </button>
 
           {/* Botão de Configurações & Perfil */}
@@ -5185,8 +5158,16 @@ export default function App() {
       {/* MINI-PLAYER INFERIOR RESPONSIVO (Posicionado logo acima da barra de navegação com respeito à safe area) */}
       <div
         onClick={() => setIsFullScreenPlayer(true)}
-        className="fixed mobile-mini-player sm:bottom-0 left-0 right-0 h-20 bg-[#181818] border-t border-white/[0.08] px-3.5 sm:px-6 flex items-center cursor-pointer z-40 hover:bg-[#202020] transition select-none"
+        className="fixed mobile-mini-player sm:bottom-0 left-0 right-0 h-20 bg-[#181818] border-t border-white/[0.08] px-3.5 sm:px-6 flex items-center cursor-pointer z-40 hover:bg-[#202020] transition select-none overflow-hidden"
       >
+        {/* Barra de Progresso Fina no Topo do Mini-Player (Visível sempre em reprodução) */}
+        <div className="absolute top-0 left-0 right-0 h-[2.5px] bg-white/10 overflow-hidden pointer-events-none">
+          <div
+            className="h-full bg-[#1DB954] transition-all duration-300"
+            style={{ width: `${Math.min(100, Math.max(0, (currentTime / (duration || 210)) * 100))}%` }}
+          />
+        </div>
+
         {/* LAYOUT MOBILE (sm:hidden) - Limpo, Descomplicado e Sem Aperto */}
         <div className="flex sm:hidden items-center justify-between w-full gap-2">
           {/* Esquerda: Capa + Título + Artista */}
@@ -5254,27 +5235,30 @@ export default function App() {
           </div>
         </div>
 
-        {/* LAYOUT DESKTOP (hidden sm:flex) - 3 Colunas Completas com Seeker e Volume */}
-        <div className="hidden sm:flex items-center justify-between w-full">
-          <div className="flex items-center gap-3 min-w-0 w-1/3">
-            <img src={activeSong.thumbnail} alt={activeSong.name} className="h-12 w-12 rounded-lg object-cover shadow" />
-            <div className="min-w-0">
-              <p className="text-sm font-bold text-white truncate">{activeSong.name}</p>
-              <p className="text-xs text-neutral-400 truncate">{activeSong.artist}</p>
+        {/* LAYOUT DESKTOP & TABLET (hidden sm:flex) - Responsivo, Proporcional e Sem Cortes */}
+        <div className="hidden sm:flex items-center justify-between w-full gap-2 md:gap-4">
+          {/* Esquerda: Capa + Título + Artista + Coração */}
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 max-w-[200px] md:max-w-[260px] lg:max-w-[320px] shrink-0">
+            <img src={activeSong.thumbnail} alt={activeSong.name} className="h-11 w-11 sm:h-12 sm:w-12 rounded-lg object-cover shadow shrink-0" />
+            <div className="min-w-0 flex-1">
+              <p className="text-xs sm:text-sm font-bold text-white truncate">{activeSong.name}</p>
+              <p className="text-[11px] sm:text-xs text-neutral-400 truncate">{activeSong.artist}</p>
             </div>
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 toggleFavorite(activeSong.id);
               }}
-              className="p-1.5 text-neutral-400 hover:text-white transition"
+              className="p-1.5 text-neutral-400 hover:text-white transition shrink-0"
+              title="Favoritar"
             >
               <Heart size={18} className={favoriteSongIds.includes(activeSong.id) ? 'fill-[#1DB954] text-[#1DB954]' : ''} />
             </button>
           </div>
 
-          <div className="flex flex-col items-center gap-1.5 w-1/3" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center gap-4">
+          {/* Centro: Controles + Scrubber */}
+          <div className="flex flex-col items-center gap-1.5 flex-1 max-w-xl px-2" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3 sm:gap-4">
               {/* BOTÃO SHUFFLE NO DESKTOP */}
               <button
                 onClick={(e) => {
@@ -5344,41 +5328,22 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-2 sm:gap-3 w-1/3" onClick={(e) => e.stopPropagation()}>
-            {/* BOTÃO DE TELA / CLIPE (Ativo quando tocando via YouTube) */}
-            {activePlayerType === 'youtube' && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowVideoDock((prev) => !prev);
-                }}
-                className={`p-2 rounded-xl transition ${
-                  showVideoDock
-                    ? 'text-[#1DB954] bg-[#1DB954]/20 border border-[#1DB954]/40 shadow-sm'
-                    : 'text-neutral-400 hover:text-white hover:bg-white/5'
-                }`}
-                title={showVideoDock ? 'Ocultar tela do clipe' : 'Assistir clipe oficial'}
-              >
-                <Tv size={18} />
-              </button>
-            )}
-
-            {/* BOTÃO DE LETRAS / SINCRONIA KARAOKÊ */}
+          {/* Direita: Letras + Fila + Add Playlist + Download + Volume (Sem o botão TV) */}
+          <div className="flex items-center justify-end gap-1 sm:gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
             <button
               onClick={() => {
                 setShowLyrics(true);
                 setIsFullScreenPlayer(true);
               }}
-              className="p-2 rounded-xl text-neutral-400 hover:text-[#1DB954] hover:bg-white/5 transition"
+              className="p-1.5 sm:p-2 rounded-xl text-neutral-400 hover:text-[#1DB954] hover:bg-white/5 transition"
               title="Ver Letra / Karaokê"
             >
               <Mic2 size={18} />
             </button>
 
-            {/* BOTÃO DA FILA DE EXECUÇÃO */}
             <button
               onClick={() => setIsQueueOpen(!isQueueOpen)}
-              className={`p-2 rounded-xl transition relative ${
+              className={`p-1.5 sm:p-2 rounded-xl transition relative ${
                 isQueueOpen
                   ? 'bg-[#1DB954]/20 text-[#1DB954] border border-[#1DB954]/40'
                   : 'text-neutral-400 hover:text-white hover:bg-white/5'
@@ -5410,8 +5375,8 @@ export default function App() {
             >
               <Download size={18} />
             </button>
-            <div className="flex items-center gap-2">
-              <button onClick={() => setIsMuted(!isMuted)} className="text-neutral-400 hover:text-white">
+            <div className="hidden lg:flex items-center gap-1.5 pl-1 border-l border-white/10">
+              <button onClick={() => setIsMuted(!isMuted)} className="text-neutral-400 hover:text-white p-1">
                 {isMuted || volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}
               </button>
               <input
@@ -5424,7 +5389,7 @@ export default function App() {
                   setVolume(parseFloat(e.target.value));
                   setIsMuted(false);
                 }}
-                className="w-20 h-1 accent-white bg-white/20 rounded-full cursor-pointer"
+                className="w-16 xl:w-20 h-1 accent-[#1DB954] bg-white/20 rounded-full cursor-pointer"
               />
             </div>
           </div>
@@ -5444,19 +5409,6 @@ export default function App() {
             </button>
             <span className="text-xs font-bold uppercase tracking-wider text-neutral-400">Tocando Agora</span>
             <div className="flex items-center gap-1">
-              {activePlayerType === 'youtube' && (
-                <button
-                  onClick={() => setShowVideoDock(!showVideoDock)}
-                  className={`rounded-full p-2 transition ${
-                    showVideoDock
-                      ? 'text-[#1DB954] bg-[#1DB954]/20'
-                      : 'text-neutral-400 hover:text-white hover:bg-white/10'
-                  }`}
-                  title={showVideoDock ? 'Ocultar tela do clipe' : 'Assistir clipe oficial'}
-                >
-                  <Tv size={22} />
-                </button>
-              )}
               <button
                 onClick={() => setShowLyrics(!showLyrics)}
                 className={`rounded-full p-2 transition ${showLyrics ? 'text-[#1DB954] bg-[#1DB954]/20' : 'text-neutral-400 hover:text-white hover:bg-white/10'}`}
