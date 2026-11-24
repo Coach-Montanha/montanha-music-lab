@@ -2,12 +2,15 @@
   "name": "montanha-music-repo",
   "private": true,
   "scripts": {
-    "build": "npm run build:web --prefix web"
+    "build": "npm install --prefix apps/montanha-bento && npm run build --prefix apps/montanha-bento"
   },
   "dependencies": {
     "@distube/ytdl-core": "^5.2.1",
     "play-dl": "^1.9.7",
     "youtubei.js": "^18.3.0"
+  },
+  "devDependencies": {
+    "wrangler": "^3.109.2"
   },
   "type": "module"
 }
