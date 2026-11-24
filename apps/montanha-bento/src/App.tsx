@@ -51,7 +51,8 @@ import {
   CheckSquare,
   Square,
   ListOrdered,
-  Mic2
+  Mic2,
+  Tv
 } from 'lucide-react';
 
 import { Song, Playlist, SearchAlbum, SearchArtist, SearchPlaylist, CategorizedSearchResults, RepeatMode } from './types';
@@ -293,6 +294,7 @@ export default function App() {
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [activePlayerType, setActivePlayerType] = useState<'native' | 'youtube'>('native');
+  const [showVideoDock, setShowVideoDock] = useState<boolean>(false);
   const activePlayerTypeRef = useRef<'native' | 'youtube'>('native');
   activePlayerTypeRef.current = activePlayerType;
   const ytHostRef = useRef<HTMLDivElement>(null);
@@ -2913,27 +2915,51 @@ export default function App() {
         !currentUser ? 'filter blur-2xl brightness-40 pointer-events-none scale-[0.98]' : 'filter-none brightness-100 scale-100'
       }`}>
       
-      {/* MOTOR TRANSPARENTE YOUTUBE IFRAME (Dock Compacto / Background Audio) */}
+      {/* MOTOR TRANSPARENTE YOUTUBE IFRAME (Ghost Layer Oculto por Padrão / Mini-Dock Opcional) */}
       <div
-        style={{
-          position: 'fixed',
-          bottom: activePlayerType === 'youtube' ? '88px' : '-9999px',
-          right: '16px',
-          width: activePlayerType === 'youtube' ? '240px' : '1px',
-          height: activePlayerType === 'youtube' ? '135px' : '1px',
-          zIndex: activePlayerType === 'youtube' ? 45 : -10,
-          borderRadius: '12px',
-          overflow: 'hidden',
-          boxShadow: '0 12px 36px rgba(0,0,0,0.7)',
-          border: '1px solid rgba(255,255,255,0.15)',
-          backgroundColor: '#000',
-          transition: 'opacity 0.3s ease, transform 0.3s ease',
-          pointerEvents: activePlayerType === 'youtube' ? 'auto' : 'none',
-          opacity: activePlayerType === 'youtube' ? 1 : 0,
-          visibility: activePlayerType === 'youtube' ? 'visible' : 'hidden'
-        }}
+        style={
+          showVideoDock && activePlayerType === 'youtube'
+            ? {
+                position: 'fixed',
+                bottom: '88px',
+                right: '16px',
+                width: '280px',
+                height: '158px',
+                zIndex: 45,
+                borderRadius: '12px',
+                overflow: 'hidden',
+                boxShadow: '0 12px 36px rgba(0,0,0,0.75)',
+                border: '1px solid rgba(255,255,255,0.15)',
+                backgroundColor: '#000',
+                transition: 'opacity 0.3s ease, transform 0.3s ease',
+                pointerEvents: 'auto',
+                opacity: 1,
+                visibility: 'visible'
+              }
+            : {
+                position: 'fixed',
+                bottom: 0,
+                right: 0,
+                width: '1px',
+                height: '1px',
+                opacity: 0.001,
+                pointerEvents: 'none',
+                zIndex: -1,
+                overflow: 'hidden',
+                visibility: 'visible'
+              }
+        }
       >
-        <div id="yt-hidden-player" ref={ytHostRef} className="w-full h-full" />
+        {showVideoDock && activePlayerType === 'youtube' && (
+          <button
+            onClick={() => setShowVideoDock(false)}
+            className="absolute top-2 right-2 z-50 p-1 rounded-full bg-black/75 hover:bg-black text-white/80 hover:text-white transition shadow"
+            title="Ocultar tela do clipe"
+          >
+            <X size={14} />
+          </button>
+        )}
+        <div id="yt-hidden-player" ref={ytHostRef} style={{ width: '100%', height: '100%', minWidth: '200px', minHeight: '120px' }} />
       </div>
 
       {/* MOTOR DE ÁUDIO HTML5 ULTRA-RESILIENTE (Web Audio API Chain + Crossfade + Equalizador) */}
@@ -5293,6 +5319,21 @@ export default function App() {
           </div>
 
           <div className="flex items-center justify-end gap-2 sm:gap-3 w-1/3" onClick={(e) => e.stopPropagation()}>
+            {/* BOTÃO DE TELA / CLIPE (Ativo quando tocando via YouTube) */}
+            {activePlayerType === 'youtube' && (
+              <button
+                onClick={() => setShowVideoDock(!showVideoDock)}
+                className={`p-2 rounded-xl transition ${
+                  showVideoDock
+                    ? 'text-[#1DB954] bg-[#1DB954]/20 border border-[#1DB954]/40 shadow-sm'
+                    : 'text-neutral-400 hover:text-white hover:bg-white/5'
+                }`}
+                title={showVideoDock ? 'Ocultar tela do clipe' : 'Assistir clipe oficial'}
+              >
+                <Tv size={18} />
+              </button>
+            )}
+
             {/* BOTÃO DE LETRAS / SINCRONIA KARAOKÊ */}
             <button
               onClick={() => {
@@ -5374,6 +5415,19 @@ export default function App() {
             </button>
             <span className="text-xs font-bold uppercase tracking-wider text-neutral-400">Tocando Agora</span>
             <div className="flex items-center gap-1">
+              {activePlayerType === 'youtube' && (
+                <button
+                  onClick={() => setShowVideoDock(!showVideoDock)}
+                  className={`rounded-full p-2 transition ${
+                    showVideoDock
+                      ? 'text-[#1DB954] bg-[#1DB954]/20'
+                      : 'text-neutral-400 hover:text-white hover:bg-white/10'
+                  }`}
+                  title={showVideoDock ? 'Ocultar tela do clipe' : 'Assistir clipe oficial'}
+                >
+                  <Tv size={22} />
+                </button>
+              )}
               <button
                 onClick={() => setShowLyrics(!showLyrics)}
                 className={`rounded-full p-2 transition ${showLyrics ? 'text-[#1DB954] bg-[#1DB954]/20' : 'text-neutral-400 hover:text-white hover:bg-white/10'}`}
