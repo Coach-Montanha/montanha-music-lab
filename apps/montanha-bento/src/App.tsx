@@ -944,22 +944,26 @@ export default function App() {
   useEffect(() => {
     const handleVisibility = () => {
       if (document.hidden) {
-        // Ao apagar a tela ou alternar app: garante que o elemento de áudio continue ativo
+        // Ao apagar a tela ou alternar app no celular:
         if (isPlayingRef.current && !userInitiatedPauseRef.current) {
-          if (audioRef.current && audioRef.current.paused && audioRef.current.src) {
+          audioAnchor.play();
+          if (activePlayerTypeRef.current === 'youtube') {
+            ytAdapterRef.current?.resume();
+          } else if (audioRef.current && audioRef.current.paused && audioRef.current.src) {
             audioRef.current.play().catch(() => {});
           }
         }
       } else {
-        // Ao reativar a tela: garante sincronia perfeita
+        // Ao reativar a tela: garante sincronia e foco contínuo
         if (isPlayingRef.current && !userInitiatedPauseRef.current) {
-          if (audioRef.current && audioRef.current.paused && audioRef.current.src) {
+          if (activePlayerTypeRef.current === 'youtube') {
+            ytAdapterRef.current?.resume();
+          } else if (audioRef.current && audioRef.current.paused && audioRef.current.src) {
             audioRef.current.play().catch(() => {});
           }
         }
       }
     };
-    document.addEventListener('visibilitychange', handleVisibility);
     window.addEventListener('focus', handleVisibility);
     return () => {
       document.removeEventListener('visibilitychange', handleVisibility);
@@ -983,12 +987,26 @@ export default function App() {
         onPlaying: () => {
           setIsPlaying(true);
           isPlayingRef.current = true;
+          userInitiatedPauseRef.current = false;
+          audioAnchor.play();
           mediaSessionController.updatePlaybackState(true);
         },
         onPaused: () => {
-          setIsPlaying(false);
-          isPlayingRef.current = false;
-          mediaSessionController.updatePlaybackState(false);
+          if (userInitiatedPauseRef.current) {
+            setIsPlaying(false);
+            isPlayingRef.current = false;
+            audioAnchor.pause();
+            mediaSessionController.updatePlaybackState(false);
+          } else {
+            // Pausa involuntária do SO móvel (tela apagada / troca de app)
+            // IGNORA a pausa do sistema e força o resume imediato com audioAnchor!
+            audioAnchor.play();
+            setTimeout(() => {
+              if (!userInitiatedPauseRef.current && isPlayingRef.current) {
+                ytAdapterRef.current?.resume();
+              }
+            }, 60);
+          }
         },
         onError: (code: number) => {
           console.warn('[YouTubeAdapter Error Code]', code);
@@ -1043,6 +1061,13 @@ export default function App() {
               const dur = Math.floor(ytAdapterRef.current.duration() || 0);
               if (dur > 1 && dur !== duration) {
                 setDuration(dur);
+              }
+              // Blindagem de auto-retomada em tela apagada no mobile:
+              if (isPlayingRef.current && !userInitiatedPauseRef.current) {
+                if (ytAdapterRef.current.isPaused()) {
+                  audioAnchor.play();
+                  ytAdapterRef.current.resume();
+                }
               }
             } catch {}
             return;
@@ -1183,9 +1208,14 @@ export default function App() {
     if (activePlayerTypeRef.current === 'youtube') {
       if (ytAdapterRef.current) {
         try {
+          userInitiatedPauseRef.current = false;
+          audioAnchor.play();
           ytAdapterRef.current.unMute();
           ytAdapterRef.current.setVolume(isMuted ? 0 : Math.round(volume * 100));
           ytAdapterRef.current.resume();
+          setIsPlaying(true);
+          isPlayingRef.current = true;
+          mediaSessionController.updatePlaybackState(true);
           return;
         } catch {}
       }

@@ -182,6 +182,12 @@ export class YouTubeAdapter {
   seek(seconds: number) {
     try { this.player?.seekTo(seconds, true); } catch {}
   }
+  getPlayerState(): number {
+    try { return this.player?.getPlayerState?.() ?? -1; } catch { return -1; }
+  }
+  isPaused(): boolean {
+    try { return this.player?.getPlayerState?.() === 2; } catch { return false; }
+  }
   currentTime(): number {
     try { return this.player?.getCurrentTime?.() ?? 0; } catch { return 0; }
   }

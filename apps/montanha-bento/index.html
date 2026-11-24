@@ -13,13 +13,45 @@
     <meta name="apple-mobile-web-app-title" content="Montanha Music" />
     <link rel="manifest" href="/manifest.json" />
     <title>Montanha Music • Streaming & Playlists</title>
-    <!-- Sessão de Áudio Nativa do WebKit / Safari (iOS 16.4+) -->
+        <!-- GUARDIÃO DE REPRODUÇÃO EM BACKGROUND & TELA BLOQUEADA (PADRÃO MOZILLA VIDEO-BG-PLAY) -->
     <script>
-      try {
-        if ('audioSession' in navigator) {
-          navigator.audioSession.type = 'playback';
-        }
-      } catch (e) {}
+      (function() {
+        try {
+          // 1. Engana o Page Visibility API e Document Focus em document e no prototype
+          Object.defineProperty(document, 'hidden', { get: () => false, configurable: true });
+          Object.defineProperty(document, 'visibilityState', { get: () => 'visible', configurable: true });
+          if (typeof Document !== 'undefined' && Document.prototype) {
+            Object.defineProperty(Document.prototype, 'hidden', { get: () => false, configurable: true });
+            Object.defineProperty(Document.prototype, 'visibilityState', { get: () => 'visible', configurable: true });
+            Document.prototype.hasFocus = () => true;
+          }
+          document.hasFocus = () => true;
+          if ('webkitHidden' in document) {
+            Object.defineProperty(document, 'webkitHidden', { get: () => false, configurable: true });
+            Object.defineProperty(document, 'webkitVisibilityState', { get: () => 'visible', configurable: true });
+          }
+
+          // 2. Intercepta addEventListener no EventTarget para impedir que scripts internos e iframes
+          // registrem ouvintes de visibilidade ou desfoque que pausam o player
+          const origAEL = EventTarget.prototype.addEventListener;
+          EventTarget.prototype.addEventListener = function(type, listener, options) {
+            if (type === 'visibilitychange' || type === 'webkitvisibilitychange' || type === 'blur' || type === 'pagehide') {
+              return;
+            }
+            return origAEL.call(this, type, listener, options);
+          };
+
+          // Limpa handlers legados inline de blur e visibility
+          window.onblur = null;
+          window.onfocus = null;
+          document.onvisibilitychange = null;
+
+          // 3. Configura a sessão de áudio nativa do WebKit / Safari (iOS 16.4+)
+          if ('audioSession' in navigator) {
+            navigator.audioSession.type = 'playback';
+          }
+        } catch (e) {}
+      })();
     </script>
   </head>
   <body class="bg-[#121212] text-white antialiased selection:bg-[#1DB954] selection:text-black overscroll-none">
