@@ -1438,7 +1438,7 @@ export default function App() {
   }, []);
 
   // Motor Transparente de Reprodução via YouTube IFrame API (Zero Erros de Bloqueio, 100% Catálogo Mundial)
-  const playInYouTube = async (targetSong: Song, explicitVideoId?: string): Promise<boolean> => {
+  const playInYouTube = async (targetSong: Song, explicitVideoId?: string, reqId?: number): Promise<boolean> => {
     let ytId = explicitVideoId || targetSong.youtubeId?.replace(/^yt-/, '').split('&')[0];
     if (!ytId || !/^[a-zA-Z0-9_-]{11}$/.test(ytId)) {
       try {
@@ -1448,8 +1448,9 @@ export default function App() {
         });
         if (res.ok) {
           const data = await res.json();
-          if (data?.videoId && /^[a-zA-Z0-9_-]{11}$/.test(data.videoId)) {
-            ytId = data.videoId;
+          const firstId = data?.results?.[0]?.id || data?.videoId;
+          if (firstId && /^[a-zA-Z0-9_-]{11}$/.test(firstId)) {
+            ytId = firstId;
             targetSong.youtubeId = ytId;
           }
         }
@@ -1458,12 +1459,14 @@ export default function App() {
       }
     }
 
+    if (reqId !== undefined && reqId !== playRequestIdRef.current) return false;
     if (!ytId) return false;
 
     try {
       if (audioRef.current) {
         try { audioRef.current.pause(); } catch {}
         audioRef.current.removeAttribute('src');
+        audioRef.current.load();
       }
 
       setActivePlayerType('youtube');
@@ -1502,6 +1505,15 @@ export default function App() {
     const reqId = ++playRequestIdRef.current;
     isSwitchingRef.current = true;
     userInitiatedPauseRef.current = false;
+
+    // Pausa imediatamente ambos os motores antes de trocar de faixa (Zero reprodução simultânea)
+    try { audio.pause(); } catch {}
+    try { ytAdapterRef.current?.stop(); } catch {}
+    try { ytAdapterRef.current?.pause(); } catch {}
+    if (window.ytPlayer && typeof window.ytPlayer.stopVideo === 'function') {
+      try { window.ytPlayer.stopVideo(); } catch {}
+    }
+
     audioAnchor.play();
 
     setCurrentSong(song);
@@ -1580,9 +1592,12 @@ export default function App() {
       if (window.ytPlayer && typeof window.ytPlayer.pauseVideo === 'function') {
         try { window.ytPlayer.pauseVideo(); } catch {}
       }
-      setActivePlayerType('native');
-    if (window.ytPlayer && typeof window.ytPlayer.pauseVideo === 'function') {
-      try { window.ytPlayer.pauseVideo(); } catch {}
+      if (reqId !== playRequestIdRef.current) return;
+    setActivePlayerType('native');
+    try { ytAdapterRef.current?.stop(); } catch {}
+    try { ytAdapterRef.current?.pause(); } catch {}
+    if (window.ytPlayer && typeof window.ytPlayer.stopVideo === 'function') {
+      try { window.ytPlayer.stopVideo(); } catch {}
     }
     audio.src = streamUrl;
       audio.currentTime = 0;
@@ -1623,11 +1638,12 @@ export default function App() {
     // 2. RESOLUÇÃO REMOTA DA URL DE ÁUDIO (JioSaavn 320kbps -> Audius -> YouTube Adapter)
     try {
       const streamRes = await fetchAudioStream(song.youtubeId, song.name, song.artist, song.audioUrl, song.id);
+      if (reqId !== playRequestIdRef.current) return;
       if (streamRes.kind === 'audio') {
         streamUrl = streamRes.url;
         streamDuration = streamRes.duration;
       } else if (streamRes.kind === 'youtube') {
-        const ytSuccess = await playInYouTube(song, streamRes.videoId);
+        const ytSuccess = await playInYouTube(song, streamRes.videoId, reqId);
         if (ytSuccess) return;
       }
     } catch {}
@@ -1636,7 +1652,7 @@ export default function App() {
 
     if (!streamUrl) {
       // 3. SE NÃO ENCONTROU STREAM DIRETO (JioSaavn), ACIONA O MOTOR TRANSPARENTE DO YOUTUBE PLAYER!
-      const ytSuccess = await playInYouTube(song);
+      const ytSuccess = await playInYouTube(song, undefined, reqId);
       if (ytSuccess) {
         return;
       }
@@ -1728,9 +1744,12 @@ export default function App() {
       }
     }
 
+    if (reqId !== playRequestIdRef.current) return;
     setActivePlayerType('native');
-    if (window.ytPlayer && typeof window.ytPlayer.pauseVideo === 'function') {
-      try { window.ytPlayer.pauseVideo(); } catch {}
+    try { ytAdapterRef.current?.stop(); } catch {}
+    try { ytAdapterRef.current?.pause(); } catch {}
+    if (window.ytPlayer && typeof window.ytPlayer.stopVideo === 'function') {
+      try { window.ytPlayer.stopVideo(); } catch {}
     }
     audio.src = streamUrl;
     audio.currentTime = 0;
@@ -2961,13 +2980,12 @@ export default function App() {
         <div id="yt-hidden-player" ref={ytHostRef} className="w-full h-full" />
       </div>
 
-      {/* MOTOR DE ÁUDIO HTML5 ULTRA-RESILIENTE (Web Audio API Chain + Crossfade + Equalizador) */}
+      {/* MOTOR DE ÁUDIO HTML5 ULTRA-RESILIENTE (Puro em Mobile para Background Nativo 100% Sem Cortes) */}
       <audio
         ref={audioRef}
         preload="auto"
         loop={repeatMode === 'one'}
         playsInline={true}
-        crossOrigin="anonymous"
         style={{
           position: 'fixed',
           bottom: 0,
@@ -2988,9 +3006,14 @@ export default function App() {
           isPlayingRef.current = true;
           mediaSessionController.updatePlaybackState(true);
           audioAnchor.play();
-          if (audioRef.current) {
-            audioEffectsEngine.attach(audioRef.current);
-            audioEffectsEngine.ensureAudioContextRunning();
+          const isMobileOrTablet = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(navigator.userAgent);
+          if (audioRef.current && !isMobileOrTablet) {
+            // Em desktop, permite EQ; em celular/tablet mantém áudio 100% nativo sem AudioContext para nunca pausar ao apagar a tela
+            const savedEq = localStorage.getItem('montanha_equalizer');
+            if (savedEq && savedEq !== 'flat') {
+              audioEffectsEngine.attach(audioRef.current);
+              audioEffectsEngine.ensureAudioContextRunning();
+            }
           }
           if (currentSongRef.current) {
             mediaSessionController.updateMetadata({
