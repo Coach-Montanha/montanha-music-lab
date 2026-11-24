@@ -1,4 +1,12 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+
+declare global {
+  interface Window {
+    YT?: any;
+    onYouTubeIframeAPIReady?: () => void;
+    ytPlayer?: any;
+  }
+}
 import {
   Play,
   Pause,
@@ -284,6 +292,9 @@ export default function App() {
   const activeLyricRef = useRef<HTMLParagraphElement | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [activePlayerType, setActivePlayerType] = useState<'native' | 'youtube'>('native');
+  const activePlayerTypeRef = useRef<'native' | 'youtube'>('native');
+  activePlayerTypeRef.current = activePlayerType;
   const silentHoldRef = useRef<SilentHoldKeeper | null>(null);
   const gestureGuardianRef = useRef<GestureGuardian | null>(null);
   const isPlayingRef = useRef<boolean>(false);
@@ -984,12 +995,23 @@ export default function App() {
     }
   }, []);
 
-  // Sincronização em Tempo Real do Progresso de Áudio (Auto-avanço gerenciado exclusivamente pelo onEnded nativo)
+  // Sincronização em Tempo Real do Progresso de Áudio (Nativo HTML5 + YouTube IFrame)
   useEffect(() => {
     let interval: any = null;
     if (isPlaying) {
       interval = setInterval(() => {
         if (!isPlayingRef.current || userInitiatedPauseRef.current || silentHoldRef.current?.isHolding()) {
+          return;
+        }
+        if (activePlayerTypeRef.current === 'youtube' && window.ytPlayer && typeof window.ytPlayer.getCurrentTime === 'function') {
+          try {
+            const cur = Math.floor(window.ytPlayer.getCurrentTime() || 0);
+            setCurrentTime(cur);
+            const dur = Math.floor(window.ytPlayer.getDuration() || 0);
+            if (dur > 1 && dur !== duration) {
+              setDuration(dur);
+            }
+          } catch {}
           return;
         }
         if (audioRef.current && !audioRef.current.paused) {
@@ -1007,10 +1029,16 @@ export default function App() {
     return () => clearInterval(interval);
   }, [isPlaying, duration]);
 
-  // Sincronização Imediata de Volume e Mute no <audio>
+  // Sincronização Imediata de Volume e Mute no <audio> e no YouTube IFrame Player
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.volume = isMuted ? 0 : volume;
+    }
+    if (window.ytPlayer && typeof window.ytPlayer.setVolume === 'function') {
+      try {
+        window.ytPlayer.setVolume(isMuted ? 0 : Math.round(volume * 100));
+        if (isMuted) window.ytPlayer.mute?.(); else window.ytPlayer.unMute?.();
+      } catch {}
     }
   }, [volume, isMuted]);
 
@@ -1100,6 +1128,16 @@ export default function App() {
     mediaSessionController.updatePlaybackState(true);
     audioAnchor.play();
 
+    // 0. Se o motor ativo for o YouTube IFrame Player
+    if (activePlayerTypeRef.current === 'youtube' && window.ytPlayer && typeof window.ytPlayer.playVideo === 'function') {
+      try {
+        window.ytPlayer.unMute?.();
+        window.ytPlayer.setVolume?.(isMuted ? 0 : Math.round(volume * 100));
+        window.ytPlayer.playVideo();
+        return;
+      } catch {}
+    }
+
     // 1. Se estiver retido no SilentHoldKeeper, retoma a música real imediatamente
     if (silentHoldRef.current?.isHolding()) {
       const resumed = silentHoldRef.current.handleResume(() => {
@@ -1131,6 +1169,14 @@ export default function App() {
     isPlayingRef.current = false;
     mediaSessionController.updatePlaybackState(false);
     audioAnchor.pause();
+
+    // 0. Se o motor ativo for o YouTube IFrame Player
+    if (activePlayerTypeRef.current === 'youtube' && window.ytPlayer && typeof window.ytPlayer.pauseVideo === 'function') {
+      try {
+        window.ytPlayer.pauseVideo();
+        return;
+      } catch {}
+    }
 
     // 1. Interceptação pelo SilentHoldKeeper: evita CoreAudio decoder eviction no Android/iOS
     if (audioRef.current && silentHoldRef.current) {
@@ -1197,7 +1243,11 @@ export default function App() {
     if (silentHoldRef.current?.isHolding()) {
       silentHoldRef.current.updateSavedPauseTime(newTime);
     }
-    if (audioRef.current && audioRef.current.src) {
+    if (activePlayerTypeRef.current === 'youtube' && window.ytPlayer && typeof window.ytPlayer.seekTo === 'function') {
+      try {
+        window.ytPlayer.seekTo(newTime, true);
+      } catch {}
+    } else if (audioRef.current && audioRef.current.src) {
       audioRef.current.currentTime = newTime;
     }
     mediaSessionController.updatePositionState({
@@ -1284,6 +1334,99 @@ export default function App() {
     };
   }, []);
 
+  // Motor Transparente de Reprodução via YouTube IFrame API (Zero Erros de Bloqueio, 100% Catálogo Mundial)
+  const playInYouTube = async (targetSong: Song): Promise<boolean> => {
+    let ytId = targetSong.youtubeId?.replace(/^yt-/, '').split('&')[0];
+    if (!ytId || !/^[a-zA-Z0-9_-]{11}$/.test(ytId)) {
+      try {
+        const q = `${targetSong.artist || ''} ${targetSong.name || ''}`.trim();
+        const res = await fetch(`/api/youtube-search?q=${encodeURIComponent(q)}`, {
+          signal: AbortSignal.timeout(4500)
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.videoId && /^[a-zA-Z0-9_-]{11}$/.test(data.videoId)) {
+            ytId = data.videoId;
+            targetSong.youtubeId = ytId;
+          }
+        }
+      } catch (err) {
+        console.warn('Erro ao buscar videoId no YouTube:', err);
+      }
+    }
+
+    if (!ytId) return false;
+
+    try {
+      if (audioRef.current) {
+        try { audioRef.current.pause(); } catch {}
+        audioRef.current.removeAttribute('src');
+      }
+
+      setActivePlayerType('youtube');
+      markSongAvailable(targetSong.id);
+      consecutiveFailuresRef.current = 0;
+      isSwitchingRef.current = false;
+      setCurrentSong(targetSong);
+      setIsPlaying(true);
+      isPlayingRef.current = true;
+      mediaSessionController.updatePlaybackState(true);
+      audioAnchor.play();
+
+      if (window.ytPlayer && typeof window.ytPlayer.loadVideoById === 'function') {
+        window.ytPlayer.loadVideoById(ytId);
+        window.ytPlayer.unMute?.();
+        window.ytPlayer.setVolume?.(isMuted ? 0 : Math.round(volume * 100));
+        window.ytPlayer.playVideo?.();
+        return true;
+      }
+
+      if (window.YT && window.YT.Player) {
+        window.ytPlayer = new window.YT.Player('yt-hidden-player', {
+          height: '1',
+          width: '1',
+          videoId: ytId,
+          playerVars: {
+            autoplay: 1,
+            controls: 0,
+            disablekb: 1,
+            playsinline: 1
+          },
+          events: {
+            onReady: (event: any) => {
+              try {
+                event.target.unMute?.();
+                event.target.setVolume?.(isMuted ? 0 : Math.round(volume * 100));
+                event.target.playVideo?.();
+              } catch {}
+            },
+            onStateChange: (event: any) => {
+              if (event.data === 1) {
+                setIsPlaying(true);
+                isPlayingRef.current = true;
+                mediaSessionController.updatePlaybackState(true);
+              } else if (event.data === 2) {
+                setIsPlaying(false);
+                isPlayingRef.current = false;
+                mediaSessionController.updatePlaybackState(false);
+              } else if (event.data === 0) {
+                if (repeatModeRef.current === 'one') {
+                  event.target.playVideo();
+                } else {
+                  handleNextSongRef.current();
+                }
+              }
+            }
+          }
+        });
+        return true;
+      }
+    } catch (e) {
+      console.warn('Erro ao reproduzir no YouTube Player:', e);
+    }
+    return false;
+  };
+
   // Motor Unificado Padrão Montanha Music (HTML5 Audio com Streaming 320kbps e Background-Safe)
   const playSong = async (song: Song, newQueue?: Song[], retry = 0, isAutoHealed = false) => {
     const audio = audioRef.current;
@@ -1364,7 +1507,15 @@ export default function App() {
     let streamDuration: number | undefined = cachedStream?.duration;
 
     if (streamUrl) {
-      audio.src = streamUrl;
+      setActivePlayerType('native');
+      if (window.ytPlayer && typeof window.ytPlayer.pauseVideo === 'function') {
+        try { window.ytPlayer.pauseVideo(); } catch {}
+      }
+      setActivePlayerType('native');
+    if (window.ytPlayer && typeof window.ytPlayer.pauseVideo === 'function') {
+      try { window.ytPlayer.pauseVideo(); } catch {}
+    }
+    audio.src = streamUrl;
       audio.currentTime = 0;
       audio.volume = isMuted ? 0 : volume;
       if (streamDuration) setDuration(streamDuration);
@@ -1412,6 +1563,12 @@ export default function App() {
     if (reqId !== playRequestIdRef.current) return;
 
     if (!streamUrl) {
+      // 3. SE NÃO ENCONTROU STREAM DIRETO (JioSaavn), ACIONA O MOTOR TRANSPARENTE DO YOUTUBE PLAYER!
+      const ytSuccess = await playInYouTube(song);
+      if (ytSuccess) {
+        return;
+      }
+
       if (song.audioUrl && !isDisallowedPreview(song.audioUrl, song.duration)) {
         streamUrl = song.audioUrl;
         streamDuration = song.duration || 210;
@@ -1499,6 +1656,10 @@ export default function App() {
       }
     }
 
+    setActivePlayerType('native');
+    if (window.ytPlayer && typeof window.ytPlayer.pauseVideo === 'function') {
+      try { window.ytPlayer.pauseVideo(); } catch {}
+    }
     audio.src = streamUrl;
     audio.currentTime = 0;
     audio.volume = isMuted ? 0 : volume;

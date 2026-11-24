@@ -24,6 +24,8 @@
   </head>
   <body class="bg-[#121212] text-white antialiased selection:bg-[#1DB954] selection:text-black overscroll-none">
     <div id="root"></div>
+    <div id="yt-hidden-player" style="position:fixed;bottom:-9999px;right:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;"></div>
+    <script src="https://www.youtube.com/iframe_api"></script>
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {

@@ -38,6 +38,31 @@ export async function autoHealOrSubstituteSong(song: Song): Promise<HealResult> 
     }
   } catch {}
 
+  // 1.5. RESOLUÇÃO VIA YOUTUBE AUDIO INTEGRAL (Garante 100% de disponibilidade para Rock, Metal, Nu-Metal e EDM)
+  try {
+    const query = `${song.artist || ''} ${song.name || ''}`.trim();
+    if (query) {
+      const ytResp = await fetch(`/api/youtube-search?q=${encodeURIComponent(query)}`, {
+        signal: AbortSignal.timeout(4500)
+      });
+      if (ytResp.ok) {
+        const ytData = await ytResp.json();
+        if (ytData?.videoId && /^[a-zA-Z0-9_-]{11}$/.test(ytData.videoId)) {
+          return {
+            success: true,
+            healedSong: {
+              ...song,
+              youtubeId: ytData.videoId,
+              duration: song.duration || 210
+            },
+            method: 'direct',
+            originalId
+          };
+        }
+      }
+    }
+  } catch {}
+
   // 2. BUSCA DE ALTERNATIVAS POR TÍTULO, ARTISTA E ÁLBUM
   try {
     const rawName = song.name || '';
