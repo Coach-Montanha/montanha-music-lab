@@ -4,7 +4,8 @@
 //   { kind: 'youtube', videoId, duration }       -> tocar no YouTubeAdapter oficial (IFrame API)
 //   { kind: 'unavailable' }                      -> marcar como indisponível
 
-import { createDecipheriv } from 'node:crypto';
+// Dynamic crypto loader
+let cryptoModule = null;
 
 const AUDIUS_BASE = 'https://api.audius.co/v1';
 const APP_NAME = 'montanha-music';
@@ -97,9 +98,14 @@ function isFakeCover(title, query) {
 }
 
 // Descriptografia nativa de stream JioSaavn (3DES-ECB com chave '38346591' repetida 3x)
-function decryptSaavnMediaUrl(encryptedMediaUrl) {
+async function decryptSaavnMediaUrl(encryptedMediaUrl) {
   if (!encryptedMediaUrl) return '';
   try {
+    if (!cryptoModule) {
+      cryptoModule = await import('crypto');
+    }
+    const createDecipheriv = cryptoModule.createDecipheriv || cryptoModule.default?.createDecipheriv;
+    if (!createDecipheriv) return '';
     const singleKey = Buffer.from('38346591', 'utf8');
     const tripleKey = Buffer.concat([singleKey, singleKey, singleKey]);
     const decipher = createDecipheriv('des-ede3-ecb', tripleKey, null);
@@ -144,7 +150,7 @@ async function resolveJioSaavn(title, artist, quality = 'high') {
 
           const enc = item.more_info?.encrypted_media_url;
           if (enc) {
-            const raw = decryptSaavnMediaUrl(enc);
+            const raw = await decryptSaavnMediaUrl(enc);
             if (raw && raw.includes('saavncdn.com')) {
               const streamUrl = raw.replace(/_\d+\.mp4$/, `${bitrateSuffix}.mp4`);
               const duration = Number(item.more_info?.duration) || 210;
