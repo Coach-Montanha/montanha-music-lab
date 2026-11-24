@@ -28,10 +28,13 @@ export async function autoHealOrSubstituteSong(song: Song): Promise<HealResult> 
       song.audioUrl,
       song.id
     );
-    if (directStream?.url) {
+    if (directStream && (directStream.kind === 'audio' || directStream.kind === 'youtube')) {
+      const healed = directStream.kind === 'youtube'
+        ? { ...song, youtubeId: directStream.videoId }
+        : { ...song, audioUrl: directStream.url };
       return {
         success: true,
-        healedSong: song,
+        healedSong: healed,
         method: 'direct',
         originalId
       };
@@ -138,7 +141,7 @@ export async function autoHealOrSubstituteSong(song: Song): Promise<HealResult> 
             cand.audioUrl,
             cand.id
           );
-          if (testStream?.url && !isDisallowedPreview(testStream.url, testStream.duration)) {
+          if (testStream && testStream.kind === 'audio' && !isDisallowedPreview(testStream.url, testStream.duration)) {
             const substituted: Song = {
               ...cand,
               id: cand.id,
@@ -148,6 +151,23 @@ export async function autoHealOrSubstituteSong(song: Song): Promise<HealResult> 
               thumbnail: cand.thumbnail || song.thumbnail,
               duration: testStream.duration || cand.duration || song.duration || 210,
               audioUrl: testStream.url
+            };
+            return {
+              success: true,
+              healedSong: substituted,
+              method: 'substituted',
+              originalId
+            };
+          } else if (testStream && testStream.kind === 'youtube') {
+            const substituted: Song = {
+              ...cand,
+              id: cand.id,
+              name: cand.name || song.name,
+              artist: cand.artist || song.artist,
+              album: cand.album || song.album,
+              thumbnail: cand.thumbnail || song.thumbnail,
+              duration: testStream.duration || cand.duration || song.duration || 210,
+              youtubeId: testStream.videoId
             };
             return {
               success: true,

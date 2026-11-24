@@ -1,17 +1,11 @@
-// Motor Resiliente de Streaming de Áudio Multi-Tier para PWA
-// Suporta reprodução em segundo plano com tela desligada / bloqueada (Android e iOS)
+// apps/montanha-bento/src/lib/audioStreamEngine.ts
 
-export interface StreamResult {
-  url: string;
-  duration: number;
-  mimeType: string;
-  title?: string;
-  artist?: string;
-  source: 'saavn-320' | 'youtube-full' | 'invidious-full' | 'blob';
-}
+export type StreamResult =
+  | { kind: 'audio'; url: string; duration?: number; source: string; isPreview?: boolean }
+  | { kind: 'youtube'; videoId: string; duration?: number }
+  | { kind: 'unavailable' };
 
-const streamCache = new Map<string, StreamResult>();
-const inflight = new Map<string, Promise<StreamResult | null>>();
+const resolved = new Map<string, StreamResult>();
 
 export function isDisallowedPreview(url?: string, duration?: number): boolean {
   if (!url || typeof url !== 'string') return true;
@@ -31,165 +25,184 @@ export function isDisallowedPreview(url?: string, duration?: number): boolean {
   return false;
 }
 
-export function getCachedStream(song: { id?: string; youtubeId?: string; name?: string; artist?: string } | string): StreamResult | null {
-  if (typeof song === 'string') {
-    const res = streamCache.get(song) || null;
-    if (res && isDisallowedPreview(res.url, res.duration)) {
-      streamCache.delete(song);
-      return null;
-    }
-    return res;
-  }
-  const cleanId = (song.youtubeId || '').replace(/^yt-/, '').split('&')[0].trim();
-  const cacheKey = cleanId || `${song.name || ''}-${song.artist || ''}`;
-  let res: StreamResult | null = null;
-  if (streamCache.has(cacheKey)) {
-    res = streamCache.get(cacheKey)!;
-  } else if (song.id && streamCache.has(song.id)) {
-    res = streamCache.get(song.id)!;
-  }
-  if (res && isDisallowedPreview(res.url, res.duration)) {
-    invalidateStream(song);
-    return null;
-  }
-  return res;
-}
-
 export function invalidateStream(song: { id?: string; youtubeId?: string; name?: string; artist?: string } | string) {
   if (typeof song === 'string') {
-    streamCache.delete(song);
-    inflight.delete(song);
+    resolved.delete(song);
     return;
   }
-  const cleanId = (song.youtubeId || '').replace(/^yt-/, '').split('&')[0].trim();
-  const cacheKey = cleanId || `${song.name || ''}-${song.artist || ''}`;
-  streamCache.delete(cacheKey);
-  inflight.delete(cacheKey);
-  if (song.id) {
-    streamCache.delete(song.id);
-    inflight.delete(song.id);
+  if (song.id) resolved.delete(song.id);
+  const key = `${song.artist || ''}|${song.name || ''}`;
+  resolved.delete(key);
+}
+
+export function getCachedStream(song: { id?: string; youtubeId?: string; name?: string; artist?: string } | string): { url: string; duration?: number } | null {
+  const key = typeof song === 'string' ? song : (song.id ?? `${song.artist || ''}|${song.name || ''}`);
+  const cached = resolved.get(key);
+  if (cached && cached.kind === 'audio') {
+    return { url: cached.url, duration: cached.duration };
   }
-}
-
-function sanitizeTitle(str: string): string {
-  return (str || '')
-    .replace(/\(.*?\)/g, '')
-    .replace(/\[.*?\]/g, '')
-    .replace(/feat\..*$/i, '')
-    .replace(/ft\..*$/i, '')
-    .replace(/[^\p{L}\p{N}\s'-]/gu, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function getArtistCandidates(artistStr: string): string[] {
-  if (!artistStr) return [];
-  const rawList = artistStr
-    .split(/[,&/]|feat\.|ft\.|x\s+/i)
-    .map(a => sanitizeTitle(a))
-    .filter(a => a.length > 1);
-
-  const candidates = new Set<string>();
-  const full = sanitizeTitle(artistStr);
-  if (full) candidates.add(full);
-  for (const a of rawList) {
-    if (a) candidates.add(a);
-  }
-  const firstWord = rawList[0]?.split(' ')[0];
-  if (firstWord && firstWord.length > 2) candidates.add(firstWord);
-
-  return Array.from(candidates);
-}
-
-// 1. TIER 1: Nosso Endpoint Serverless Próprio /api/stream (Zero Erros de CORS no Navegador)
-async function fetchFromInternalApi(title: string, artist: string, youtubeId?: string): Promise<StreamResult | null> {
-  try {
-    const quality = typeof window !== 'undefined' ? localStorage.getItem('montanha_sound_quality') || 'high' : 'high';
-    const params = new URLSearchParams();
-    if (title) params.set('title', title);
-    if (artist) params.set('artist', artist);
-    if (youtubeId) params.set('id', youtubeId);
-    params.set('quality', quality);
-
-    const res = await fetch(`/api/stream?${params.toString()}`, {
-      signal: AbortSignal.timeout(7500)
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (data?.url && (data.url.startsWith('http') || data.url.startsWith('/'))) {
-        return {
-          url: data.url,
-          duration: Number(data.duration) || 210,
-          mimeType: data.mimeType || 'audio/mp4',
-          title: data.title || title,
-          artist: data.artist || artist,
-          source: data.source || 'saavn-320'
-        };
-      }
-    }
-  } catch {}
   return null;
 }
 
-export function fetchAudioStream(
+/** Assinatura padronizada: NUNCA retorna null, sempre devolve um "kind" */
+export async function fetchAudioStream(
   youtubeId?: string,
   songName?: string,
   artistName?: string,
   fallbackAudioUrl?: string,
   songId?: string
-): Promise<StreamResult | null> {
-  const cleanId = (youtubeId || '').replace(/^yt-/, '').split('&')[0].trim();
-  const cacheKey = cleanId || `${songName || ''}-${artistName || ''}`;
+): Promise<StreamResult> {
+  const key = songId ?? `${artistName || ''}|${songName || ''}`;
+  const cached = resolved.get(key);
+  if (cached && cached.kind !== 'unavailable') return cached;
 
-  if (songId && streamCache.has(songId)) {
-    const cached = streamCache.get(songId)!;
-    if (!isDisallowedPreview(cached.url, cached.duration)) {
-      return Promise.resolve(cached);
+  try {
+    const qs = new URLSearchParams({ title: songName ?? '', artist: artistName ?? '' });
+    if (youtubeId) qs.set('youtubeId', youtubeId);
+
+    const r = await fetch(`/api/stream?${qs.toString()}`, {
+      signal: AbortSignal.timeout(6000)
+    });
+    if (r.ok) {
+      const data = (await r.json()) as StreamResult;
+      if (data.kind !== 'unavailable') {
+        resolved.set(key, data);
+        if (songId) resolved.set(songId, data);
+        return data;
+      }
     }
-    streamCache.delete(songId);
+  } catch {
+    /* rede/API fora: cai no fallback abaixo */
   }
 
-  if (streamCache.has(cacheKey)) {
-    const cached = streamCache.get(cacheKey)!;
-    if (!isDisallowedPreview(cached.url, cached.duration)) {
-      return Promise.resolve(cached);
-    }
-    streamCache.delete(cacheKey);
+  // Prévia de 30s só como último recurso se não for preview proibido
+  if (fallbackAudioUrl && !isDisallowedPreview(fallbackAudioUrl)) {
+    return { kind: 'audio', url: fallbackAudioUrl, source: 'fallback', isPreview: false };
   }
+  return { kind: 'unavailable' };
+}
 
-  if (inflight.has(cacheKey)) {
-    return inflight.get(cacheKey)!;
+// ---------------------------------------------------------------------------
+// Player oficial do YouTube (IFrame Player API)
+// ---------------------------------------------------------------------------
+
+declare global {
+  interface Window {
+    YT?: any;
+    onYouTubeIframeAPIReady?: () => void;
   }
+}
 
-  const promise = (async () => {
-    // Passo 1: Busca via Serverless API interna (Saavn 320kbps + YTDL YouTube Completo — Zero 30s)
-    if (songName || cleanId) {
-      const internalResult = await fetchFromInternalApi(songName || '', artistName || '', cleanId);
-      if (internalResult && !isDisallowedPreview(internalResult.url, internalResult.duration)) {
-        streamCache.set(cacheKey, internalResult);
-        if (songId) streamCache.set(songId, internalResult);
-        return internalResult;
+let ytApi: Promise<void> | null = null;
+function loadYouTubeApi(): Promise<void> {
+  if (window.YT?.Player) return Promise.resolve();
+  if (!ytApi) {
+    ytApi = new Promise<void>((resolve) => {
+      const prev = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = () => {
+        prev?.();
+        resolve();
+      };
+      if (!document.querySelector('script[src*="youtube.com/iframe_api"]')) {
+        const s = document.createElement('script');
+        s.src = 'https://www.youtube.com/iframe_api';
+        document.head.appendChild(s);
+      }
+    });
+  }
+  return ytApi;
+}
+
+export interface YouTubeCallbacks {
+  onEnded: () => void;
+  onError: (code: number) => void;
+  onPlaying?: () => void;
+  onPaused?: () => void;
+}
+
+export class YouTubeAdapter {
+  private player: any = null;
+  private currentVid: string | null = null;
+
+  constructor(private host: HTMLElement, private cb: YouTubeCallbacks) {}
+
+  async play(videoId: string): Promise<void> {
+    await loadYouTubeApi();
+
+    if (this.player && typeof this.player.loadVideoById === 'function') {
+      try {
+        this.currentVid = videoId;
+        this.player.loadVideoById(videoId);
+        this.player.unMute?.();
+        this.player.playVideo?.();
+        return;
+      } catch (err) {
+        console.warn('Erro ao chamar loadVideoById:', err);
       }
     }
 
-    // Passo 2: Fallback do áudio salvo originalmente (SE E SOMENTE SE for áudio completo — zero previews de 30s)
-    if (fallbackAudioUrl && !isDisallowedPreview(fallbackAudioUrl)) {
-      const fallbackResult: StreamResult = {
-        url: fallbackAudioUrl,
-        duration: 210,
-        mimeType: 'audio/mp4',
-        title: songName,
-        artist: artistName,
-        source: 'saavn-320'
-      };
-      return fallbackResult;
-    }
+    return new Promise<void>((resolve) => {
+      this.currentVid = videoId;
+      this.player = new window.YT.Player(this.host, {
+        width: '100%',
+        height: '100%',
+        videoId,
+        playerVars: {
+          autoplay: 1,
+          playsinline: 1,
+          controls: 1,
+          rel: 0,
+          modestbranding: 1
+        },
+        events: {
+          onReady: (e: any) => {
+            try {
+              e.target.unMute?.();
+              e.target.playVideo?.();
+            } catch {}
+            resolve();
+          },
+          onStateChange: (e: { data: number }) => {
+            if (e.data === 0) this.cb.onEnded(); // ENDED
+            if (e.data === 1) this.cb.onPlaying?.(); // PLAYING
+            if (e.data === 2) this.cb.onPaused?.(); // PAUSED
+          },
+          onError: (e: { data: number }) => this.cb.onError(e.data),
+        },
+      });
+    });
+  }
 
-    return null;
-  })().finally(() => {
-    inflight.delete(cacheKey);
-  });
-
-  inflight.set(cacheKey, promise);
-  return promise;
+  pause() {
+    try { this.player?.pauseVideo(); } catch {}
+  }
+  resume() {
+    try { this.player?.playVideo(); } catch {}
+  }
+  seek(seconds: number) {
+    try { this.player?.seekTo(seconds, true); } catch {}
+  }
+  currentTime(): number {
+    try { return this.player?.getCurrentTime?.() ?? 0; } catch { return 0; }
+  }
+  duration(): number {
+    try { return this.player?.getDuration?.() ?? 0; } catch { return 0; }
+  }
+  setVolume(volPercent: number) {
+    try { this.player?.setVolume?.(volPercent); } catch {}
+  }
+  mute() {
+    try { this.player?.mute?.(); } catch {}
+  }
+  unMute() {
+    try { this.player?.unMute?.(); } catch {}
+  }
+  stop() {
+    try { this.player?.stopVideo(); } catch {}
+  }
+  destroy() {
+    try { this.player?.destroy(); } catch {}
+    this.player = null;
+    this.currentVid = null;
+  }
 }

@@ -1,12 +1,31 @@
-// Serverless Function /api/stream - Montanha Music
-// Resolve áudio de alta fidelidade (320kbps MP4 Akamai JioSaavn nativo / YouTube Completo 206 Range Proxy)
-// 100% MÚSICAS COMPLETAS — PREVIEWS DE 30s BANIDOS TERMINANTEMENTE
+// api/stream.js — Vercel Serverless (Node 18+)
+// Resolve cada faixa para UMA destas respostas:
+//   { kind: 'audio',   url, duration, source }  -> tocar no <audio>
+//   { kind: 'youtube', videoId, duration }       -> tocar no YouTubeAdapter oficial (IFrame API)
+//   { kind: 'unavailable' }                      -> marcar como indisponível
 
 import { createDecipheriv } from 'node:crypto';
-import { Ytdl } from '@distube/ytdl-core';
 
-const ytdlClient = new Ytdl();
-const ytCache = new Map();
+const AUDIUS_BASE = 'https://api.audius.co/v1';
+const APP_NAME = 'montanha-music';
+
+const norm = (s = '') =>
+  s
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\(.*?\)|\[.*?\]/g, ' ')
+    .replace(/[^a-z0-9 ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+function sameSong(title, artist, cand) {
+  const t = norm(title);
+  const a = norm(artist);
+  const ct = norm(cand.title);
+  const ca = norm(cand.user?.name);
+  return Boolean(t && ct.includes(t) && ca && (ca.includes(a) || a.includes(ca)));
+}
 
 function sanitizeTitle(str) {
   return (str || '')
@@ -35,10 +54,6 @@ function extractArtistCandidates(artistStr) {
   }
   for (const a of rawList) {
     if (!candidates.includes(a)) candidates.push(a);
-  }
-  const firstWord = rawList[0]?.split(' ')[0];
-  if (firstWord && firstWord.length > 2 && !candidates.includes(firstWord)) {
-    candidates.push(firstWord);
   }
   return candidates.length > 0 ? candidates : [normalized.trim()];
 }
@@ -75,23 +90,10 @@ function isFakeCover(title, query) {
   const lower = title.toLowerCase();
   const qLower = (query || '').toLowerCase();
   const badMarkers = [
-    'karaoke',
-    'tribute',
-    'originally performed by',
-    'in the style of',
-    'instrumental version',
-    'cover version',
-    '8-bit',
-    '16-bit',
-    'chiptune',
-    'midi version'
+    'karaoke', 'tribute', 'originally performed by', 'in the style of',
+    'instrumental version', 'cover version', '8-bit', '16-bit', 'chiptune', 'midi version'
   ];
-  for (const marker of badMarkers) {
-    if (lower.includes(marker) && !qLower.includes(marker)) {
-      return true;
-    }
-  }
-  return false;
+  return badMarkers.some(m => lower.includes(m) && !qLower.includes(m));
 }
 
 // Descriptografia nativa de stream JioSaavn (3DES-ECB com chave '38346591' repetida 3x)
@@ -110,27 +112,121 @@ function decryptSaavnMediaUrl(encryptedMediaUrl) {
   }
 }
 
-function isDisallowedPreview(url, duration) {
-  if (!url || typeof url !== 'string') return true;
-  if (
-    url.includes('dzcdn.net') ||
-    url.includes('mzstatic') ||
-    url.includes('apple.com') ||
-    url.includes('preview') ||
-    url.includes('p.scdn.co')
-  ) {
-    return true;
+// ---------- Resolvedor 1: JioSaavn 320kbps MP4 Akamai (Zero CORS, Estúdio) ----------
+async function resolveJioSaavn(title, artist, quality = 'high') {
+  const cleanT = sanitizeTitle(title);
+  const candidates = extractArtistCandidates(artist);
+  const bitrateSuffix = quality === 'economy' ? '_96' : quality === 'standard' ? '_160' : '_320';
+
+  const queries = [];
+  if (candidates.length > 0) {
+    queries.push(`${cleanT} ${candidates[0]}`.trim());
+    if (candidates[1]) queries.push(`${cleanT} ${candidates[1]}`.trim());
   }
-  if (duration && Number(duration) <= 30) {
-    return true;
+  queries.push(cleanT);
+
+  for (const q of queries.slice(0, 3)) {
+    try {
+      const jioUrl = `https://www.jiosaavn.com/api.php?_format=json&_marker=0&api_version=4&ctx=web6dot0&__call=search.getResults&q=${encodeURIComponent(q)}&p=0&n=5`;
+      const resp = await fetch(jioUrl, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+        signal: AbortSignal.timeout(3000)
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        const results = data.results || [];
+        for (const item of results) {
+          if (!isTitleMatch(item.title, cleanT)) continue;
+          if (isFakeCover(item.title, cleanT)) continue;
+
+          const itemArtist = item.more_info?.artistMap?.primary_artists?.[0]?.name || item.more_info?.music || item.subtitle || '';
+          if (candidates.length > 0 && !isArtistMatch(itemArtist, candidates)) continue;
+
+          const enc = item.more_info?.encrypted_media_url;
+          if (enc) {
+            const raw = decryptSaavnMediaUrl(enc);
+            if (raw && raw.includes('saavncdn.com')) {
+              const streamUrl = raw.replace(/_\d+\.mp4$/, `${bitrateSuffix}.mp4`);
+              const duration = Number(item.more_info?.duration) || 210;
+              return {
+                kind: 'audio',
+                url: streamUrl,
+                duration,
+                source: (quality === 'economy' ? 'saavn-96' : quality === 'standard' ? 'saavn-160' : 'saavn-320')
+              };
+            }
+          }
+        }
+      }
+    } catch {}
   }
-  return false;
+  return null;
 }
 
-async function searchYouTubeVideoId(query) {
-  if (!query) return null;
+// ---------- Resolvedor 2: Audius (API aberta, MP3 completo) ----------
+async function resolveAudius(title, artist) {
   try {
-    const ytSearchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+    const headers = process.env.AUDIUS_API_KEY
+      ? { Authorization: `Bearer ${process.env.AUDIUS_API_KEY}` }
+      : {};
+    const q = encodeURIComponent(`${artist} ${title}`);
+
+    const search = await fetch(`${AUDIUS_BASE}/tracks/search?query=${q}&app_name=${APP_NAME}`, {
+      headers,
+      signal: AbortSignal.timeout(3000)
+    });
+    if (!search.ok) return null;
+    const { data = [] } = await search.json();
+
+    const hit = data.find((t) => t.is_streamable !== false && sameSong(title, artist, t));
+    if (!hit) return null;
+
+    const stream = await fetch(
+      `${AUDIUS_BASE}/tracks/${hit.id}/stream?no_redirect=true&app_name=${APP_NAME}`,
+      { headers, signal: AbortSignal.timeout(3000) }
+    );
+    if (!stream.ok) return null;
+    const { data: url } = await stream.json();
+    return url ? { kind: 'audio', url, duration: hit.duration || 210, source: 'audius' } : null;
+  } catch {
+    return null;
+  }
+}
+
+// ---------- Resolvedor 3: YouTube (ID do vídeo para YouTubeAdapter oficial) ----------
+async function resolveYouTube(title, artist, knownId) {
+  if (knownId && /^[a-zA-Z0-9_-]{11}$/.test(knownId)) {
+    return { kind: 'youtube', videoId: knownId };
+  }
+
+  // Se houver YOUTUBE_API_KEY configurada, tenta primeiro a API oficial v3
+  const key = process.env.YOUTUBE_API_KEY;
+  if (key) {
+    try {
+      const params = new URLSearchParams({
+        part: 'snippet',
+        type: 'video',
+        videoEmbeddable: 'true',
+        videoSyndicated: 'true',
+        videoCategoryId: '10',
+        maxResults: '3',
+        q: `${artist} ${title} official audio`,
+        key,
+      });
+      const r = await fetch(`https://www.googleapis.com/youtube/v3/search?${params}`, {
+        signal: AbortSignal.timeout(3000)
+      });
+      if (r.ok) {
+        const { items = [] } = await r.json();
+        const videoId = items[0]?.id?.videoId;
+        if (videoId) return { kind: 'youtube', videoId };
+      }
+    } catch {}
+  }
+
+  // Fallback resiliente sem API key: busca pública via HTML scrape leve
+  try {
+    const ytSearchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(`${artist} ${title} official`)}`;
     const ytResp = await fetch(ytSearchUrl, {
       signal: AbortSignal.timeout(3500),
       headers: {
@@ -143,196 +239,51 @@ async function searchYouTubeVideoId(query) {
       const html = await ytResp.text();
       const match = html.match(/"videoId":"([a-zA-Z0-9_-]{11})"/);
       if (match && match[1]) {
-        return match[1];
+        return { kind: 'youtube', videoId: match[1] };
       }
     }
   } catch {}
+
   return null;
 }
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Range');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
-  // 1. FAST-PATH: Range Proxying para YouTube (Status 206, chunked streaming seguro contra timeout)
-  const ytDirectId = (req.query?.yt || req.body?.yt || '').trim();
-  if (ytDirectId && /^[a-zA-Z0-9_-]{11}$/.test(ytDirectId)) {
+  const title = (req.query?.title || req.query?.t || '').trim();
+  const artist = (req.query?.artist || req.query?.a || '').trim();
+  const youtubeId = (req.query?.youtubeId || req.query?.id || '').replace(/^yt-/, '').split('&')[0].trim();
+  const quality = (req.query?.quality || 'high').trim();
+
+  if (!title && !youtubeId) {
+    return res.status(400).json({ kind: 'unavailable', error: 'title ou youtubeId são obrigatórios' });
+  }
+
+  const resolvers = [
+    () => resolveJioSaavn(title, artist, quality),
+    () => resolveAudius(title, artist),
+    () => resolveYouTube(title, artist, youtubeId),
+  ];
+
+  for (const resolve of resolvers) {
     try {
-      let cached = ytCache.get(ytDirectId);
-      if (!cached || Date.now() > cached.expires) {
-        const info = await ytdlClient.getInfo(ytDirectId);
-        const format = info.formats.find(f => f.itag === 140) || info.formats.find(f => f.hasAudio && !f.hasVideo);
-        if (!format) {
-          return res.status(404).json({ error: 'Nenhum formato de áudio disponível' });
-        }
-        cached = {
-          contentLength: Number(format.contentLength) || 5000000,
-          expires: Date.now() + 3600000
-        };
-        ytCache.set(ytDirectId, cached);
+      const result = await resolve();
+      if (result) {
+        const ttl = result.kind === 'youtube' ? 604800 : 3600;
+        res.setHeader('Cache-Control', `s-maxage=${ttl}, stale-while-revalidate=86400`);
+        return res.status(200).json(result);
       }
-
-      const totalLen = cached.contentLength;
-      let start = 0;
-      let end = totalLen - 1;
-
-      const clientRange = req.headers?.range;
-      if (clientRange && clientRange.startsWith('bytes=')) {
-        const parts = clientRange.replace(/bytes=/, '').split('-');
-        start = parseInt(parts[0], 10) || 0;
-        if (parts[1]) {
-          end = parseInt(parts[1], 10);
-        } else {
-          // Chunk de 1MB por requisição garante resposta instantânea sem timeout na Vercel
-          end = Math.min(start + 1048576, totalLen - 1);
-        }
-      } else {
-        end = Math.min(1048576, totalLen - 1);
-      }
-
-      const chunkSize = end - start + 1;
-      res.status(206);
-      res.setHeader('Content-Type', 'audio/mp4');
-      res.setHeader('Content-Range', `bytes ${start}-${end}/${totalLen}`);
-      res.setHeader('Content-Length', chunkSize);
-      res.setHeader('Accept-Ranges', 'bytes');
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Cache-Control', 'public, max-age=3600');
-
-      const downloadStream = ytdlClient.download(ytDirectId, {
-        filter: f => f.hasAudio && !f.hasVideo,
-        range: { start, end }
-      });
-
-      downloadStream.pipe(res);
-      return;
     } catch (err) {
-      return res.status(500).json({ error: 'Erro ao transmitir áudio: ' + (err?.message || err) });
+      console.warn('[stream] resolver falhou:', err?.message);
     }
   }
 
-  const title = (req.query?.title || req.query?.t || req.body?.title || '').trim();
-  const artist = (req.query?.artist || req.query?.a || req.body?.artist || '').trim();
-  const id = (req.query?.id || req.body?.id || '').trim();
-  const quality = (req.query?.quality || req.body?.quality || 'high').trim();
-  const bitrateSuffix = quality === 'economy' ? '_96' : quality === 'standard' ? '_160' : '_320';
-
-  const cleanT = sanitizeTitle(title);
-  const candidates = extractArtistCandidates(artist);
-
-  if (!cleanT && !id) {
-    return res.status(400).json({ error: 'Parâmetro title ou id obrigatório' });
-  }
-
-  // TIER 1: JioSaavn Nativo 320kbps MP4 Akamai (Descriptografia direta, zero CORS, zero 30s)
-  if (cleanT) {
-    try {
-      const candidateList = [...candidates];
-      const queries = [];
-      if (candidateList.length > 0) {
-        queries.push(`${cleanT} ${candidateList[0]}`.trim());
-        if (candidateList[1]) queries.push(`${cleanT} ${candidateList[1]}`.trim());
-        queries.push(`${cleanT} ${candidateList[0]}`.trim());
-      }
-      queries.push(cleanT);
-
-      const saavnPromises = queries.slice(0, 4).map(async (q) => {
-        const jioUrl = `https://www.jiosaavn.com/api.php?_format=json&_marker=0&api_version=4&ctx=web6dot0&__call=search.getResults&q=${encodeURIComponent(q)}&p=0&n=5`;
-        const resp = await fetch(jioUrl, {
-          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
-          signal: AbortSignal.timeout(3000)
-        });
-        if (resp.ok) {
-          const data = await resp.json();
-          const results = data.results || [];
-          for (const item of results) {
-            if (!isTitleMatch(item.title, cleanT)) continue;
-            if (isFakeCover(item.title, cleanT)) continue;
-
-            const itemArtist = item.more_info?.artistMap?.primary_artists?.[0]?.name || item.more_info?.music || item.subtitle || '';
-            if (candidateList.length > 0 && !isArtistMatch(itemArtist, candidateList)) continue;
-
-            const enc = item.more_info?.encrypted_media_url;
-            if (enc) {
-              const raw = decryptSaavnMediaUrl(enc);
-              if (raw && raw.includes('saavncdn.com')) {
-                const streamUrl = raw.replace(/_\d+\.mp4$/, `${bitrateSuffix}.mp4`);
-                const duration = Number(item.more_info?.duration) || 210;
-
-                if (!isDisallowedPreview(streamUrl, duration)) {
-                  return {
-                    url: streamUrl,
-                    duration,
-                    mimeType: 'audio/mp4',
-                    title: item.title || title,
-                    artist: item.more_info?.artistMap?.primary_artists?.[0]?.name || candidates[0] || artist,
-                    source: (quality === 'economy' ? 'saavn-96' : quality === 'standard' ? 'saavn-160' : 'saavn-320')
-                  };
-                }
-              }
-            }
-          }
-        }
-        throw new Error('not found');
-      });
-
-      const winner = await Promise.any(saavnPromises);
-      if (winner && !isDisallowedPreview(winner.url, winner.duration)) {
-        return res.status(200).json(winner);
-      }
-    } catch {}
-  }
-
-  let lastYtError = null;
-  // TIER 2: YouTube Completo via Range Proxy (Todas as faixas ocidentais, rock, metal, dance, sem 30s)
-  try {
-    let youtubeId = id.replace(/^yt-/, '').split('&')[0];
-    if (!youtubeId || !/^[a-zA-Z0-9_-]{11}$/.test(youtubeId)) {
-      if (cleanT) {
-        const queries = [
-          `${cleanT} ${candidates[0] || artist}`.trim(),
-          candidates[1] ? `${cleanT} ${candidates[1]}` : null,
-          cleanT
-        ].filter(Boolean);
-
-        for (const q of queries) {
-          youtubeId = await searchYouTubeVideoId(q);
-          if (youtubeId) break;
-        }
-      }
-    }
-
-    if (youtubeId && /^[a-zA-Z0-9_-]{11}$/.test(youtubeId)) {
-      const info = await ytdlClient.getInfo(youtubeId);
-      const duration = Number(info.videoDetails?.lengthSeconds) || 210;
-      const format = info.formats.find(f => f.itag === 140) || info.formats.find(f => f.hasAudio && !f.hasVideo);
-
-      if (duration > 30) {
-        ytCache.set(youtubeId, {
-          contentLength: Number(format?.contentLength) || 5000000,
-          expires: Date.now() + 3600000
-        });
-        return res.status(200).json({
-          url: `/api/stream?yt=${youtubeId}`,
-          duration,
-          mimeType: 'audio/mp4',
-          title: info.videoDetails?.title || title,
-          artist: info.videoDetails?.author?.name || artist,
-          source: 'youtube-full'
-        });
-      }
-    } else {
-      lastYtError = 'No videoId resolved from YouTube search';
-    }
-  } catch (ytErr) {
-    lastYtError = ytErr?.message || String(ytErr);
-    console.warn('[Stream YouTube Fallback Error]', ytErr?.message || ytErr);
-  }
-
-  return res.status(404).json({ error: 'Fluxo de áudio completo não encontrado na fonte', ytError: lastYtError });
+  res.setHeader('Cache-Control', 's-maxage=300');
+  return res.status(200).json({ kind: 'unavailable' });
 }

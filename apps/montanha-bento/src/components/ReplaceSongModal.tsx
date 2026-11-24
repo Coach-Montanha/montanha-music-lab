@@ -82,7 +82,7 @@ export function ReplaceSongModal({
 
     try {
       const res = await fetchAudioStream(song.youtubeId, song.name, song.artist, undefined, song.id);
-      const streamUrl = res?.url;
+      const streamUrl = res.kind === 'audio' ? res.url : null;
       if (!streamUrl) {
         setPreviewingSongId(null);
         return;
