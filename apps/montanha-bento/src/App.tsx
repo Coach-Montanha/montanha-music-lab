@@ -2915,52 +2915,48 @@ export default function App() {
         !currentUser ? 'filter blur-2xl brightness-40 pointer-events-none scale-[0.98]' : 'filter-none brightness-100 scale-100'
       }`}>
       
-      {/* MOTOR TRANSPARENTE YOUTUBE IFRAME (Ghost Layer Oculto por Padrão / Mini-Dock Opcional) */}
+      {/* MOTOR TRANSPARENTE YOUTUBE IFRAME (Estrutura de DOM 100% Estática - Sem Reconciliação React no IFrame) */}
       <div
-        style={
-          showVideoDock && activePlayerType === 'youtube'
-            ? {
-                position: 'fixed',
-                bottom: '88px',
-                right: '16px',
-                width: '280px',
-                height: '158px',
-                zIndex: 45,
-                borderRadius: '12px',
-                overflow: 'hidden',
-                boxShadow: '0 12px 36px rgba(0,0,0,0.75)',
-                border: '1px solid rgba(255,255,255,0.15)',
-                backgroundColor: '#000',
-                transition: 'opacity 0.3s ease, transform 0.3s ease',
-                pointerEvents: 'auto',
-                opacity: 1,
-                visibility: 'visible'
-              }
-            : {
-                position: 'fixed',
-                bottom: 0,
-                right: 0,
-                width: '1px',
-                height: '1px',
-                opacity: 0.001,
-                pointerEvents: 'none',
-                zIndex: -1,
-                overflow: 'hidden',
-                visibility: 'visible'
-              }
-        }
+        style={{
+          position: 'fixed',
+          bottom: showVideoDock && activePlayerType === 'youtube' ? '88px' : '0px',
+          right: showVideoDock && activePlayerType === 'youtube' ? '16px' : '0px',
+          width: showVideoDock && activePlayerType === 'youtube' ? '280px' : '1px',
+          height: showVideoDock && activePlayerType === 'youtube' ? '158px' : '1px',
+          zIndex: showVideoDock && activePlayerType === 'youtube' ? 45 : -1,
+          borderRadius: '12px',
+          overflow: 'hidden',
+          boxShadow: showVideoDock && activePlayerType === 'youtube' ? '0 12px 36px rgba(0,0,0,0.75)' : 'none',
+          border: showVideoDock && activePlayerType === 'youtube' ? '1px solid rgba(255,255,255,0.15)' : 'none',
+          backgroundColor: '#000',
+          transition: 'all 0.3s ease',
+          pointerEvents: showVideoDock && activePlayerType === 'youtube' ? 'auto' : 'none',
+          opacity: showVideoDock && activePlayerType === 'youtube' ? 1 : 0.001,
+          visibility: 'visible'
+        }}
       >
-        {showVideoDock && activePlayerType === 'youtube' && (
-          <button
-            onClick={() => setShowVideoDock(false)}
-            className="absolute top-2 right-2 z-50 p-1 rounded-full bg-black/75 hover:bg-black text-white/80 hover:text-white transition shadow"
-            title="Ocultar tela do clipe"
-          >
-            <X size={14} />
-          </button>
-        )}
-        <div id="yt-hidden-player" ref={ytHostRef} style={{ width: '100%', height: '100%', minWidth: '200px', minHeight: '120px' }} />
+        <div id="yt-hidden-player" ref={ytHostRef} className="w-full h-full" />
       </div>
+
+      {/* Botão de Fechar Mini-Dock (Isolado no DOM, sem colisão com o IFrame) */}
+      {showVideoDock && activePlayerType === 'youtube' && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowVideoDock(false);
+          }}
+          style={{
+            position: 'fixed',
+            bottom: '214px',
+            right: '24px',
+            zIndex: 46
+          }}
+          className="p-1 rounded-full bg-black/80 hover:bg-black text-white/90 hover:text-white transition shadow-lg border border-white/20"
+          title="Ocultar tela do clipe"
+        >
+          <X size={14} />
+        </button>
+      )}
 
       {/* MOTOR DE ÁUDIO HTML5 ULTRA-RESILIENTE (Web Audio API Chain + Crossfade + Equalizador) */}
       <audio
@@ -5322,7 +5318,10 @@ export default function App() {
             {/* BOTÃO DE TELA / CLIPE (Ativo quando tocando via YouTube) */}
             {activePlayerType === 'youtube' && (
               <button
-                onClick={() => setShowVideoDock(!showVideoDock)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowVideoDock((prev) => !prev);
+                }}
                 className={`p-2 rounded-xl transition ${
                   showVideoDock
                     ? 'text-[#1DB954] bg-[#1DB954]/20 border border-[#1DB954]/40 shadow-sm'
