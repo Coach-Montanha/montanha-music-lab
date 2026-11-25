@@ -305,7 +305,7 @@ export default function App() {
     const isHlsStream = url.includes('.m3u8');
     if (isHlsStream && !audio.canPlayType('application/vnd.apple.mpegurl') && Hls.isSupported()) {
       const hls = new Hls({
-        enableWorker: true,
+        enableWorker: false,
         lowLatencyMode: false,
         backBufferLength: 30
       });
@@ -1456,20 +1456,22 @@ export default function App() {
           .catch(() => {});
       }
 
-      // Pré-carrega faixa N+2 em segundo plano para garantir fila ininterrupta
-      if (currentQ.length > 2) {
-        let nextNextIdx = currentIdx + 2;
-        if (nextNextIdx >= currentQ.length) {
-          if (repeatModeRef.current === 'all') {
-            nextNextIdx = nextNextIdx % currentQ.length;
-          } else {
-            return;
+      // Pré-carrega faixas N+2 e N+3 em segundo plano para garantir fila ininterrupta em background
+      for (const offset of [2, 3]) {
+        if (currentQ.length > offset) {
+          let targetIdx = currentIdx + offset;
+          if (targetIdx >= currentQ.length) {
+            if (repeatModeRef.current === 'all') {
+              targetIdx = targetIdx % currentQ.length;
+            } else {
+              continue;
+            }
           }
-        }
-        const nextNextSong = currentQ[nextNextIdx];
-        if (nextNextSong && !unavailableSongIds.includes(nextNextSong.id)) {
-          fetchAudioStream(nextNextSong.youtubeId, nextNextSong.name, nextNextSong.artist, nextNextSong.audioUrl, nextNextSong.id)
-            .catch(() => {});
+          const upcomingSong = currentQ[targetIdx];
+          if (upcomingSong && !unavailableSongIds.includes(upcomingSong.id)) {
+            fetchAudioStream(upcomingSong.youtubeId, upcomingSong.name, upcomingSong.artist, upcomingSong.audioUrl, upcomingSong.id)
+              .catch(() => {});
+          }
         }
       }
     };
@@ -3324,46 +3326,10 @@ export default function App() {
                   {currentUser ? `Sincronizada na nuvem como ${currentUser.email}` : 'Playlists salvas no dispositivo'}
                 </p>
               </div>
-              <div className="flex items-center gap-2 sm:gap-3">
-                <button
-                  onClick={() => handleEnrichAllPlaylistsCovers(false)}
-                  disabled={isEnrichingAllCovers}
-                  className="text-xs font-bold text-[#1DB954] hover:underline flex items-center gap-1.5 transition disabled:opacity-50 bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-full border border-white/10"
-                  title="Scan Inteligente com Checkpoint: pula playlists já verificadas"
-                >
-                  {isEnrichingAllCovers ? (
-                    <>
-                      <Sparkles size={14} className="animate-spin" />
-                      <span>Verificando ({enrichAllProgress.current}/${enrichAllProgress.total})...</span>
-                    </>
-                  ) : verifiedPlaylistsCount === playlists.length && playlists.length > 0 ? (
-                    <>
-                      <CheckCircle2 size={14} />
-                      <span>Acervo 100% Verificado</span>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles size={14} />
-                      <span>
-                        {verifiedPlaylistsCount > 0
-                          ? `Verificar (${playlists.length - verifiedPlaylistsCount} restantes)`
-                          : 'Verificar Acervo'}
-                      </span>
-                    </>
-                  )}
-                </button>
-                {verifiedPlaylistsCount > 0 && !isEnrichingAllCovers && (
-                  <button
-                    onClick={() => setIsReverifyModalOpen(true)}
-                    className="p-1.5 text-neutral-400 hover:text-white rounded-full bg-white/5 hover:bg-white/10 border border-white/10 transition"
-                    title="Opções de Checkpoint e Re-escaneamento"
-                  >
-                    <Sliders size={13} />
-                  </button>
-                )}
+              <div className="flex items-center gap-2 lg:hidden">
                 <button
                   onClick={() => setIsImportModalOpen(true)}
-                  className="text-xs font-bold text-[#1DB954] hover:underline flex items-center gap-1"
+                  className="text-xs font-bold text-[#1DB954] hover:underline flex items-center gap-1.5 bg-white/5 px-3 py-1.5 rounded-full border border-white/10"
                 >
                   <Link2 size={14} />
                   <span>Importar Link</span>

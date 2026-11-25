@@ -9,10 +9,10 @@ async function getSoundCloudClientId(forceRefresh = false) {
     return cachedScClientId;
   }
   try {
-    const page = await fetch("https://soundcloud.com", { signal: AbortSignal.timeout(3000) }).then((r) => r.text());
+    const page = await fetch("https://soundcloud.com", { signal: AbortSignal.timeout(2500) }).then((r) => r.text());
     const scripts = [...page.matchAll(/src="(https:\/\/a-v2\.sndcdn\.com\/assets\/[^"]+\.js)"/g)].map((m) => m[1]);
-    for (const s of scripts.slice(-5)) {
-      const js = await fetch(s, { signal: AbortSignal.timeout(3000) }).then((r) => r.text());
+    for (const s of scripts.slice(-4)) {
+      const js = await fetch(s, { signal: AbortSignal.timeout(2500) }).then((r) => r.text());
       const m = js.match(/client_id:"([a-zA-Z0-9]{32})"/);
       if (m && m[1]) {
         cachedScClientId = m[1];
@@ -133,43 +133,36 @@ async function resolveJioSaavn(title, artist, quality = "high") {
   if (!cleanT) return null;
   const candidates = extractArtistCandidates(artist);
   const bitrateSuffix = quality === "economy" ? "_96" : quality === "standard" ? "_160" : "_320";
+  const q = candidates.length > 0 ? `${cleanT} ${candidates[0]}`.trim() : cleanT;
 
-  const queries = [];
-  if (candidates.length > 0) {
-    queries.push(`${cleanT} ${candidates[0]}`.trim());
-  }
-  queries.push(cleanT);
+  try {
+    const url = "https://www.jiosaavn.com/api.php?_format=json&_marker=0&api_version=4&ctx=web6dot0&__call=search.getResults&q=" + encodeURIComponent(q) + "&p=0&n=6";
+    const resp = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" },
+      signal: AbortSignal.timeout(2500)
+    });
+    if (resp.ok) {
+      const data = await resp.json();
+      const results = data.results || [];
+      for (const item of results) {
+        if (!isTitleMatch(item.title, cleanT)) continue;
+        if (isFakeCover(item.title, cleanT)) continue;
 
-  for (const q of queries.slice(0, 2)) {
-    try {
-      const url = "https://www.jiosaavn.com/api.php?_format=json&_marker=0&api_version=4&ctx=web6dot0&__call=search.getResults&q=" + encodeURIComponent(q) + "&p=0&n=6";
-      const resp = await fetch(url, {
-        headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" },
-        signal: AbortSignal.timeout(3000)
-      });
-      if (resp.ok) {
-        const data = await resp.json();
-        const results = data.results || [];
-        for (const item of results) {
-          if (!isTitleMatch(item.title, cleanT)) continue;
-          if (isFakeCover(item.title, cleanT)) continue;
+        const itemArtist = item.more_info?.artistMap?.primary_artists?.[0]?.name || item.more_info?.music || item.subtitle || "";
+        if (candidates.length > 0 && !isArtistMatch(itemArtist, candidates)) continue;
 
-          const itemArtist = item.more_info?.artistMap?.primary_artists?.[0]?.name || item.more_info?.music || item.subtitle || "";
-          if (candidates.length > 0 && !isArtistMatch(itemArtist, candidates)) continue;
-
-          const enc = item.more_info?.encrypted_media_url;
-          if (enc) {
-            const raw = decryptSaavnMediaUrl(enc);
-            if (raw && raw.includes("saavncdn.com")) {
-              const streamUrl = raw.replace(/_\d+\.mp4$/, `${bitrateSuffix}.mp4`);
-              const duration = Number(item.more_info?.duration) || 210;
-              return { kind: "audio", url: streamUrl, duration, source: "saavn-320" };
-            }
+        const enc = item.more_info?.encrypted_media_url;
+        if (enc) {
+          const raw = decryptSaavnMediaUrl(enc);
+          if (raw && raw.includes("saavncdn.com")) {
+            const streamUrl = raw.replace(/_\d+\.mp4$/, `${bitrateSuffix}.mp4`);
+            const duration = Number(item.more_info?.duration) || 210;
+            return { kind: "audio", url: streamUrl, duration, source: "saavn-320" };
           }
         }
       }
-    } catch {}
-  }
+    }
+  } catch {}
   return null;
 }
 
@@ -177,14 +170,14 @@ async function resolveAudius(title, artist) {
   try {
     const q = encodeURIComponent(`${artist} ${title}`.trim());
     const search = await fetch(`https://api.audius.co/v1/tracks/search?query=${q}&app_name=montanha-music`, {
-      signal: AbortSignal.timeout(3000)
+      signal: AbortSignal.timeout(2500)
     });
     if (!search.ok) return null;
     const { data = [] } = await search.json();
     const hit = data.find((t) => t.is_streamable !== false && sameSong(title, artist, t));
     if (!hit) return null;
     const stream = await fetch(`https://api.audius.co/v1/tracks/${hit.id}/stream?no_redirect=true&app_name=montanha-music`, {
-      signal: AbortSignal.timeout(3000)
+      signal: AbortSignal.timeout(2500)
     });
     if (!stream.ok) return null;
     const { data: url } = await stream.json();
@@ -204,13 +197,13 @@ async function resolveSoundCloud(title, artist) {
     let clientId = await getSoundCloudClientId();
     let resp = await fetch(
       `https://api-v2.soundcloud.com/search/tracks?q=${encodeURIComponent(q)}&limit=10&client_id=${clientId}`,
-      { signal: AbortSignal.timeout(3500) }
+      { signal: AbortSignal.timeout(2800) }
     );
     if (resp.status === 401 || resp.status === 403) {
       clientId = await getSoundCloudClientId(true);
       resp = await fetch(
         `https://api-v2.soundcloud.com/search/tracks?q=${encodeURIComponent(q)}&limit=10&client_id=${clientId}`,
-        { signal: AbortSignal.timeout(3500) }
+        { signal: AbortSignal.timeout(2800) }
       );
     }
     if (!resp.ok) return null;
@@ -231,7 +224,7 @@ async function resolveSoundCloud(title, artist) {
       const chosen = prog || hlsMp4 || hlsMp3 || transcodings[0];
       if (!chosen?.url) continue;
 
-      const streamResp = await fetch(`${chosen.url}?client_id=${clientId}`, { signal: AbortSignal.timeout(3000) });
+      const streamResp = await fetch(`${chosen.url}?client_id=${clientId}`, { signal: AbortSignal.timeout(2500) });
       if (!streamResp.ok) continue;
       const streamData = await streamResp.json();
       if (streamData?.url) {
@@ -260,7 +253,7 @@ async function resolveYouTube(title, artist, knownId) {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Accept-Language": "en-US,en;q=0.9"
       },
-      signal: AbortSignal.timeout(3500)
+      signal: AbortSignal.timeout(3000)
     });
     if (ytResp.ok) {
       const html = await ytResp.text();
@@ -295,14 +288,21 @@ export async function onRequest(context) { const { request } = context;
       }
 
       if (title || artist) {
-        const saavnRes = await resolveJioSaavn(title, artist, quality);
-        if (saavnRes) return new Response(JSON.stringify(saavnRes), { headers: corsHeaders });
+        // EXECUÇÃO PARALELA ULTRA-RÁPIDA (< 1s): Dispara JioSaavn, SoundCloud e Audius juntos
+        const [saavnRes, scRes, audiusRes] = await Promise.allSettled([
+          resolveJioSaavn(title, artist, quality),
+          resolveSoundCloud(title, artist),
+          resolveAudius(title, artist)
+        ]);
 
-        const audiusRes = await resolveAudius(title, artist);
-        if (audiusRes) return new Response(JSON.stringify(audiusRes), { headers: corsHeaders });
+        const bestAudio =
+          (saavnRes.status === "fulfilled" && saavnRes.value) ||
+          (scRes.status === "fulfilled" && scRes.value) ||
+          (audiusRes.status === "fulfilled" && audiusRes.value);
 
-        const scRes = await resolveSoundCloud(title, artist);
-        if (scRes) return new Response(JSON.stringify(scRes), { headers: corsHeaders });
+        if (bestAudio) {
+          return new Response(JSON.stringify(bestAudio), { headers: corsHeaders });
+        }
       }
 
       const ytRes = await resolveYouTube(title, artist, youtubeId);
@@ -329,7 +329,7 @@ export async function onRequest(context) { const { request } = context;
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "Accept-Language": "en-US,en;q=0.9"
           },
-          signal: AbortSignal.timeout(3500)
+          signal: AbortSignal.timeout(3000)
         });
         if (ytResp.ok) {
           const html = await ytResp.text();

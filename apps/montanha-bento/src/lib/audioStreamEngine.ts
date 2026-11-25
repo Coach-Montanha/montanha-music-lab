@@ -61,7 +61,7 @@ export async function fetchAudioStream(
     if (youtubeId) qs.set('youtubeId', youtubeId);
 
     const r = await fetch(`/api/stream?${qs.toString()}`, {
-      signal: AbortSignal.timeout(6000)
+      signal: AbortSignal.timeout(9000)
     });
     if (r.ok) {
       const data = (await r.json()) as StreamResult;
