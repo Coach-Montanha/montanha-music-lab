@@ -82,6 +82,7 @@ import { fetchRealTrackCover, cacheImageLocally, downloadImageFile, enrichPlayli
 import { fetchAudioStream, invalidateStream, getCachedStream, isDisallowedPreview, YouTubeAdapter, StreamResult } from './lib/audioStreamEngine';
 import { fetchLyrics, LyricsData } from './lib/lyricsEngine';
 import { autoHealOrSubstituteSong } from './lib/songHealerEngine';
+import { preBufferEngine } from './lib/preBufferEngine';
 import Hls from 'hls.js';
 import { SilentHoldKeeper, GestureGuardian } from 'pwa-audio-player';
 import { GenreCategory } from './lib/genresData';
@@ -993,6 +994,19 @@ export default function App() {
     };
   }, []);
 
+  // Monitoramento de Contexto Ativo para Pré-Buffer com Janela Deslizante de 15s e Esvaziamento Imediato
+  useEffect(() => {
+    if (selectedPlaylist && selectedPlaylist.songs && selectedPlaylist.songs.length > 0) {
+      preBufferEngine.setContext(`pl_${selectedPlaylist.id}`, selectedPlaylist.songs);
+    }
+  }, [selectedPlaylist?.id, selectedPlaylist?.songs?.length]);
+
+  useEffect(() => {
+    if (viewingEntity && viewingEntity.songs && viewingEntity.songs.length > 0) {
+      preBufferEngine.setContext(`entity_${viewingEntity.name}_${viewingEntity.type}`, viewingEntity.songs);
+    }
+  }, [viewingEntity?.name, viewingEntity?.songs?.length]);
+
   // Inicialização do SilentHoldKeeper, Web Audio Effects Engine e Otimizador Universal de Navegadores
   useEffect(() => {
     // Inicialização do YouTubeAdapter oficial para reprodução do YouTube
@@ -1564,6 +1578,7 @@ export default function App() {
       // 1. LIMPEZA IMEDIATA DE CACHE & PRELOAD: Purga qualquer stream remanescente da playlist anterior
       if (preloadTimeoutRef.current) clearTimeout(preloadTimeoutRef.current);
       nextSongStreamRef.current = null;
+      preBufferEngine.setContext(selectedPlaylist?.id || `ctx_${song.id}`, newQueue);
 
       // 2. ISOLAMENTO ESTRITO DA FILA: Define a nova playlist como fonte de verdade exclusiva
       const cleanQueue = [...newQueue];
@@ -1620,7 +1635,10 @@ export default function App() {
     // Isso garante que o Android / iOS considere a transição como contínua e NUNCA
     // bloqueie o áudio em background na tela bloqueada.
     // =========================================================================
-    const preloaded = takePreloaded(song.id);
+    const prebuf = preBufferEngine.getPrebuffered(song.id);
+    const preloaded = (prebuf && prebuf.stream.kind === 'audio')
+      ? { url: prebuf.stream.url, duration: prebuf.stream.duration }
+      : takePreloaded(song.id);
     const cachedStream = (preloaded && !isDisallowedPreview(preloaded.url, preloaded.duration))
       ? preloaded
       : getCachedStream(song);
@@ -1645,6 +1663,7 @@ export default function App() {
       audio.volume = isMuted ? 0 : volume;
       if (streamDuration) setDuration(streamDuration);
       schedulePreload(song);
+      preBufferEngine.onTrackChanged(song.id, queueRef.current);
 
       try {
         await audio.play();
@@ -1808,6 +1827,7 @@ export default function App() {
 
     // Dispara preload antecipado da faixa seguinte imediatamente
     schedulePreload(song);
+    preBufferEngine.onTrackChanged(song.id, queueRef.current);
 
     try {
       await audio.play();
@@ -2074,6 +2094,7 @@ export default function App() {
       originalQueueRef.current = [...pl.songs];
       if (preloadTimeoutRef.current) clearTimeout(preloadTimeoutRef.current);
       nextSongStreamRef.current = null;
+      preBufferEngine.setContext(`pl_${pl.id}`, pl.songs);
     }
   };
 
