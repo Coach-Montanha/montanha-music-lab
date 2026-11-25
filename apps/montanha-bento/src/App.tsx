@@ -82,6 +82,7 @@ import { fetchRealTrackCover, cacheImageLocally, downloadImageFile, enrichPlayli
 import { fetchAudioStream, invalidateStream, getCachedStream, isDisallowedPreview, YouTubeAdapter, StreamResult } from './lib/audioStreamEngine';
 import { fetchLyrics, LyricsData } from './lib/lyricsEngine';
 import { autoHealOrSubstituteSong } from './lib/songHealerEngine';
+import Hls from 'hls.js';
 import { SilentHoldKeeper, GestureGuardian } from 'pwa-audio-player';
 import { GenreCategory } from './lib/genresData';
 import { GenreExploreGrid } from './components/GenreExploreGrid';
@@ -292,7 +293,28 @@ export default function App() {
   const activeLyricRef = useRef<HTMLParagraphElement | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const hlsRef = useRef<Hls | null>(null);
   const [activePlayerType, setActivePlayerType] = useState<'native' | 'youtube'>('native');
+
+  const attachAudioSource = (audio: HTMLAudioElement, url: string) => {
+    if (hlsRef.current) {
+      try { hlsRef.current.destroy(); } catch {}
+      hlsRef.current = null;
+    }
+    const isHlsStream = url.includes('.m3u8');
+    if (isHlsStream && !audio.canPlayType('application/vnd.apple.mpegurl') && Hls.isSupported()) {
+      const hls = new Hls({
+        enableWorker: true,
+        lowLatencyMode: false,
+        backBufferLength: 30
+      });
+      hls.loadSource(url);
+      hls.attachMedia(audio);
+      hlsRef.current = hls;
+    } else {
+      audio.src = url;
+    }
+  };
   const activePlayerTypeRef = useRef<'native' | 'youtube'>('native');
   activePlayerTypeRef.current = activePlayerType;
   const ytHostRef = useRef<HTMLDivElement>(null);
@@ -1478,6 +1500,10 @@ export default function App() {
     if (!ytId) return false;
 
     try {
+      if (hlsRef.current) {
+        try { hlsRef.current.destroy(); } catch {}
+        hlsRef.current = null;
+      }
       if (audioRef.current) {
         try { audioRef.current.pause(); } catch {}
         audioRef.current.removeAttribute('src');
@@ -1614,7 +1640,7 @@ export default function App() {
     if (window.ytPlayer && typeof window.ytPlayer.stopVideo === 'function') {
       try { window.ytPlayer.stopVideo(); } catch {}
     }
-    audio.src = streamUrl;
+    attachAudioSource(audio, streamUrl);
       audio.currentTime = 0;
       audio.volume = isMuted ? 0 : volume;
       if (streamDuration) setDuration(streamDuration);
@@ -1766,7 +1792,7 @@ export default function App() {
     if (window.ytPlayer && typeof window.ytPlayer.stopVideo === 'function') {
       try { window.ytPlayer.stopVideo(); } catch {}
     }
-    audio.src = streamUrl;
+    attachAudioSource(audio, streamUrl);
     audio.currentTime = 0;
     audio.volume = isMuted ? 0 : volume;
     isFadingOutRef.current = false;

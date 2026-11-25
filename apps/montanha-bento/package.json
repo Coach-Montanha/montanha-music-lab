@@ -14,6 +14,7 @@
     "@distube/ytdl-core": "^5.2.1",
     "@supabase/supabase-js": "^2.119.0",
     "framer-motion": "^11.0.0",
+    "hls.js": "^1.7.4",
     "lucide-react": "^0.344.0",
     "pwa-audio-player": "^1.1.0",
     "react": "^18.2.0",

@@ -1,5 +1,29 @@
 import { createDecipheriv } from "node:crypto";
 
+let cachedScClientId = "Hpp4j7peQTPimFlKMjTX3y3mK2946b7y";
+let scClientIdFetchedAt = 0;
+
+async function getSoundCloudClientId(forceRefresh = false) {
+  const now = Date.now();
+  if (!forceRefresh && cachedScClientId && now - scClientIdFetchedAt < 3600 * 1000) {
+    return cachedScClientId;
+  }
+  try {
+    const page = await fetch("https://soundcloud.com", { signal: AbortSignal.timeout(3000) }).then((r) => r.text());
+    const scripts = [...page.matchAll(/src="(https:\/\/a-v2\.sndcdn\.com\/assets\/[^"]+\.js)"/g)].map((m) => m[1]);
+    for (const s of scripts.slice(-5)) {
+      const js = await fetch(s, { signal: AbortSignal.timeout(3000) }).then((r) => r.text());
+      const m = js.match(/client_id:"([a-zA-Z0-9]{32})"/);
+      if (m && m[1]) {
+        cachedScClientId = m[1];
+        scClientIdFetchedAt = now;
+        return cachedScClientId;
+      }
+    }
+  } catch {}
+  return cachedScClientId;
+}
+
 const norm = (s = "") =>
   s
     .toLowerCase()
@@ -25,7 +49,7 @@ function sanitizeTitle(str) {
     .replace(/\[.*?\]/g, "")
     .replace(/feat\..*$/i, "")
     .replace(/ft\..*$/i, "")
-    .replace(/[^\p{L}\p{N}\s\x27-]/gu, " ")
+    .replace(/[^\p{L}\p{N}\s'-]/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -49,9 +73,9 @@ function extractArtistCandidates(artistStr) {
   return candidates.length > 0 ? candidates : [normalized.trim()];
 }
 
-function isTitleMatch(saavnTitle, targetTitle) {
-  if (!saavnTitle || !targetTitle) return false;
-  const s = sanitizeTitle(saavnTitle).toLowerCase();
+function isTitleMatch(candTitle, targetTitle) {
+  if (!candTitle || !targetTitle) return false;
+  const s = sanitizeTitle(candTitle).toLowerCase();
   const t = sanitizeTitle(targetTitle).toLowerCase();
   if (s === t) return true;
   if (s.includes(t) || t.includes(s)) return true;
@@ -62,10 +86,10 @@ function isTitleMatch(saavnTitle, targetTitle) {
   return common.length >= Math.min(2, tWords.length) && common.length / Math.max(tWords.length, 1) >= 0.6;
 }
 
-function isArtistMatch(saavnArtist, candidates) {
+function isArtistMatch(candArtist, candidates) {
   if (!candidates || candidates.length === 0) return true;
-  if (!saavnArtist) return false;
-  const s = sanitizeTitle(saavnArtist).toLowerCase();
+  if (!candArtist) return false;
+  const s = sanitizeTitle(candArtist).toLowerCase();
   for (const cand of candidates) {
     const c = cand.toLowerCase();
     if (!c) continue;
@@ -83,7 +107,8 @@ function isFakeCover(title, query) {
   const qLower = (query || "").toLowerCase();
   const badMarkers = [
     "karaoke", "tribute", "originally performed by", "in the style of",
-    "instrumental version", "cover version", "8-bit", "16-bit", "chiptune", "midi version"
+    "instrumental version", "cover version", "8-bit", "16-bit", "chiptune", "midi version",
+    "slowed", "reverb", "nightcore", "sped up", "8d audio", "full album", "live at"
   ];
   return badMarkers.some((m) => lower.includes(m) && !qLower.includes(m));
 }
@@ -169,6 +194,59 @@ async function resolveAudius(title, artist) {
   }
 }
 
+async function resolveSoundCloud(title, artist) {
+  const cleanT = sanitizeTitle(title);
+  if (!cleanT) return null;
+  const candidates = extractArtistCandidates(artist);
+  const q = `${candidates[0] || artist || ""} ${cleanT}`.trim();
+
+  try {
+    let clientId = await getSoundCloudClientId();
+    let resp = await fetch(
+      `https://api-v2.soundcloud.com/search/tracks?q=${encodeURIComponent(q)}&limit=10&client_id=${clientId}`,
+      { signal: AbortSignal.timeout(3500) }
+    );
+    if (resp.status === 401 || resp.status === 403) {
+      clientId = await getSoundCloudClientId(true);
+      resp = await fetch(
+        `https://api-v2.soundcloud.com/search/tracks?q=${encodeURIComponent(q)}&limit=10&client_id=${clientId}`,
+        { signal: AbortSignal.timeout(3500) }
+      );
+    }
+    if (!resp.ok) return null;
+    const data = await resp.json();
+
+    for (const item of data.collection || []) {
+      if (item.policy !== "ALLOW" || !item.duration || item.duration < 60000 || item.duration > 600000) continue;
+      if (isFakeCover(item.title, title)) continue;
+      if (!isTitleMatch(item.title, cleanT)) continue;
+
+      const haystack = `${item.title || ""} ${item.user?.username || ""} ${item.publisher_metadata?.artist || ""}`;
+      if (candidates.length > 0 && !isArtistMatch(haystack, candidates)) continue;
+
+      const transcodings = item.media?.transcodings || [];
+      const prog = transcodings.find((x) => x.format?.protocol === "progressive");
+      const hlsMp4 = transcodings.find((x) => x.format?.protocol === "hls" && x.format?.mime_type?.includes("mp4"));
+      const hlsMp3 = transcodings.find((x) => x.format?.protocol === "hls" && x.format?.mime_type?.includes("mpeg"));
+      const chosen = prog || hlsMp4 || hlsMp3 || transcodings[0];
+      if (!chosen?.url) continue;
+
+      const streamResp = await fetch(`${chosen.url}?client_id=${clientId}`, { signal: AbortSignal.timeout(3000) });
+      if (!streamResp.ok) continue;
+      const streamData = await streamResp.json();
+      if (streamData?.url) {
+        return {
+          kind: "audio",
+          url: streamData.url,
+          duration: Math.round(item.duration / 1000),
+          source: chosen.format?.protocol === "progressive" ? "soundcloud-mp3" : "soundcloud-hls"
+        };
+      }
+    }
+  } catch {}
+  return null;
+}
+
 async function resolveYouTube(title, artist, knownId) {
   if (knownId && /^[a-zA-Z0-9_-]{11}$/.test(knownId)) {
     return { kind: "youtube", videoId: knownId };
@@ -195,43 +273,82 @@ async function resolveYouTube(title, artist, knownId) {
   return null;
 }
 
-export async function onRequest(context) {
-  const { request } = context;
-  const url = new URL(request.url);
+export async function onRequest(context) { const { request } = context;
+    const url = new URL(request.url);
 
-  const corsHeaders = {
-    "Content-Type": "application/json",
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
-    "Cache-Control": "public, max-age=86400, s-maxage=604800"
-  };
+    if (url.pathname === "/api/stream") {
+      const title = (url.searchParams.get("title") || url.searchParams.get("t") || "").trim();
+      const artist = (url.searchParams.get("artist") || url.searchParams.get("a") || "").trim();
+      const youtubeId = (url.searchParams.get("youtubeId") || url.searchParams.get("id") || "").replace(/^yt-/, "").split("&")[0].trim();
+      const quality = (url.searchParams.get("quality") || "high").trim();
 
-  if (request.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+      const corsHeaders = {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+        "Cache-Control": "public, max-age=3600, s-maxage=3600"
+      };
 
-  const title = (url.searchParams.get("title") || url.searchParams.get("t") || "").trim();
-  const artist = (url.searchParams.get("artist") || url.searchParams.get("a") || "").trim();
-  const youtubeId = (url.searchParams.get("youtubeId") || url.searchParams.get("id") || "").replace(/^yt-/, "").split("&")[0].trim();
-  const quality = (url.searchParams.get("quality") || "high").trim();
+      if (request.method === "OPTIONS") {
+        return new Response(null, { headers: corsHeaders });
+      }
 
-  if (title || artist) {
-    const saavnRes = await resolveJioSaavn(title, artist, quality);
-    if (saavnRes) {
-      return new Response(JSON.stringify(saavnRes), { headers: corsHeaders });
+      if (title || artist) {
+        const saavnRes = await resolveJioSaavn(title, artist, quality);
+        if (saavnRes) return new Response(JSON.stringify(saavnRes), { headers: corsHeaders });
+
+        const audiusRes = await resolveAudius(title, artist);
+        if (audiusRes) return new Response(JSON.stringify(audiusRes), { headers: corsHeaders });
+
+        const scRes = await resolveSoundCloud(title, artist);
+        if (scRes) return new Response(JSON.stringify(scRes), { headers: corsHeaders });
+      }
+
+      const ytRes = await resolveYouTube(title, artist, youtubeId);
+      if (ytRes) return new Response(JSON.stringify(ytRes), { headers: corsHeaders });
+
+      return new Response(JSON.stringify({ kind: "unavailable" }), { headers: corsHeaders });
     }
 
-    const audiusRes = await resolveAudius(title, artist);
-    if (audiusRes) {
-      return new Response(JSON.stringify(audiusRes), { headers: corsHeaders });
+    if (url.pathname === "/api/youtube-search") {
+      const q = (url.searchParams.get("q") || "").trim();
+      const corsHeaders = {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*"
+      };
+
+      if (!q) {
+        return new Response(JSON.stringify({ results: [] }), { headers: corsHeaders });
+      }
+
+      try {
+        const ytSearchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
+        const ytResp = await fetch(ytSearchUrl, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9"
+          },
+          signal: AbortSignal.timeout(3500)
+        });
+        if (ytResp.ok) {
+          const html = await ytResp.text();
+          const matches = [...html.matchAll(/"videoId":"([a-zA-Z0-9_-]{11})"/g)];
+          const seen = new Set();
+          const results = [];
+          for (const m of matches) {
+            const id = m[1];
+            if (!seen.has(id)) {
+              seen.add(id);
+              results.push({ id, title: q });
+              if (results.length >= 10) break;
+            }
+          }
+          return new Response(JSON.stringify({ results }), { headers: corsHeaders });
+        }
+      } catch {}
+
+      return new Response(JSON.stringify({ results: [] }), { headers: corsHeaders });
     }
-  }
 
-  const ytRes = await resolveYouTube(title, artist, youtubeId);
-  if (ytRes) {
-    return new Response(JSON.stringify(ytRes), { headers: corsHeaders });
-  }
-
-  return new Response(JSON.stringify({ kind: "unavailable" }), { headers: corsHeaders });
-}
+    return new Response("Not Found", { status: 404 }); }
