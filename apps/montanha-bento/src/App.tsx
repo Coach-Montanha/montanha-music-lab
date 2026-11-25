@@ -938,6 +938,8 @@ export default function App() {
     };
   }, [isPlaying]);
 
+  const wasBackgroundPausedRef = useRef(false);
+
   // Manutenção Contínua de Áudio em Background ao Travar a Tela do Celular (Android / iOS)
   useEffect(() => {
     const handleVisibility = () => {
@@ -952,8 +954,9 @@ export default function App() {
           }
         }
       } else {
-        // Ao reativar a tela: garante sincronia e foco contínuo
-        if (isPlayingRef.current && !userInitiatedPauseRef.current) {
+        // Ao reativar a tela ou voltar para o app: retoma se o SO pausou involuntariamente
+        if (!userInitiatedPauseRef.current && (isPlayingRef.current || wasBackgroundPausedRef.current)) {
+          wasBackgroundPausedRef.current = false;
           if (activePlayerTypeRef.current === 'youtube') {
             ytAdapterRef.current?.resume();
           } else if (audioRef.current && audioRef.current.paused && audioRef.current.src) {
@@ -964,7 +967,6 @@ export default function App() {
     };
     window.addEventListener('focus', handleVisibility);
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('focus', handleVisibility);
     };
   }, []);
@@ -983,6 +985,7 @@ export default function App() {
           }
         },
         onPlaying: () => {
+          wasBackgroundPausedRef.current = false;
           setIsPlaying(true);
           isPlayingRef.current = true;
           userInitiatedPauseRef.current = false;
@@ -991,17 +994,25 @@ export default function App() {
         },
         onPaused: () => {
           if (userInitiatedPauseRef.current) {
+            wasBackgroundPausedRef.current = false;
             setIsPlaying(false);
             isPlayingRef.current = false;
             audioAnchor.pause();
             mediaSessionController.updatePlaybackState(false);
           } else {
-            // Pausa involuntária do SO móvel (tela apagada / troca de app)
-            // IGNORA a pausa do sistema e força o resume imediato com audioAnchor!
+            // Tenta manter ativo em background; se o SO móvel bloquear, sincroniza UI para nunca congelar em 'play'
             audioAnchor.play();
             setTimeout(() => {
               if (!userInitiatedPauseRef.current && isPlayingRef.current) {
                 ytAdapterRef.current?.resume();
+                setTimeout(() => {
+                  if (ytAdapterRef.current?.isPaused() && !userInitiatedPauseRef.current) {
+                    wasBackgroundPausedRef.current = true;
+                    setIsPlaying(false);
+                    isPlayingRef.current = false;
+                    mediaSessionController.updatePlaybackState(false);
+                  }
+                }, 350);
               }
             }, 60);
           }
@@ -1015,8 +1026,12 @@ export default function App() {
 
     browserOptimizer.init();
 
-    if (audioRef.current) {
-      audioEffectsEngine.attach(audioRef.current);
+    const isMobileOrTablet = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(navigator.userAgent);
+    if (audioRef.current && !isMobileOrTablet) {
+      const savedEq = localStorage.getItem('montanha_equalizer');
+      if (savedEq && savedEq !== 'flat') {
+        audioEffectsEngine.attach(audioRef.current);
+      }
     }
 
     if (audioRef.current && !silentHoldRef.current) {
@@ -5207,30 +5222,30 @@ export default function App() {
           </div>
 
           {/* Direita: Controles Essenciais Touch-Friendly */}
-          <div className="flex items-center gap-1.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
             {/* Letra no mobile mini-player */}
             <button
               onClick={() => {
                 setShowLyrics(true);
                 setIsFullScreenPlayer(true);
               }}
-              className="p-2 rounded-xl text-neutral-300 hover:text-white transition"
+              className="p-1.5 rounded-xl text-neutral-300 hover:text-white transition"
               title="Ver Letra / Karaokê"
             >
-              <Mic2 size={18} />
+              <Mic2 size={17} />
             </button>
 
             {/* Fila com badge */}
             <button
               onClick={() => setIsQueueOpen(!isQueueOpen)}
-              className={`p-2 rounded-xl transition relative ${
+              className={`p-1.5 rounded-xl transition relative ${
                 isQueueOpen
                   ? 'bg-[#1DB954]/20 text-[#1DB954]'
                   : 'text-neutral-300 hover:text-white'
               }`}
               title="Abrir Fila de Reprodução"
             >
-              <ListMusic size={18} />
+              <ListMusic size={17} />
               {queue.length > 0 && (
                 <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-[#1DB954] text-[9px] font-black text-black shadow">
                   {queue.length}
@@ -5238,22 +5253,31 @@ export default function App() {
               )}
             </button>
 
+            {/* Retroceder / Faixa Anterior */}
+            <button
+              onClick={handlePrevSong}
+              className="p-1.5 text-neutral-300 active:text-white transition"
+              title="Faixa Anterior"
+            >
+              <SkipBack size={17} fill="currentColor" />
+            </button>
+
             {/* Play/Pause */}
             <button
               onClick={togglePlay}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-black active:scale-95 transition shadow ml-0.5"
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-black active:scale-95 transition shadow mx-0.5"
               title={isPlaying ? "Pausar" : "Tocar"}
             >
-              {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" className="ml-0.5" />}
+              {isPlaying ? <Pause size={17} fill="currentColor" /> : <Play size={17} fill="currentColor" className="ml-0.5" />}
             </button>
 
             {/* Próxima */}
             <button
               onClick={handleNextSong}
-              className="p-2 text-neutral-300 active:text-white transition"
+              className="p-1.5 text-neutral-300 active:text-white transition"
               title="Próxima Faixa"
             >
-              <SkipForward size={18} fill="currentColor" />
+              <SkipForward size={17} fill="currentColor" />
             </button>
           </div>
         </div>
